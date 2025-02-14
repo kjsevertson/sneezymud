@@ -11,8 +11,22 @@
 #include "room.h"
 #include "connect.h"
 
+
 int task_rest(TBeing* ch, cmdTypeT cmd, const char* arg, int pulse, TRoom*,
   TObj*) {
+  int mod = 1;
+  if (ch->inCamp()) {
+    mod *= 1.3;
+  }
+  if (ch->hasClass(CLASS_THIEF) && ch->isAffected(SKILL_CONCEALMENT)) {
+    mod *= 1.5;
+  }
+  if (ch->roomp->hasMobToCuddle()) {
+    mod *= 1.3;
+  }
+  if (ch->roomp->hasCampfire()) {
+    mod *= 1.3;
+  }
   if (ch->isLinkdead() || (ch->getPosition() != POSITION_RESTING)) {
     ch->stopTask();
     return FALSE;
@@ -38,13 +52,13 @@ int task_rest(TBeing* ch, cmdTypeT cmd, const char* arg, int pulse, TRoom*,
                   "Your lack of activity drains your precious lifeforce.\n\r");
               }
             } else {
-              ch->addToHit(1);
+              ch->addToHit(1*mod);
             }
           } else {
-            ch->addToHit(1);
+            ch->addToHit(1*mod);
           }
           if (ch->getMove() < ch->moveLimit())
-            ch->addToMove(1);
+            ch->addToMove(1*mod);
           if (ch->desc && ch->ansi()) {
             ch->desc->updateScreenAnsi(CHANGED_HP);
             ch->desc->updateScreenAnsi(CHANGED_MANA);

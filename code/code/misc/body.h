@@ -11,7 +11,8 @@
 //  This is an attempt to make some sense out of the limb system.
 #pragma once
 
-#include "limbs.h"
+#include <cstring>
+void test(const char* str) {std::strlen(str);}
 
 const int MAX_SHEATH = 3;
 

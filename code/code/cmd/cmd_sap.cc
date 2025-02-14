@@ -2,8 +2,8 @@
 #include "being.h"
 #include "combat.h"
 #include "obj_base_weapon.h"
-
-int TBeing::doSlam(const char* argument, TBeing* vict) {
+/*
+int TBeing::doSap(const char* argument, TBeing* vict) {
   int rc;
   TBeing* victim;
   const int SLAM_MOVE = 3;
@@ -13,7 +13,7 @@ int TBeing::doSlam(const char* argument, TBeing* vict) {
   }
 
   // Ensure player even knows the skill before continuing
-  if (!doesKnowSkill(SKILL_SLAM)) {
+  if (!doesKnowSkill(SKILL_SAP)) {
     sendTo(
       "You wouldn't even know where to begin in executing that maneuver.\n\r");
     return false;
@@ -32,14 +32,14 @@ int TBeing::doSlam(const char* argument, TBeing* vict) {
     return false;
   }
 
-  auto* weapon = dynamic_cast<TBaseWeapon*>(heldInPrimHand());
+  auto* weapon = dynamic_cast<TGenWeapon*>(heldInPrimHand());
 
   // Ensure this isn't a peaceful room
   if (checkPeaceful("You feel too peaceful to contemplate violence.\n\r"))
     return false;
 
   // Make sure the player has enough vitality to use the skill
-  if (getMove() < SLAM_MOVE) {
+  if (getMove() < SAP_MOVE) {
     sendTo("You don't have the vitality to make the move!\n\r");
     return false;
   }
@@ -78,9 +78,9 @@ int TBeing::doSlam(const char* argument, TBeing* vict) {
   if (!(isImmortal() || IS_SET(specials.act, ACT_IMMORTAL)))
     addToMove(-SLAM_MOVE);
 
-  int skillValue = getSkillValue(SKILL_SLAM);
-  int successfulHit = specialAttack(victim, SKILL_SLAM);
-  int successfulSkill = bSuccess(skillValue, SKILL_SLAM);
+  int skillValue = getSkillValue(SKILL_SAP);
+  int successfulHit = specialAttack(victim, SKILL_SAP);
+  int successfulSkill = bSuccess(skillValue, SKILL_SAP);
 
   // Success use case
   if (!victim->awake() || (successfulHit && successfulSkill &&
@@ -93,7 +93,7 @@ int TBeing::doSlam(const char* argument, TBeing* vict) {
   }
 
   if (rc)
-    addSkillLag(SKILL_SLAM, rc);
+    addSkillLag(SKILL_SAP, rc);
 
   if (IS_SET_DELETE(rc, DELETE_VICT)) {
     if (vict)
@@ -111,10 +111,10 @@ int TBeing::doSlam(const char* argument, TBeing* vict) {
 }
 
 int TBeing::slamSuccess(TBeing* victim) {
-  int skillLevel = getSkillLevel(SKILL_SLAM);
+  int skillLevel = getSkillLevel(SKILL_SAP);
   int dam =
-    getSkillDam(victim, SKILL_SLAM, skillLevel, getAdvLearning(SKILL_SLAM));
-  auto* weapon = dynamic_cast<TBaseWeapon*>(heldInPrimHand());
+    getSkillDam(victim, SKILL_SAP, skillLevel, getAdvLearning(SKILL_SAP));
+  auto* weapon = dynamic_cast<TGenWeapon*>(heldInPrimHand());
 
   // Scaling damage here due to the limitations of getSkillDam and how it treats
   // skills learned at low levels This formula is designed to allow the damage
@@ -139,20 +139,7 @@ int TBeing::slamSuccess(TBeing* victim) {
   dam = max((int)(victim->hitLimit() * scalingConstant), dam);
 
   // Send description text to players in the room
-  if (getCombatMode() == ATTACK_BERSERK) {
-    dam *= 2;
-    act(
-      "$n slams $N with $s weapon in a <R>berserk fury<z>, inflicting "
-      "considerable damage!",
-      FALSE, this, 0, victim, TO_NOTVICT);
-    act(
-      "You slam your weapon into $N in a <R>berserk fury<z>, inflicting "
-      "considerable damage!",
-      FALSE, this, 0, victim, TO_CHAR);
-    act("$n slams $s weapon into you with a <r>berserker's <z>zeal!", FALSE,
-      this, 0, victim, TO_VICT);
-
-  } else {
+  if  (){
     act("$n slams $N with $s weapon, inflicting considerable damage!", FALSE,
       this, 0, victim, TO_NOTVICT);
     act("You slam your weapon into $N, inflicting considerable damage!", FALSE,
@@ -164,20 +151,13 @@ int TBeing::slamSuccess(TBeing* victim) {
   // Determine damage type
   spellNumT damageType = DAMAGE_NORMAL;
 
-  if (weapon->isBluntWeapon())
-    damageType = DAMAGE_CAVED_SKULL;
-  else if (weapon->isPierceWeapon())
-    damageType = DAMAGE_IMPALE;
-  else if (weapon->isSlashWeapon())
-    damageType = DAMAGE_HACKED;
-  // Reconcile damage
   if (reconcileDamage(victim, dam, damageType) == -1)
     return DELETE_VICT;
 
   return true;
 }
 
-int TBeing::slamFail(TBeing* victim) {
+int TBeing::sapFail(TBeing* victim) {
   if (victim->getPosition() > POSITION_DEAD) {
     act(
       "$n's attempt at slamming $N's with $s his weapon fails to make contact.",
@@ -188,8 +168,9 @@ int TBeing::slamFail(TBeing* victim) {
       this, 0, victim, TO_VICT);
   }
 
-  if (reconcileDamage(victim, 0, SKILL_SLAM) == -1)
+  if (reconcileDamage(victim, 0, SKILL_SAP) == -1)
     return DELETE_VICT;
 
   return true;
 }
+*/

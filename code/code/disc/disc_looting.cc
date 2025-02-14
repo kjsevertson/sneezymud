@@ -15,6 +15,8 @@
 #include "disc_looting.h"
 #include "obj_trap.h"
 #include "obj_portal.h"
+#include "trap.h"
+#include "low.h"
 
 int TBeing::doSearch(const char* argument) {
   int rc;
@@ -129,6 +131,118 @@ int detectSecret(TBeing* thief) {
   thief->setMove(max(0, (thief->getMove() - 30)));
   return TRUE;
 }
+// Make the function return void since you don't actually need a return value from it
+void reclaimTrapComps (TBeing* thief, sstring trap_type, TTrap* trap) {
+  int item1, item2, item3;
+
+  if (trap_type == "fire") {
+    item1 = Obj::ST_FLINT;
+    item2 = Obj::ST_SULPHUR;
+    item3 = Obj::ST_BAG;
+  } else if (trap_type == "explosive") {
+    item1 = Obj::ST_FLINT;
+    item2 = Obj::ST_SULPHUR;
+    item3 = Obj::ST_HYDROGEN;
+  } else if (trap_type == "poison") {
+    if (trap->isGrenade() || trap->isLandMine()) {
+      item1 = Obj::ST_CANISTER;
+      item2 = Obj::ST_SPRING;
+      item3 = Obj::ST_CON_POISON;
+    } else {
+      item1 = Obj::ST_NEEDLE;
+      item2 = Obj::ST_SPRING;
+      item3 = Obj::ST_POISON;
+    }
+  } else if (trap_type == "sleep") {
+    item1 = Obj::ST_NOZZLE;
+    item2 = Obj::ST_GAS;
+    item3 = Obj::ST_HOSE;
+  } else if (trap_type == "acid") {     
+    if (trap->isGrenade()|| trap->isLandMine()) {
+      item1 = Obj::ST_CANISTER;
+      item2 = Obj::ST_SPRING;
+      item3 = Obj::ST_ACID_VIAL;
+    } else {
+      item1 = Obj::ST_NOZZLE;
+      item2 = Obj::ST_ACID_VIAL;
+      item3 = Obj::ST_BELLOWS;
+    }
+  } else if (trap_type == "spore") {     
+    if (trap->isGrenade()|| trap->isLandMine()) {
+      item1 = Obj::ST_CANISTER;
+      item2 = Obj::ST_SPRING;
+      item3 = Obj::ST_FUNGUS;
+    } else {
+      item1 = Obj::ST_FUNGUS;
+      item2 = Obj::ST_NOZZLE;
+      item3 = Obj::ST_BELLOWS;
+    }
+  } else if (trap_type == "spike") {
+    item1 = Obj::ST_SPIKE;
+    item2 = Obj::ST_SPRING;
+    item3 = Obj::ST_TRIPWIRE;
+  } else if (trap_type == "bolt") {
+      item1 = Obj::ST_TUBING;
+      item2 = Obj::ST_CGAS;
+      item3 = Obj::ST_BOLTS;
+  } else if (trap_type == "blade") {
+    item1 = Obj::ST_RAZOR_BLADE;
+    item2 = Obj::ST_SPRING;
+    item3 = Obj::ST_TRIPWIRE;
+  } else if (trap_type == "disk") {
+    item1 = Obj::ST_RAZOR_DISK;
+    item2 = Obj::ST_SPRING;
+    item3 = Obj::ST_CANISTER;
+  } else if (trap_type == "hammer") {
+    item1 = Obj::ST_CONCRETE;
+    item2 = Obj::ST_WEDGE;
+    item3 = Obj::ST_TRIPWIRE;
+  } else if (trap_type == "pebble") {
+    item1 = Obj::ST_TUBING;
+    item2 = Obj::ST_CGAS;
+    item3 = Obj::ST_PEBBLES;
+  } else if (trap_type == "frost") {
+    item1 = Obj::ST_NOZZLE;
+    item2 = Obj::ST_HOSE;
+    item3 = Obj::ST_FROST;
+  } else if (trap_type == "teleport") {     
+    if (trap->isGrenade()|| trap->isLandMine()) {
+      item1 = Obj::ST_PENTAGRAM;
+      item2 = Obj::ST_CRYSTALINE;
+      item3 = Obj::ST_BLINK;
+    } else {
+      item1 = Obj::ST_PENTAGRAM;
+      item2 = Obj::ST_TRIPWIRE;
+      item3 = Obj::ST_BLINK;
+    }
+  } else if (trap_type == "power") {     
+    if (trap->isGrenade()|| trap->isLandMine()) {
+      item1 = Obj::ST_PENTAGRAM;
+      item2 = Obj::ST_CRYSTALINE;
+      item3 = Obj::ST_ATHANOR;
+    } else {
+      item1 = Obj::ST_PENTAGRAM;
+      item2 = Obj::ST_TRIPWIRE;
+      item3 = Obj::ST_ATHANOR;
+    }
+  } else {
+    return;
+  } 
+
+  // Can just pass VIRTUAL instead of REAL here to let read_object call 'real_object()' internally
+  TObj* comp1 = read_object(item1, VIRTUAL);
+  TObj* comp2 = read_object(item2, VIRTUAL);
+  TObj* comp3 = read_object(item3, VIRTUAL);
+  
+  if (!comp1 || !comp2 || !comp3) {
+    // This will just cause the function to fail silently if read_object doesn't return a valid object
+    return;
+  }
+  
+  *thief += *comp1;
+  *thief += *comp2;
+  *thief += *comp3;
+}
 
 int TBeing::disarmTrap(const char* arg, TObj* tp) {
   int rc;
@@ -179,32 +293,38 @@ int TObj::disarmMe(TBeing* thief) {
   return FALSE;
 }
 
-int TTrap::disarmMe(TBeing* thief) {
-  int rc;
-  char trap_type[80];
-  int bKnown = thief->getSkillValue(SKILL_DISARM_TRAP);
-
+int TTrap::disarmMe(TBeing* thief) {  
   if (getTrapCharges() <= 0) {
     thief->sendTo("That trap is already disarmed.\n\r");
-    return FALSE;
+    return false;
   }
 
-  strcpy(trap_type, trap_types[getTrapDamType()].c_str());
+  sstring trap_type = trap_types[getTrapDamType()];
 
-  if (thief->bSuccess(bKnown, SKILL_DISARM_TRAP)) {
+  if (thief->bSuccess(SKILL_DISARM_TRAP)) {
     thief->sendTo(format("Click.  You disarm the %s trap.\n\r") % trap_type);
-    act("$n disarms $p.", FALSE, thief, this, 0, TO_ROOM);
+    act("$n disarms $p.", false, thief, this, nullptr, TO_ROOM);
+
     setTrapCharges(0);
-    return TRUE;
-  } else {
-    thief->sendTo("Click. (whoops)\n\r");
-    act("$n tries to disarm $p.", FALSE, thief, this, 0, TO_ROOM);
-    rc = thief->triggerTrap(this);
-    if (IS_SET_DELETE(rc, DELETE_THIS)) {
-      return DELETE_VICT;
+
+    if ((isGrenade() && thief->doesKnowSkill(SKILL_SET_TRAP_GREN)) ||
+        (isLandMine() && thief->doesKnowSkill(SKILL_SET_TRAP_MINE)) || 
+        (!isGrenade() && !isLandMine() && thief->doesKnowSkill(SKILL_SET_TRAP_CONT)) {
+      reclaimTrapComps(thief, trap_type, this);
     }
-    return TRUE;
+
+    return true;
+  } 
+
+  thief->sendTo("Click. (whoops)\n\r");
+  act("$n tries to disarm $p.", false, thief, this, nullptr, TO_ROOM);
+
+  int rc = thief->triggerTrap(this);
+  if (IS_SET_DELETE(rc, DELETE_THIS)) {
+    return DELETE_VICT;
   }
+
+  return true; 
 }
 
 int disarmTrapObj(TBeing* thief, TObj* trap) {
@@ -245,6 +365,9 @@ int disarmTrapDoor(TBeing* thief, dirTypeT door) {
     if ((rp = real_roomp(exitp->to_room)) &&
         (back = rp->dir_option[rev_dir(door)])) {
       REMOVE_BIT(back->condition, EXIT_TRAPPED);
+    }
+    if (thief->doesKnowSkill(SKILL_SET_TRAP_DOOR)) {
+      reclaimTrapComps(thief, trap_type, nullptr);
     }
     return TRUE;
   } else {

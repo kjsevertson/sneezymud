@@ -1469,7 +1469,7 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
               act("In the distance, $p embeds itself in $N.", TRUE, ch, this,
                 tb, TO_CHAR);
             if (spec)
-              checkSpec(ch, CMD_ARROW_EMBED, "", NULL);
+              checkSpec(tb, CMD_ARROW_EMBED, "", NULL);
           } else {
             if (!ch->sameRoom(*tb))
               act("In the distance, $N is hit by $p.", TRUE, ch, this, tb,

@@ -3895,8 +3895,10 @@ int TBeing::getGrenadeTrapDam(doorTrapT trap_type) {
   // i kept the damage on them lower then other traps.
   // this is number of d8 to use when calculating damage
   // base range: 5 - 30
+  // getSkillLevel refers to PC level (1-50)
   int damage = 5 + getSkillLevel(SKILL_SET_TRAP_GREN) / 2;
 
+//getGrenadeTrapLearn refers to skill learnedness (1-100)
   damage *= getGrenadeTrapLearn(trap_type);
   damage /= 100;
 

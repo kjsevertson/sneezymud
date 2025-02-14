@@ -66,8 +66,9 @@ const unsigned short int PART_TRANSFORMED = (1 << 9);
 const unsigned short int PART_ENTANGLED = (1 << 10);
 const unsigned short int PART_BRUISED = (1 << 11);
 const unsigned short int PART_GANGRENOUS = (1 << 12);
+const unsigned short int PART_CORRODED = (1 << 13);
 
-const int MAX_PARTS = 12;  // move and change
+const int MAX_PARTS = 13;  // move and change
 
 /* 'class' for PC's */
 const unsigned short CLASS_MAGE = (1 << 0);      // 1

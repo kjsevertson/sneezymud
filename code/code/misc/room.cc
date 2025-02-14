@@ -473,3 +473,36 @@ TThing* TRoom::findInRoom(const std::function<bool(TThing*)>& predicate) {
   auto found = std::find_if(stuff.begin(), stuff.end(), predicate);
   return found != stuff.end() ? *found : nullptr;
 }
+
+
+bool TRoom::hasMobToCuddle() {
+  for (TThing* thing : stuff) {
+    auto* mob = dynamic_cast<TMonster*>(thing);
+    if (mob && (mob->getRace() == RACE_CANINE || mob->getRace() == RACE_FELINE)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+bool TRoom::hasCampfire() {
+  
+  for (auto* obj : stuff) {
+    auto* log = dynamic_cast<TOrganic*>(obj);
+    if (log && (log->getOType() = ORGANIC_WOOD) && (log->isObjStat(ITEM_BURNING()))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+TPool* TRoom::hasPool(liqTypeT liq) {
+  for (TThing* thing : stuff) {
+    auto* pool = dynamic_cast<TPool*>(thing);
+    if (pool && pool->getDrinkType() == liq) {
+      return pool;
+    }
+  }
+  return nullptr;
+}

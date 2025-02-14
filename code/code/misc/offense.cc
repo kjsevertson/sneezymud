@@ -1798,7 +1798,18 @@ int TBeing::frostEngulfed() {
   int i;
   int res;
   TThing* t = NULL;
-  // Need to account for worn containers
+  if (affectedBySpell(AFFECT_WET) && !isImmune(IMMUNE_COLD, WEAR_BODY)) {
+      affectedData af;
+      af.type = AFFECT_DISEASE;
+      af.level = 0;
+      af.duration = 200;
+      af.modifier = DISEASE_FROSTBITE;
+      af.location = APPLY_NONE;
+      af.bitvector = 0;
+      affectTo(&af);
+      disease_start(this, &af);
+  }
+    // Need to account for worn containers
   for (i = MIN_WEAR; i < MAX_WEAR; i++) {
     if (!(t = equipment[i]) || !(obj = dynamic_cast<TObj*>(t)))
       continue;

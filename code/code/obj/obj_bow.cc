@@ -199,7 +199,7 @@ void TBow::bloadArrowBow(TBeing* ch, TArrow* the_arrow) {
 
   --(*this);
   ch->equipChar(this, ch->getPrimaryHold());
-
+  this->checkSpec(ch, CMD_BLOAD, "", NULL);
   ch->addToWait(combatRound(1.5));
 }
 

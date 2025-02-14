@@ -4748,6 +4748,10 @@ void TBeing::describeOtherFeatures(const TGenWeapon* obj, int learn) const {
       sendTo(COLOR_OBJECTS,
         format("%s seems small enough to be used for stabbing.\n\r") %
           sstring(capbuf).cap());
+    if (obj->isSpear())
+      sendTo(COLOR_OBJECTS,
+        format("%s seems like it could be used as a spear.\n\r") %
+          sstring(capbuf).cap());
     if (obj->canBackstab())
       sendTo(COLOR_OBJECTS, format("%s seems small enough to be used for "
                                    "backstabbing or throat slitting.\n\r") %

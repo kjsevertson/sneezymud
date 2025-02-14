@@ -104,8 +104,20 @@ bool willBreakHide(cmdTypeT tCmd, bool isPre) {
       return (isPre ? false : true);
     case CMD_SLIT:
       return (isPre ? false : true);
-
+    
+    ///rest is a special case. we don't want to break hide for it
+    ///this represents the PC's ability to remain alert
+    /// CMD_STAND is included to prevent hide from breaking when the thief
+    /// exits rest.
+    /// CMD_SIGN is meant to represent a 'thieves cant' means of communication
+    /// without revealing the thief's position, because it already requires that the PC be visible
+    /// CMD_PTELL is also included because it's meant to be silent
+    /// conceal, disguise, spy, sneak, and hide are also included as they are stealth-oriented thief abilities
+    case CMD_PTELL:
+    case CMD_REST:
+    case CMD_STAND:
     case CMD_LOOK:
+    case CMD_SIGN:
     case CMD_SCORE:
     case CMD_TROPHY:
     case CMD_INVENTORY:
@@ -119,6 +131,7 @@ bool willBreakHide(cmdTypeT tCmd, bool isPre) {
     case CMD_TIME:
     case CMD_HIDE:
     case CMD_SNEAK:
+    case CMD_CONCEAL:
     case CMD_QUEST:
     case CMD_LEVELS:
     case CMD_WIZLIST:

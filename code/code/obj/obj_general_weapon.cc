@@ -163,5 +163,19 @@ bool TGenWeapon::canBackstab() const {
 }
 
 bool TGenWeapon::canStab() const {
-  return isPierceWeapon() && getVolume() <= 2000;
+  return isPierceWeapon() && getVolume() <= 2500;
 }
+ bool TGenWeapon::isSpear() const {
+  return isPaired() && isPierceWeapon() && getVolume() <= 4500;
+ }
+
+ bool TGenWeapon::canSap() const {
+  return isBluntWeapon() && getVolume() <= 2500;
+ }
+
+ bool TGenWeapon::canHamstring() const {
+  return isSlashWeapon() && getVolume() <= 2500;
+ }
+ bool TGenWeapon::hasSpikes() const {
+  return isObjStat(ITEM_SPIKED);
+ }
