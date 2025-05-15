@@ -25,6 +25,7 @@ class CDThief : public CDiscipline {
     CSkill skDisarmThief;
     CSkill skTrack;
     CSkill skRepairThief;
+    CSkill skHamstring;
 
     CDThief() :
       CDiscipline(),
@@ -47,7 +48,8 @@ class CDThief : public CDiscipline {
       skHide(),
       skDisarmThief(),
       skTrack(),
-      skRepairThief() {}
+      skRepairThief(),
+      skHamstring() {}
     CDThief(const CDThief& a) :
       CDiscipline(a),
       skSwindle(a.skSwindle),
@@ -69,7 +71,8 @@ class CDThief : public CDiscipline {
       skHide(a.skHide),
       skDisarmThief(a.skDisarmThief),
       skTrack(a.skTrack),
-      skRepairThief(a.skRepairThief) {}
+      skRepairThief(a.skRepairThief),
+      skHamstring(a.skHamstring) {}
     CDThief& operator=(const CDThief& a) {
       if (this == &a)
         return *this;
@@ -94,6 +97,7 @@ class CDThief : public CDiscipline {
       skDisarmThief = a.skDisarmThief;
       skTrack = a.skTrack;
       skRepairThief = a.skRepairThief;
+      skHamstring = a.skHamstring;
       return *this;
     }
     virtual ~CDThief() {}

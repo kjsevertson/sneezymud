@@ -625,7 +625,7 @@ int TBeing::triggerContTrap(TOpenContainer* obj) {
         t = NULL;
       }
       rc = objDamage(DAMAGE_TRAP_FIRE, obj->getContainerTrapDam(), obj);
-
+      rc = trapFire(obj->getContainerTrapDam(), nullptr);
       ADD_DELETE(rc, DELETE_ITEM);
       return rc;
     case DOOR_TRAP_TNT:
@@ -656,7 +656,7 @@ int TBeing::triggerContTrap(TOpenContainer* obj) {
         }
       }
       rc = objDamage(DAMAGE_TRAP_TNT, amnt, obj);
-
+      rc = trapExplosive(amnt, nullptr);
       ADD_DELETE(rc, DELETE_ITEM);
       return rc;
     case DOOR_TRAP_POISON:
@@ -680,6 +680,7 @@ int TBeing::triggerContTrap(TOpenContainer* obj) {
         TRUE, this, obj, 0, TO_ROOM);
 
       rc = objDamage(DAMAGE_TRAP_PIERCE, obj->getContainerTrapDam(), obj);
+      rc = trapSpike(obj->getContainerTrapDam(), nullptr);
       return rc;
     case DOOR_TRAP_DISEASE:
       act("A cloud of spores pours from $p, engulfing you.", FALSE, this, obj,
@@ -706,6 +707,7 @@ int TBeing::triggerContTrap(TOpenContainer* obj) {
         0, TO_ROOM);
 
       rc = objDamage(DAMAGE_TRAP_BLUNT, obj->getContainerTrapDam(), obj);
+      rc = trapPebble(obj->getContainerTrapDam(), nullptr);
       return rc;
     case DOOR_TRAP_BLADE:
       act(
@@ -718,6 +720,7 @@ int TBeing::triggerContTrap(TOpenContainer* obj) {
         TRUE, this, obj, 0, TO_ROOM);
 
       rc = objDamage(DAMAGE_TRAP_SLASH, obj->getContainerTrapDam(), obj);
+      rc = trapDisc(obj->getContainerTrapDam(), nullptr);
       return rc;
     case DOOR_TRAP_FROST:
       act("A frosty blast jets from a place of concealment in $p into you.",
@@ -726,6 +729,7 @@ int TBeing::triggerContTrap(TOpenContainer* obj) {
         TRUE, this, obj, 0, TO_ROOM);
 
       rc = objDamage(DAMAGE_TRAP_FROST, obj->getContainerTrapDam(), obj);
+      rc = trapFrost(obj->getContainerTrapDam(), nullptr);
       return rc;
     case DOOR_TRAP_ENERGY:
       act("Bolts of plasma stream from a place of concealment in $p into you.",
@@ -736,6 +740,7 @@ int TBeing::triggerContTrap(TOpenContainer* obj) {
         TRUE, this, obj, 0, TO_ROOM);
 
       rc = objDamage(DAMAGE_TRAP_ENERGY, obj->getContainerTrapDam(), obj);
+      rc = trapPower(obj->getContainerTrapDam(), nullptr);
       return rc;
     case DOOR_TRAP_ACID:
       act("A strange liquid pours from a place of concealment in $p onto you.",
@@ -744,6 +749,7 @@ int TBeing::triggerContTrap(TOpenContainer* obj) {
         TRUE, this, obj, 0, TO_ROOM);
 
       rc = objDamage(DAMAGE_TRAP_ACID, obj->getContainerTrapDam(), obj);
+      rc = trapAcid(obj->getContainerTrapDam(), nullptr);
       return rc;
     default:
       break;
@@ -962,6 +968,9 @@ int TBeing::triggerDoorTrap(dirTypeT door) {
       trapPoison(dam);
       break;
     case DOOR_TRAP_SPIKE:
+      rc = trapSpike(dam, nullptr);
+      if (IS_SET_DELETE(rc, DELETE_THIS))
+        return DELETE_THIS;
       return trapDoorPierceDamage(dam, door);
     case DOOR_TRAP_SLEEP:
       sendTo("You are engulfed in a cloud of gas.\n\r");
@@ -972,10 +981,19 @@ int TBeing::triggerDoorTrap(dirTypeT door) {
       break;
     case DOOR_TRAP_TNT:
       exitp->destroyDoor(door, in_room);
+      rc = trapExplosive(dam, nullptr);
+      if (IS_SET_DELETE(rc, DELETE_THIS))
+        return DELETE_THIS;
       return trapDoorTntDamage(dam, door);
     case DOOR_TRAP_FIRE:
+      rc = trapFire(dam, nullptr);
+      if (IS_SET_DELETE(rc, DELETE_THIS))
+        return DELETE_THIS;
       return trapDoorFireDamage(dam, door);
     case DOOR_TRAP_ACID:
+      rc = trapAcid(dam, nullptr);
+      if (IS_SET_DELETE(rc, DELETE_THIS))
+        return DELETE_THIS;
       return trapDoorAcidDamage(dam, door);
     case DOOR_TRAP_DISEASE:
       sendTo("You are engulfed in a cloud of spores.\n\r");
@@ -987,7 +1005,6 @@ int TBeing::triggerDoorTrap(dirTypeT door) {
         TO_CHAR);
       act("A chaotic, swirling vortex surrounds $n.", TRUE, this, 0, 0,
         TO_ROOM);
-
       rc = trapTeleport(dam);
       if (IS_SET_DELETE(rc, DELETE_THIS))
         return DELETE_THIS;
@@ -995,10 +1012,19 @@ int TBeing::triggerDoorTrap(dirTypeT door) {
     case DOOR_TRAP_HAMMER:
       return trapDoorHammerDamage(dam, door);
     case DOOR_TRAP_BLADE:
+      rc = trapDisc(dam, nullptr);
+      if (IS_SET_DELETE(rc, DELETE_THIS))
+        return DELETE_THIS;
       return trapDoorSlashDamage(dam, door);
     case DOOR_TRAP_ENERGY:
+      rc = trapPower(dam, nullptr);
+      if (IS_SET_DELETE(rc, DELETE_THIS))
+        return DELETE_THIS;
       return trapDoorEnergyDamage(dam, door);
     case DOOR_TRAP_FROST:
+      rc = trapFrost(dam, nullptr);
+      if (IS_SET_DELETE(rc, DELETE_THIS))
+        return DELETE_THIS;
       return trapDoorFrostDamage(dam, door);
     default:
       break;
@@ -1566,6 +1592,7 @@ int TBeing::trapDoorTntDamage(int amnt, dirTypeT door) {
     TBeing* tbt = dynamic_cast<TBeing*>(t);
     if (tbt && this != tbt) {
       rc = tbt->objDamage(DAMAGE_TRAP_TNT, amnt / 2, NULL);
+      rc = trapExplosive(amnt, NULL);
       if (IS_SET_DELETE(rc, DELETE_THIS)) {
         delete tbt;
         tbt = NULL;
@@ -1585,6 +1612,7 @@ int TBeing::trapDoorTntDamage(int amnt, dirTypeT door) {
       TBeing* tbt = dynamic_cast<TBeing*>(t);
       if (tbt && this != tbt) {
         rc = tbt->objDamage(DAMAGE_TRAP_TNT, amnt / 4, NULL);
+        rc = trapExplosive(amnt/2, NULL);
         if (IS_SET_DELETE(rc, DELETE_THIS)) {
           delete tbt;
           tbt = NULL;

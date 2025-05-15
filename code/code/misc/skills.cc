@@ -880,6 +880,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDThief*)cd)->skTrack;
     case SKILL_SAP:
       return &((CDThief*)cd)->skSap;
+    case SKILL_HAMSTRING:
+      return &((CDThief*)cd)->skHamstring;
 
       // disc_fighting_thief
 
@@ -905,6 +907,10 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
 
     case SKILL_POISON_WEAPON:  //            498
       return &((CDPoisons*)cd)->skPoisonWeapons;
+    case SKILL_TOXICITY:
+      return &((CDPoisons*)cd)->skToxicity;
+    case SKILL_HARVEST_REAGENTS:
+      return &((CDPoisons*)cd)->skHarvestReagent;
 
       // disc_stealth
 
@@ -924,7 +930,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDTraps*)cd)->skSetTrapsGren;
     case SKILL_SET_TRAP_ARROW:
       return &((CDTraps*)cd)->skSetTrapsArrow;
-
+    case SKILL_TINKER:
+      return &((CDTraps*)cd)->skTinker;
     case SPELL_TREE_WALK:
       return &((CDNature*)cd)->skTreeWalk;
 
@@ -1166,6 +1173,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDAdventuring*)cd)->skGnollJargon;
     case SKILL_TROGLODYTE_PIDGIN:
       return &((CDAdventuring*)cd)->skTroglodytePidgin;
+    case SKILL_COOK:
+      return &((CDAdventuring*)cd)->skCook;
 
       // disc_wizardry
     case SKILL_WIZARDRY:  // 960

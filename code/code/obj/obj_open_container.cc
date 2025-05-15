@@ -514,7 +514,9 @@ int TOpenContainer::disarmMe(TBeing* thief) {
     act(buf, FALSE, thief, this, 0, TO_CHAR);
     act("$n disarms $p.", FALSE, thief, this, 0, TO_ROOM);
     remContainerFlag(CONT_TRAPPED);
-
+    if (thief->doesKnowSkill(SKILL_SET_TRAP_CONT)) {
+      reclaimTrapComps(thief, trap_type_buf, nullptr);
+    }
     return TRUE;
   } else {
     thief->sendTo("Click. (whoops)\n\r");
@@ -566,6 +568,8 @@ void TOpenContainer::pickMe(TBeing* thief) {
   if (thief->bSuccess(bKnown, SKILL_PICK_LOCK)) {
     remContainerFlag(CONT_LOCKED);
     thief->sendTo("*Click*\n\r");
+    thief->gainTaskExp(0, 50);
+    thief->doSave(SILENT_YES);
     act("$n fiddles with $p.", FALSE, thief, this, 0, TO_ROOM);
   } else {
     if (critFail(thief, SKILL_PICK_LOCK)) {

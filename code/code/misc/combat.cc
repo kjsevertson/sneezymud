@@ -1486,6 +1486,7 @@ bool TObj::makeScraps() {
   }
 
   o = new TTrash();
+  o->setMaterial(getMaterial());  // Use accessor methods instead of direct access
 
   if (isMineral()) {
     o->name = "shattered pile";

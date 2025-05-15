@@ -1479,6 +1479,8 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme) const {
       case SKILL_CUDGEL:
       case SKILL_HIDE:
       case SKILL_POISON_WEAPON:
+      case SKILL_TOXICITY:
+      case SKILL_HARVEST_REAGENTS:
       case SKILL_DISGUISE:
       case SKILL_DODGE_THIEF:
       case SKILL_SET_TRAP_CONT:
@@ -1486,6 +1488,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme) const {
       case SKILL_SET_TRAP_MINE:
       case SKILL_SET_TRAP_GREN:
       case SKILL_SET_TRAP_ARROW:
+      case SKILL_TINKER:
       case SKILL_DUAL_WIELD_THIEF:
       case SKILL_DISARM_THIEF:
       case SKILL_COUNTER_STEAL:
@@ -1555,6 +1558,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme) const {
       case SKILL_AVIAN:
       case SKILL_FISHBURBLE:
       case SKILL_COMMON:
+      case SKILL_COOK:
         // some spells have 2 effects, skip over one of them
         if (!aff->shouldGenerateText())
           continue;
@@ -2037,6 +2041,19 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme) const {
           }
         }
         break;
+        case SKILL_HAMSTRING:
+        if (show) {
+          if (aff->modifier2 > 0) {  // modifier2 stores the limb information
+            str += format("Your %s is useless from being hamstrung. Duration: %s\n\r") %
+                   describeBodySlot(static_cast<wearSlotT>(aff->modifier2)) % describeDuration(this, aff->duration);
+          } else {
+            str += format("You are recovering from being hamstrung. Duration: %s\n\r") %
+                   describeDuration(this, aff->duration);
+          }
+        }
+        break;
+
+        
       case AFFECT_BITTEN_BY_VAMPIRE:
         // secret!
         break;

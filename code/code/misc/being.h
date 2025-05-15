@@ -19,6 +19,8 @@
 #include "stats.h"
 #include "obj.h"
 #include "defs.h"
+#include "obj_trash.h"
+
 
 class CSkill;
 class TGuild;
@@ -1331,7 +1333,20 @@ class TBeing : public TThing {
     int doTurn(const char*, TBeing*);
     virtual void doMedit(const char*);
     void doPreen(sstring& argument);
-
+    int doTinker(const char*);
+    int tinkerBag(TBeing*, TObj*, const char*);
+    int tinkerBagFuse(TBeing*, TOpenContainer*);
+    int tinkerBagStretch(TBeing*, TOpenContainer*);
+    int tinkerBagExplode(TBeing*, TObj*);
+    int tinkerBagStraps(TBeing*, TOpenContainer*);
+    int tinkerBagReinforce(TBeing*, TOpenContainer*);
+    int tinkerBagPatch(TBeing*, TOpenContainer*);
+    int tinkerBagBelt(TBeing*, TOpenContainer*);
+    int tinkerBagSew(TBeing*, TOpenContainer*);
+    int tinkerBagMark(TBeing*, TOpenContainer*);
+    int tinkerBagCamo(TBeing*, TOpenContainer*);
+    int tinkerJunk(TBeing*, TObj*, const char*);
+    int tinkerJunkReclaim(TBeing*, TTrash*);
     void setGuildID(int);
     void setGuildRank(int);
     int getGuildID() const;
@@ -1789,6 +1804,7 @@ class TBeing : public TThing {
     void doCommand(const char*);
     int doAssist(const char*, TBeing*, bool flags = FALSE);
     void doRoll(TBeing*, dirTypeT);
+    double gainTaskExp(int baseLevel, double scaleFactor);
     void doRoll(TObj*, dirTypeT);
     void doRoll(const sstring&);
     void doEcho(const char*);
@@ -1980,6 +1996,7 @@ class TBeing : public TThing {
     virtual void doLoad(const char*);
     int doDisguise(const char*);
     int doPoisonWeapon(sstring);
+    int doHarvestReagents(const char*);
     int doGarrotte(const char*, TBeing*);
     int doStab(const char* argument, TBeing* vict);
     int stabSuccess(TBeing* victim);
@@ -1988,6 +2005,9 @@ class TBeing : public TThing {
     int sapFail(TBeing* victim);
     int sapSuccess(TBeing* victim);
     int doCudgel(const char*, TBeing*);
+    int doHamstring(const char* argument, TBeing* vict);
+    int hamstringSuccess(TBeing* victim);
+    int hamstringFail(TBeing* victim);
     virtual int moneyMeBeing(TThing* mon, TThing* sub);
     virtual unsigned int getTimer() const = 0;
     virtual void setTimer(unsigned int) = 0;

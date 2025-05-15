@@ -1,0 +1,25 @@
+Syntax: toxicity
+
+This passive skill represents a thief's knowledge of poisons and toxic substances.
+The higher your toxicity skill, the more resistant you become to poisons. As the 
+application of poisons sometimes leans on the application of other dangerous 
+substances, thieves with this training will also find themselves more resistant 
+to sleep, disease, paralysis, and acid.
+
+Notably, this built-up resistance will aid the thief in the planting and preparation of
+poisons using the planting and cooking skills.
+
+Toxicity provides several benefits:
+- Increased resistance to poison effects
+- Partial resistance to sleep, disease, paralysis, and acid effects
+- Reduced chance of self-poisoning when using the poison weapons skill
+- Enhanced protection when harvesting dangerous reagents
+- Improved effectiveness when creating poisons through cooking
+
+This skill improves passively as you are exposed to toxic substances and
+as you work with poisons. Higher levels of thief training will increase
+your maximum potential in this skill.
+
+See Also: POISON WEAPONS, HARVEST REAGENT, COOKING
+Related Topics: THIEF SKILLS, RESISTANCES
+

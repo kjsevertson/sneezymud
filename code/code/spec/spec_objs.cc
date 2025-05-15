@@ -66,6 +66,7 @@
 #include "handler.h"
 #include "extern.h"
 #include "limbs.h"
+#include "parse.h"
 #include "room.h"
 #include "low.h"
 #include "monster.h"
@@ -1719,6 +1720,9 @@ int newbieHelperWProc(TBeing* vict, cmdTypeT cmd, const char* Parg, TObj* o,
                                 "area for newbies]\n\r") %
                          o->getName());
           } else
+  return FALSE;
+
+
             return FALSE;  // He didn't call on us for help, maybe another
                            // player?
           return TRUE;     // If we got here, we had a topic so lets eat the
@@ -2766,7 +2770,42 @@ int telekinesisGlove(TBeing* ch, cmdTypeT cmd, const char* arg, TObj* o,
   }
   return FALSE;
 }
+int tinkerBagFuse(TBeing* ch, cmdTypeT cmd, const char* arg, TObj* o, TObj*) {
+  if (cmd != CMD_GENERIC_PULSE)
+    return FALSE;
+    
+  TOpenContainer* container = dynamic_cast<TOpenContainer*>(o);
+  if (!container || !container->isContainerFlag(CONT_TRAPPED))
+    return FALSE;
 
+  // Make sure it's specifically a bag
+  if (o->itemType() != ITEM_BAG)
+    return FALSE;
+
+  // Countdown using structure as timer
+  if (container->getStructPoints() > 0) {
+    container->addToStructPoints(-1);
+    return FALSE;
+  }
+
+  // Time's up! Trigger the trap
+  // Check if item is equipped or in inventory
+  ch = dynamic_cast<TBeing*>(container->equippedBy);
+  if (!ch) {
+    ch = dynamic_cast<TBeing*>(container->parent);
+    if (!ch)
+      return FALSE;
+  }
+
+  act("$p makes an ominous clicking sound!", TRUE, ch, container, 0, TO_CHAR);
+  act("$n's $p makes an ominous clicking sound!", TRUE, ch, container, 0, TO_ROOM);
+  
+  ch->triggerContTrap(container);
+
+  // Destroy the bag after explosion
+  container->makeScraps();
+  return DELETE_THIS;
+}
 int manaBurnRobe(TBeing* vict, cmdTypeT cmd, const char* arg, TObj* o, TObj*) {
 #if 0
   
@@ -6408,6 +6447,75 @@ int caltrop(TBeing* ch, cmdTypeT cmd, const char*, TObj* o, TObj*) {
   return FALSE;
 }
 
+int satyrShrine(TBeing* ch, cmdTypeT cmd, const char* arg, TObj* o, TObj*) {
+  TBaseContainer* shrine = nullptr;
+  TRoom* destinationRoom = nullptr;
+
+  if (!ch || !o || (cmd != CMD_SAY && cmd != CMD_SAY2) || strcmp(arg, "Thozgich") != 0 || !(shrine = dynamic_cast<TBaseContainer*>(o)) || !shrine->roomp || !(destinationRoom = real_roomp(6070))) {
+    return false;
+  }
+
+  static constexpr std::array<int, 6> required_obj_vnums = {
+    Obj::HEART_APPLE,
+    Obj::HEART_CHERRY,
+    Obj::HEART_PEAR,
+    Obj::HEART_HICKORY,
+    Obj::HEART_OAK,
+    Obj::HEART_CHESTNUT
+  };
+
+  std::vector<TObj*> found_objs;
+
+  for (int vnum : required_obj_vnums) {
+    TObj* obj = shrine->findObjectInContainer(vnum);
+
+    if (!obj) {
+      ch->sendTo(
+        "Nothing happens, but you feel the satyr shrine pulse in response to "
+        "the word of power. It must be missing something.\n\r");
+      act("$p seems to pulse briefly in response to $n's voice.", false, ch,
+        shrine, nullptr, TO_ROOM);
+      return false;
+    }
+
+    found_objs.push_back(obj);
+  }
+
+  for (TObj* obj : found_objs) {
+    act("You feel $p crumble and be absorbed by the shrine!", false, ch, obj,
+      nullptr, TO_CHAR);
+    act("$p crumbles and is absorbed by the shrine!", false, obj, obj, nullptr,
+      TO_ROOM);
+
+      --(*obj);
+      delete obj;
+  }
+
+  TObj* portalIn = read_object(Obj::PETRIFIED_PORTAL_IN, VIRTUAL);
+  TObj* portalOut = read_object(Obj::PETRIFIED_PORTAL_OUT, VIRTUAL);
+
+  *shrine->roomp += *portalIn;
+
+    act("The shrine dissolves into mist!", false, portalIn, nullptr, nullptr,
+    TO_ROOM);
+
+    if (!shrine->stuff.empty()) {
+    act("The remaining objects in the shrine tumble to the $g.", false, shrine,
+      nullptr, nullptr, TO_ROOM);
+  }
+
+  for (TThing* thing : shrine->stuff) {
+    --(*thing);
+    *shrine->roomp += *thing;
+  }
+
+  *destinationRoom += *portalOut;
+
+  act("<message>", false, portalOut, nullptr, nullptr, TO_ROOM);
+
+  return DELETE_ITEM;
+}
+
 int skittishObject(TBeing* ch, cmdTypeT cmd, const char* arg, TObj* o, TObj*) {
   if (cmd != CMD_GENERIC_PULSE && cmd != CMD_OBJ_GOTTEN)
     return FALSE;
@@ -7714,4 +7822,6 @@ TObjSpecs objSpecials[NUM_OBJ_SPECIALS + 1] = {
   {TRUE, "flamingArrowBow", flamingArrowBow},
   {TRUE, "caltrop", caltrop},
   {FALSE, "acidBlob", acidBlob},  // 167
+  {FALSE, "satyr shrine", satyrShrine},
+  {TRUE, "tinker: bag fuse", tinkerBagFuse},
   {FALSE, "last proc", bogusObjProc}};

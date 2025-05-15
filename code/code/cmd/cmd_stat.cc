@@ -1595,6 +1595,7 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_GARROTTE:
       case SKILL_STABBING:
       case SKILL_SAP:
+      case SKILL_HAMSTRING:
       case SKILL_BACKSTAB:
       case SKILL_THROATSLIT:
       case SKILL_HEADBUTT:
@@ -1853,6 +1854,8 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_CUDGEL:
       case SKILL_HIDE:
       case SKILL_POISON_WEAPON:
+      case SKILL_TOXICITY:
+      case SKILL_HARVEST_REAGENTS:
       case SKILL_DISGUISE:
       case SKILL_DODGE_THIEF:
       case SKILL_SET_TRAP_CONT:
@@ -1860,6 +1863,7 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_SET_TRAP_MINE:
       case SKILL_SET_TRAP_GREN:
       case SKILL_SET_TRAP_ARROW:
+      case SKILL_TINKER:
       case SKILL_DUAL_WIELD_THIEF:
       case SKILL_DISARM_THIEF:
       case SKILL_COUNTER_STEAL:
@@ -1956,6 +1960,7 @@ void TBeing::statBeing(TBeing* k) {
       case SPELL_CREEPING_DOOM:
       case SPELL_FERAL_WRATH:
       case SPELL_SKY_SPIRIT:
+      case SKILL_COOK:
         if (!discArray[aff->type]) {
           vlogf(LOG_BUG,
             format("BOGUS AFFECT (%d) on %s") % aff->type % k->getName());

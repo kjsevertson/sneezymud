@@ -10,6 +10,7 @@ class CDTraps : public CDiscipline {
     CSkill skSetTrapsMine;
     CSkill skSetTrapsGren;
     CSkill skSetTrapsArrow;
+    CSkill skTinker;
 
     virtual CDTraps* cloneMe() { return new CDTraps(*this); }
 

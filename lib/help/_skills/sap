@@ -1,0 +1,28 @@
+Syntax: sap <victim>
+
+Sap is a tactical combat maneuver where the attacker strikes a victim with a 
+blunt weapon, targeting vulnerable areas like arms, wrists, or hands to 
+temporarily disable them. Unlike backstab which focuses on lethal damage, 
+sap aims to incapacitate by causing limb trauma.
+
+A successful sap attack can:
+- Deal significant damage to the targeted limb
+- Potentially paralyze the limb, causing the victim to drop held items
+- Inflict bruising damage to the limb
+
+The effectiveness of sap depends on several factors:
+- The attacker must be wielding a suitable blunt weapon in their primary hand
+- Stealth significantly improves success chance (sneak, hide, noise level)
+- Height difference between attacker and victim affects damage
+- Mauls and spiked weapons are particularly effective for sapping
+
+Sap is most effective when:
+- The attacker is stealthy and approaches undetected
+- The victim is unaware or distracted in combat
+- The attacker is in a favorable position (standing/flying)
+
+This skill requires a moderate level of thief training to learn and becomes 
+more effective as the thief's skill improves.
+
+See Also: BACKSTAB, CUDGEL, BASH
+Related Topics: COMBAT, THIEF SKILLS

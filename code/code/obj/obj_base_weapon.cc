@@ -15,6 +15,7 @@
 #include "colorstring.h"
 #include "configuration.h"
 #include "combat.h"
+#include "spells.h"
 #include "statistics.h"
 #include "shop.h"
 #include "skills.h"
@@ -1008,12 +1009,32 @@ int TGenWeapon::smiteWithMe(TBeing* ch, TBeing* v) {
 int TBaseWeapon::poisonWeaponWeapon(TBeing* ch, TThing* poison) {
   int rc;
 
+  // Check for water attempt first
+  TBaseCup* cup = dynamic_cast<TBaseCup*>(poison);
+  if (cup && cup->getDrinkType() == LIQ_WATER) {
+    if (isPoisoned()) {
+      setPoison((liqTypeT)-1); // Remove poison
+      ch->sendTo("You wash the poison off your weapon.\n\r");
+      act("$n washes the poison off $p.", FALSE, ch, this, 0, TO_ROOM);
+      return TRUE;
+    } else {
+      ch->sendTo("This weapon isn't poisoned.\n\r");
+      return FALSE;
+    }
+  }
+
   if (isBluntWeapon()) {
     ch->sendTo("Blunt weapons can't be poisoned effectively.\n\r");
     return FALSE;
   }
+
   if (isPoisoned()) {
     ch->sendTo("That is already poisoned!\n\r");
+    return FALSE;
+  }
+  
+  if (!isPoisoned() && (cup->getDrinkType() == LIQ_WATER)) {
+    ch->sendTo("You can't poison your weapon with water.\n\r");
     return FALSE;
   }
 
@@ -1679,7 +1700,38 @@ void TBaseWeapon::applyPoison(TBeing* vict) {
       ANSI_RED);
     act("There was something nasty on that $o!", FALSE, ch, this, vict,
       TO_NOTVICT, ANSI_RED);
+    
+    // Apply base poison effect
     doLiqSpell(ch, vict, poison, 1);
+    
+    // Check for additional poison damage from SKILL_POISON_WEAPON
+    if (ch->doesKnowSkill(SKILL_POISON_WEAPON)) {
+      int bKnown = ch->getSkillValue(SKILL_POISON_WEAPON);
+      if (ch->bSuccess(bKnown, SKILL_POISON_WEAPON)) {
+        int extraDamage = ch->getSkillLevel(SKILL_POISON_WEAPON) / 2;
+        extraDamage = min(extraDamage, 15); // Cap the extra damage
+        
+        act("The poison seems particularly effective!", 
+          FALSE, ch, this, vict, TO_CHAR, ANSI_RED);
+        act("The poison seems particularly potent!", 
+          FALSE, ch, this, vict, TO_VICT, ANSI_RED);
+        
+        int rc = vict->reconcileDamage(ch, extraDamage, SPELL_POISON);
+        if (IS_SET_DELETE(rc, DELETE_VICT))
+          return;
+      }
+    }
+    
+    // Check if wielder has poison weapon skill for preservation
+    if (ch->doesKnowSkill(SKILL_POISON_WEAPON)) {
+      int bKnown = ch->getSkillValue(SKILL_POISON_WEAPON);
+      // Give them a chance based on skill to preserve the poison
+      if (ch->bSuccess(bKnown, SKILL_POISON_WEAPON) && percentChance(75)) {
+        act("Your expert application allows the poison to remain effective.", 
+          FALSE, ch, this, 0, TO_CHAR);
+        return; // Exit without removing poison
+      }
+    }
   } else {
     doLiqSpell(vict, vict, poison, 1);
   }

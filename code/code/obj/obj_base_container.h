@@ -37,10 +37,12 @@ class TBaseContainer : public virtual TObj {
       itemTypeT, int&, int);
     virtual sstring showModifier(showModeT, const TBeing*) const;
     virtual void purchaseMe(TBeing*, TMonster*, int, int);
+    virtual void updateBagDesc();
     virtual int thawObject(TBeing*, int perc);
     virtual TThingKind getKind() const;
 
     int isSaddle() const;
+    TObj* findObjectInContainer(int vnum) const;
 
   protected:
     TBaseContainer();
