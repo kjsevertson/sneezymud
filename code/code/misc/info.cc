@@ -1482,6 +1482,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme) const {
       case SKILL_TOXICITY:
       case SKILL_HARVEST_REAGENTS:
       case SKILL_DISGUISE:
+      case SKILL_SKULK:
       case SKILL_DODGE_THIEF:
       case SKILL_SET_TRAP_CONT:
       case SKILL_SET_TRAP_DOOR:

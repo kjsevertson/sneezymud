@@ -96,7 +96,8 @@ int TBeing::backstabHit(TBeing* victim, TThing* obj, int modifier) {
     getAdvLearning(SKILL_BACKSTAB));
 
   int specialAttackValue =
-    specialAttack(victim, SKILL_BACKSTAB, modifier, true);
+    specialAttack(victim, SKILL_BACKSTAB, modifier, STAT_FOC, STAT_DEX, 
+                  STAT_AGI, STAT_PER, true);
   if (!victim->awake() || specialAttackValue == GUARANTEED_SUCCESS ||
       specialAttackValue == COMPLETE_SUCCESS ||
       (specialAttackValue == PARTIAL_SUCCESS &&

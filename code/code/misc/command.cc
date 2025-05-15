@@ -1,0 +1,1 @@
+  {"skulk", doSkulk, POSITION_STANDING, 1, PULSE_VIOLENCE, CMD_SKULK, 0},

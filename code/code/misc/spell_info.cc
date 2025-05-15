@@ -2573,10 +2573,6 @@ void buildSpellArray() {
 
   discArray[SKILL_SAP] = new spellInfo(SKILL_THIEF, DISC_THIEF, DISC_THIEF_FIGHT, 
     STAT_STR, "sap", TASK_NORMAL, LAG_5, POSITION_STANDING, MANA_0, LIFEFORCE_0, 
-<<<<<<< Updated upstream
-    PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_50, LEARN_2, START_DO_20, 
-    LEARN_DO_2, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SKILLS, 0.0, 0, 0);
-=======
     PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_50, LEARN_2, START_DO_30, 
     LEARN_DO_2, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SKILLS, 0.0, 0, 0);
   
@@ -2585,7 +2581,6 @@ void buildSpellArray() {
       "hamstring", TASK_NORMAL, LAG_3, POSITION_CRAWLING, MANA_0, LIFEFORCE_0,
       PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_1, LEARN_3, START_DO_30,
       LEARN_DO_2, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SKILLS, 0.0, 0, 0);
->>>>>>> Stashed changes
 
   discArray[SKILL_GARROTTE] =
     new spellInfo(SKILL_THIEF, DISC_THIEF_FIGHT, DISC_THIEF_FIGHT, STAT_EXT,
@@ -2650,6 +2645,12 @@ void buildSpellArray() {
       "You do not know how much longer you can keep this shape.", "", START_1,
       LEARN_1, START_DO_10, LEARN_DO_2, START_DO_NO, LEARN_DO_NO,
       LEARN_DIFF_SKILLS, 0.0, 0, 0);
+
+    discArray[SKILL_SKULK] =
+    new spellInfo(SKILL_THIEF, DISC_STEALTH, DISC_STEALTH, STAT_EXT, "skulk",
+      TASK_NORMAL, LAG_0, POSITION_STANDING, MANA_0, LIFEFORCE_0, PRAY_0, 0,
+      SYMBOL_STRESS_0, "", "", "", "", START_1, LEARN_1, START_DO_10,
+      LEARN_DO_2, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SKILLS, 0.0, 0, 0);
 
   // disc_traps
 

@@ -128,8 +128,10 @@ int TBeing::doSap(const char* argument, TBeing* vict) {
   }
 
   int skillValue = getSkillValue(SKILL_SAP);
-  // Pass the modifier to specialAttack
-  int successfulHit = specialAttack(victim, SKILL_SAP, modifier);
+  // Pass the modifier to specialAttack with custom stats
+  int successfulHit = specialAttack(victim, SKILL_SAP, modifier, 
+                                   STAT_STR, STAT_DEX, 
+                                   STAT_CON, STAT_PER, true);
   int successfulSkill = bSuccess(skillValue, SKILL_SAP);
 
   // Success use case

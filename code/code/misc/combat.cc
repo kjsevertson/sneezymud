@@ -24,6 +24,7 @@
 #include "materials.h"
 #include "range.h"
 #include "combat.h"
+#include "spells.h"
 #include "statistics.h"
 #include "person.h"
 #include "disease.h"
@@ -3028,11 +3029,12 @@ int TBeing::specialAttack(TBeing* target, spellNumT skill,
 
   // Handle surprise attacks
   if (skill == SKILL_BACKSTAB || skill == SKILL_CUDGEL ||
-      skill == SKILL_RANGED_PROF) {
+      skill == SKILL_RANGED_PROF || skill == SKILL_HAMSTRING || skill == SKILL_SAP) {
     if (target->isWary())
       situationalModifier -= 10;
     else
-      target->makeWary();
+      if (!target->affectedBySpell(SKILL_SUBTERFUGE)) 
+        target->makeWary();
   }
 
   // Adjust for level difference

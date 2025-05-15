@@ -188,8 +188,10 @@ int TBeing::doHamstring(const char* argument, TBeing* vict) {
   }
 
   int skillValue = getSkillValue(SKILL_HAMSTRING);
-  // Pass the modifier to specialAttack
-  int successfulHit = specialAttack(victim, SKILL_HAMSTRING, modifier);
+  // Pass the modifier to specialAttack with custom stats
+  int successfulHit = specialAttack(victim, SKILL_HAMSTRING, modifier,
+                                   STAT_DEX, STAT_AGI, 
+                                   STAT_AGI, STAT_PER, true);
   int successfulSkill = bSuccess(skillValue, SKILL_HAMSTRING);
 
   // Success use case

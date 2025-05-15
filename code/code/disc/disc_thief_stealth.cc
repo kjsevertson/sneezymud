@@ -1,3 +1,4 @@
+#include "defs.h"
 #include "extern.h"
 #include "handler.h"
 #include "being.h"
@@ -13,6 +14,7 @@
 #include "pathfinder.h"
 #include "obj_portal.h"
 #include "client.h"
+#include "spec_mobs.h"
 
 
 void TBeing::doTrack(const char* argument) {
@@ -969,7 +971,7 @@ int subterfuge(TBeing* thief, TBeing* victim) {
     thief->sendTo("No way!! You simply can NOT concentrate!\n\r");
     return FALSE;
   }
-  if (thief->getMove() < 50) {
+  if (thief->getMove() < 10) {
     thief->sendTo("You don't have enough mp to make the move.\n\r");
     return FALSE;
   }
@@ -980,41 +982,126 @@ int subterfuge(TBeing* thief, TBeing* victim) {
 
   int level = thief->getSkillLevel(SKILL_SUBTERFUGE);
   int bKnown = thief->getSkillValue(SKILL_SUBTERFUGE);
-  int tmpNum = ::number(0, bKnown);
+  int advLearning = thief->getAdvLearning(SKILL_SUBTERFUGE);
 
-  thief->addToMove(-tmpNum);
-  thief->setMove(max(0, thief->getMove()));
+  thief->addToMove(-10);
 
   if (thief->isNotPowerful(victim, level, SKILL_SUBTERFUGE, SILENT_YES)) {
-    act("$s mind is too powerful to be confused.", FALSE, thief, NULL, victim,
-      TO_CHAR);
-    thief->sendTo("You simply fail to confuse your target.\n\r");
-    return TRUE;
-  }
-  if ((victim->plotStat(STAT_CURRENT, STAT_PER, 3, 18, 12) +
-        victim->plotStat(STAT_CURRENT, STAT_FOC, 3, 18, 12)) >
-      (thief->plotStat(STAT_CURRENT, STAT_KAR, 3, 18, 12) +
-        thief->plotStat(STAT_CURRENT, STAT_FOC, 3, 18, 12))) {
-    act("$N is too smart to fall for this ploy.", FALSE, thief, NULL, victim,
-      TO_CHAR);
-    thief->sendTo("You simply fail to confuse your target.\n\r");
+    act("$N's mind is too powerful to be confused.", FALSE, thief, NULL, victim, TO_CHAR);
     return TRUE;
   }
 
-  if (thief->bSuccess(bKnown, SKILL_SUBTERFUGE)) {
-    if (victim->isLucky(thief->spellLuckModifier(SKILL_SUBTERFUGE))) {
-      thief->sendTo("Uhoh! You simply fail to confuse your target!\n\r");
-      thief->setCharFighting(victim);
-      thief->setVictFighting(victim);
-      return TRUE;
+  if (!victim->isHumanoid() && bKnown < 80) {
+    thief->sendTo("You aren't skilled enough to cudgel monsters, yet.\n\r");
+    return TRUE;
+  }
+
+  // skill execution with bSuccess
+  if (!thief->bSuccess(bKnown, SKILL_SUBTERFUGE)) {
+    thief->sendTo("You fail to execute the subterfuge properly.\n\r");
+    return TRUE;
+  }
+
+  // Tier 1: Remove wary status (base effect, always happens on success)
+  if (victim->isWary()) {
+    victim->affectFrom(AFFECT_WARY);
+    act("$N seems less wary now.", FALSE, thief, NULL, victim, TO_CHAR);
+  }
+
+    int situationalMod = 0;
+  
+    if (!victim->isWise()) {
+      situationalMod += 10;
     }
-    thief->sendTo("You have totally confused the monster!\n\r");
 
-    REMOVE_BIT(victim->specials.act, ACT_HUNTING);
-    REMOVE_BIT(victim->specials.act, ACT_HATEFUL);
+    if (!victim->isIntelligent()) {
+      situationalMod += 10;
+    }
+
+    if (thief->isCharismatic()) {
+      situationalMod += 10;
+    }
+
+  // specialAttack with custom stats
+  int attackValue = thief->specialAttack(victim, SKILL_SUBTERFUGE, situationalMod, 
+                                        STAT_CHA, STAT_INT,  // Attacker stats
+                                        STAT_INT, STAT_WIS,  // Defender stats
+                                        true);  // Allow partial success
+
+  if (attackValue > FAILURE) {
+    // Success - apply base effects
+    thief->sendTo("You have confused the monster!\n\r");
+    
+    // Apply subterfuge affect for PER reduction
+    affectedData af;
+    af.type = SKILL_SUBTERFUGE;
+    af.duration = level * Pulse::UPDATES_PER_MUDHOUR;
+    af.modifier = -10;
+    af.location = APPLY_PER;
+    af.bitvector = 0;
+    victim->affectTo(&af);
+    
+    // Apply subterfuge affect for FOC reduction
+    affectedData af2;
+    af2.type = SKILL_SUBTERFUGE;
+    af2.duration = level * Pulse::UPDATES_PER_MUDHOUR;
+    af2.modifier = -10;
+    af2.location = APPLY_FOC;
+    af2.bitvector = 0;
+    victim->affectTo(&af2);
+    
+    // Apply subterfuge affect for vision reduction
+    affectedData af3;
+    af3.type = SKILL_SUBTERFUGE;
+    af3.duration = level * Pulse::UPDATES_PER_MUDHOUR;
+    af3.modifier = -5;
+    af3.location = APPLY_VISION;
+    af3.bitvector = 0;
+    victim->affectTo(&af3);
+    
+    // Tier 2: 75% skill - Remove hunting/hateful flags
+    if (bKnown >= 75) {
+      REMOVE_BIT(victim->specials.act, ACT_HUNTING);
+      REMOVE_BIT(victim->specials.act, ACT_HATEFUL);
+      act("$N seems to forget why $E was so angry.", FALSE, thief, NULL, victim, TO_CHAR);
+    }
+    
+    // Tier 3: 20% advanced discipline - Remove thief/cityguard/archer procs
+    if (advLearning >= 20) {
+      REMOVE_BIT(victim->specials.act, ACT_NICE_THIEF);
+      REMOVE_BIT(victim->specials.act, ACT_GUARDIAN);
+      REMOVE_BIT(victim->specials.act, ACT_AFRAID);
+      act("$N seems less vigilant about $S duties.", FALSE, thief, NULL, victim, TO_CHAR);
+    }
+
+    TMonster* mob = dynamic_cast<TMonster*>(victim);
+    if (mob && (mob->spec == SPEC_CITYGUARD || 
+      mob->spec == SPEC_JANITOR ||
+      mob->spec == SPEC_ARCHER)) {
+      mob->spec = 0;  // Set to no special proc
+      act("$N seems to forget $S special duties completely.", FALSE, thief, NULL, mob, TO_CHAR);
+    } else {
+      act("$N seems less vigilant about $S duties.", FALSE, thief, NULL, mob, TO_CHAR);
+    }
+    
+    // Tier 4: 50% advanced discipline - Remove aggro flag
+    if (advLearning >= 50 && IS_SET(victim->specials.act, ACT_AGGRESSIVE)) {
+      REMOVE_BIT(victim->specials.act, ACT_AGGRESSIVE);
+      act("$N's aggressive demeanor softens considerably.", FALSE, thief, NULL, victim, TO_CHAR);
+    }
+    
+    // Tier 5: 80% advanced discipline - Remove berserk from players
+    if (advLearning >= 80 && victim->isPc() && victim->isCombatMode(ATTACK_BERSERK)) {
+      victim->setCombatMode(ATTACK_NORMAL);
+      victim->affectFrom(SKILL_BERSERK);
+      act("$N's berserker rage subsides as you calm $M down.", FALSE, thief, NULL, victim, TO_CHAR);
+      act("$n's subtle gestures and words calm your rage.", FALSE, thief, NULL, victim, TO_VICT);
+      act("$n somehow calms $N's berserker rage.", FALSE, thief, NULL, victim, TO_NOTVICT);
+    }
 
     return TRUE;
   } else {
+    // Failure
     thief->sendTo("Uhoh! Something went wrong!\n\r");
     thief->setCharFighting(victim);
     thief->setVictFighting(victim);
@@ -1070,4 +1157,56 @@ int spy(TBeing* thief) {
   aff.bitvector = 0;
   thief->affectTo(&aff, -1);
   return TRUE;
+}
+
+int skulk(TBeing* thief, spellNumT skill) {
+  if (thief->fight()) {
+    thief->sendTo("You can't skulk while fighting!\n\r");
+    return FALSE;
+  }
+  
+  if (thief->riding) {
+    thief->sendTo("You can't skulk while mounted!\n\r");
+    return FALSE;
+  }
+  
+  if (thief->affectedBySpell(SPELL_SKULK)) {
+    thief->sendTo("You are already skulking!\n\r");
+    return FALSE;
+  }
+  
+  // Check if they have enough movement points
+  if (thief->getMove() < 15) {
+    thief->sendTo("You're too tired to skulk right now.\n\r");
+    return FALSE;
+  }
+  
+  // Deduct initial movement cost
+  thief->addToMove(-15);
+  
+  thief->sendTo("You begin practicing your skulking technique.\n\r");
+  act("$n begins practicing $s skulking technique.", TRUE, thief, 0, 0, TO_ROOM);
+  
+  // Calculate task time based on skill
+  int taskTime = max(5, 20 - (thief->getSkillValue(skill) / 10));
+  
+  // Start the task
+  start_task(thief, skulk_task, NULL, NULL, taskTime, thief->in_room, 0, 0, 0);
+  
+  return TRUE;
+}
+
+int TBeing::doSkulk() {
+  spellNumT skill = getSkillNum(SKILL_SKULK);
+  
+  if (!doesKnowSkill(skill)) {
+    sendTo("You know nothing about skulking.\n\r");
+    return FALSE;
+  }
+  
+  int rc = skulk(this, skill);
+  if (rc)
+    addSkillLag(skill, rc);
+  
+  return rc;
 }

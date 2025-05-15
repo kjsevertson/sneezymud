@@ -1995,6 +1995,7 @@ class TBeing : public TThing {
     void doNewbieEqLoad(race_t, unsigned short, bool);
     virtual void doLoad(const char*);
     int doDisguise(const char*);
+    int doSkulk();
     int doPoisonWeapon(sstring);
     int doHarvestReagents(const char*);
     int doGarrotte(const char*, TBeing*);
