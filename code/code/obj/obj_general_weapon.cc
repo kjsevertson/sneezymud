@@ -276,6 +276,7 @@ int hardHit(TBeing* victim, TBeing* ch, TObj* obj, wearSlotT vicLimb, wearSlotT 
         if (vicEq->getStructPoints() <= 0) {
          vicEq->makeScraps();
         delete vicEq;
+        vicEq = nullptr;
       }  
     }
     // Case 2: Weapon hits victim's body part
