@@ -124,6 +124,29 @@ short TBeing::getImmunity(immuneTypeT type) const {
     }
   }
 
+  if (doesKnowSkill(SKILL_TOXICITY)) {
+    amount = max((int)getSkillValue(SKILL_TOXICITY), 0);
+    switch (type) {
+      case IMMUNE_POISON:
+        imm += amount;
+        break;
+      case IMMUNE_DISEASE:
+        imm += (amount / 3);
+        break;
+      case IMMUNE_ACID:
+        imm += (amount / 4);
+        break;
+      case IMMUNE_PARALYSIS:
+        imm += (amount / 5);
+        break;
+      case IMMUNE_SLEEP:
+        imm += (amount / 3);
+        break;
+      default:
+        break;
+    }
+  }
+
   if (doesKnowSkill(SKILL_DUFALI)) {
     amount = max((int)getSkillValue(SKILL_DUFALI), 0);
     switch (type) {
@@ -311,6 +334,7 @@ immuneTypeT getTypeImmunity(spellNumT type) {
     case SKILL_THROATSLIT:
     case SKILL_STABBING:
     case SKILL_SAP:
+    case SKILL_HAMSTRING:
     case TYPE_PIERCE:
     case TYPE_STING:
     case TYPE_STAB:

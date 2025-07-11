@@ -905,6 +905,10 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
 
     case SKILL_POISON_WEAPON:  //            498
       return &((CDPoisons*)cd)->skPoisonWeapons;
+    case SKILL_TOXICITY:
+      return &((CDPoisons*)cd)->skToxicity;
+    case SKILL_HARVEST_REAGENTS:
+      return &((CDPoisons*)cd)->skHarvestReagent;
 
       // disc_stealth
 

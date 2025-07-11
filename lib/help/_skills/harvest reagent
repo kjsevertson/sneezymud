@@ -1,0 +1,81 @@
+Syntax: harvest reagent
+
+This skill allows thieves to locate and harvest poisonous plants and fungi 
+from their surroundings. Success depends on both skill level and the local 
+environment - different regions yield different toxic components.
+
+The harvested reagents can be used with poison weapons or sold to 
+alchemists. Care must be taken when harvesting, as some reagents are 
+dangerous to handle without proper knowledge.
+
+To harvest reagents successfully:
+- You must be holding a bladed weapon (slash/pierce) in your primary hand
+- You need forceps or tongs in your off-hand for safe handling
+- You must be in an area that contains toxic plants (natural environments)
+- You need sufficient movement points to complete the task
+
+The harvesting process takes time and concentration. Each successful harvest 
+yields one reagent, and you can collect multiple reagents per harvesting 
+session. Your weapon will gradually become duller with use.
+
+REAGENT LOCATIONS:
+Different environments yield different toxic plants:
+
+Temperate Forest:
+- Death camas flowers and seeds
+- Destroying angel mushroom caps
+- Jimson weed flowers and seeds
+- Hemlock flowers and seeds
+- Monkshood flowers and seeds
+
+Temperate Hills:
+- Death camas flowers and seeds
+- Destroying angel caps
+- Jimson weed flowers and seeds
+- Hemlock flowers and seeds
+- Sweet pee flowers and seeds
+
+Temperate Mountains:
+- Death camas flowers and seeds
+- Hemlock flowers and seeds
+
+Arctic Forest:
+- Death camas flowers and seeds
+- Monkshood flowers and seeds
+
+Arctic Mountains:
+- Death camas flowers and seeds
+
+Caves (Temperate/Tropical):
+- Destroying angel caps
+- Violet fungus
+
+Swamps (Temperate):
+- Destroying angel caps
+- Hemlock flowers and seeds
+- Monkshood flowers and seeds
+- Sweet pee flowers and seeds
+- Violet fungus
+
+Swamps (Tropical):
+- Destroying angel caps
+- Monkshood flowers and seeds
+- Sweet pee flowers and seeds
+- Acacia flowers and seeds
+
+Desert:
+- Acacia flowers and seeds
+
+Rainforest:
+- Acacia flowers and seeds
+
+Risks of harvesting include:
+- Poisoning yourself if you lack proper tools or immunity
+- Damaging your weapon on tough plants
+- Breaking your tools through misuse
+
+Your toxicity skill provides additional protection when harvesting dangerous 
+components.
+
+See Also: POISON WEAPONS, TOXICITY
+Related Topics: THIEF SKILLS, CRAFTING

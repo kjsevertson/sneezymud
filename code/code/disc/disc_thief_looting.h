@@ -20,3 +20,5 @@ int disarmTrapDoor(TBeing*, dirTypeT);
 
 int detectTrapObj(TBeing*, const TThing*);
 int detectTrapDoor(TBeing*, int);
+
+bool reclaimTrapComps(TBeing* thief, sstring trap_type, TTrap* trap);

@@ -32,3 +32,8 @@ class liqInfoT {
     liqInfoT();
     ~liqInfoT();
 };
+
+// Checks if enough water is available from environment or containers
+// If water is found in a container, sets container pointer if not null
+// Returns true if enough water is available
+bool checkWaterUsage(TBeing* ch, int reqUnits, TBaseCup** container);

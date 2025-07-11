@@ -83,6 +83,7 @@ bool TRoom::isNatureSector() const {
     case SECT_JUNGLE:
     case SECT_RAINFOREST:
     case SECT_TEMPERATE_FOREST:
+    case SECT_TEMPERATE_FOREST_ROAD:
     case SECT_ARCTIC_FOREST:
     case SECT_ARCTIC_FOREST_ROAD:
     case SECT_RAINFOREST_ROAD:
@@ -234,6 +235,32 @@ bool TRoom::isWildernessSector() const {
 bool TRoom::notRangerLandSector() const {
   return (isCitySector() || isRoadSector() || isFallSector() ||
           isUnderwaterSector() || isWaterSector() || isIndoorSector());
+}
+
+bool TRoom::isToxicSector() const {
+  switch (getSectorType()) {
+    case SECT_TEMPERATE_FOREST:
+    case SECT_TEMPERATE_FOREST_ROAD:
+    case SECT_TEMPERATE_HILLS:
+    case SECT_TEMPERATE_MOUNTAINS:
+    case SECT_ARCTIC_FOREST:
+    case SECT_ARCTIC_FOREST_ROAD:
+    case SECT_ARCTIC_MOUNTAINS:
+    case SECT_TEMPERATE_ROAD:
+    case SECT_DEAD_WOODS:
+    case SECT_TEMPERATE_CAVE:
+    case SECT_TROPICAL_HILLS:
+    case SECT_TROPICAL_CAVE:
+    case SECT_TEMPERATE_SWAMP:
+    case SECT_TROPICAL_SWAMP:
+    case SECT_TROPICAL_BEACH:
+    case SECT_TROPICAL_MOUNTAINS:
+    case SECT_DESERT:
+    case SECT_RAINFOREST:
+      return TRUE;
+    default:
+      return FALSE;
+  }
 }
 
 roomDirData* TRoom::exitDir(dirTypeT door) const {

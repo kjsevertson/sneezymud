@@ -1479,7 +1479,10 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme) const {
       case SKILL_CUDGEL:
       case SKILL_HIDE:
       case SKILL_POISON_WEAPON:
+      case SKILL_TOXICITY:
+      case SKILL_HARVEST_REAGENTS:
       case SKILL_DISGUISE:
+      case SKILL_SKULK:
       case SKILL_DODGE_THIEF:
       case SKILL_SET_TRAP_CONT:
       case SKILL_SET_TRAP_DOOR:
@@ -1555,6 +1558,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme) const {
       case SKILL_AVIAN:
       case SKILL_FISHBURBLE:
       case SKILL_COMMON:
+      case SKILL_COOK:
         // some spells have 2 effects, skip over one of them
         if (!aff->shouldGenerateText())
           continue;

@@ -1053,6 +1053,14 @@ int mapSpellnumToFile(spellNumT stt) {
       return 743;
     case SKILL_SAP:
       return 744;
+    case SKILL_HAMSTRING:
+      return 745;
+    case SKILL_TOXICITY:
+      return 746;
+    case SKILL_HARVEST_REAGENTS:
+      return 747;
+    case SKILL_SKULK:
+      return 748;
     case AFFECT_DISEASE:
       return 2500;
     case AFFECT_COMBAT:
@@ -2172,6 +2180,10 @@ spellNumT mapFileToSpellnum(int stt) {
       return SKILL_COMMON;
     case 720:
       return SKILL_SAP;
+    case 722:
+      return SKILL_TOXICITY;
+    case 723:
+      return SKILL_HARVEST_REAGENTS;
     case 730:
       return SKILL_ADVANCED_OFFENSE;
     case 731:

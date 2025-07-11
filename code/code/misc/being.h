@@ -19,6 +19,8 @@
 #include "stats.h"
 #include "obj.h"
 #include "defs.h"
+#include "obj_trash.h"
+
 
 class CSkill;
 class TGuild;
@@ -1980,6 +1982,7 @@ class TBeing : public TThing {
     virtual void doLoad(const char*);
     int doDisguise(const char*);
     int doPoisonWeapon(sstring);
+    int doHarvestReagents(const char*);
     int doGarrotte(const char*, TBeing*);
     int doStab(const char* argument, TBeing* vict);
     int stabSuccess(TBeing* victim);

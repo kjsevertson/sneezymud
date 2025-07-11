@@ -235,6 +235,7 @@ class TRoom : public TThing {
     bool isWaterSector() const;
     bool isWildernessSector() const;
     bool notRangerLandSector() const;
+    bool isToxicSector() const;
     void sendStr(const sstring& msg) const;
 
     sectorTypeT getSectorType() const;
