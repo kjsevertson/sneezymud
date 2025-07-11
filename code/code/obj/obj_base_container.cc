@@ -19,6 +19,7 @@
 #include "obj_opal.h"
 #include "obj_saddlebag.h"
 #include "obj_component.h"
+#include "materials.h"
 
 TBaseContainer::TBaseContainer() : TObj() {}
 
@@ -413,4 +414,123 @@ int TBaseContainer::isSaddle() const {
       return 2;
   }
   return FALSE;
+}
+
+TObj* TBaseContainer::findObjectInContainer(int vnum) const {
+  for (TThing* thing : stuff) {
+    auto* obj = dynamic_cast<TObj*>(thing);
+    if (obj && obj->objVnum() == vnum) {
+      return obj;
+    }
+  }
+  return nullptr;
+}
+
+void TBaseContainer::updateBagDesc() { 
+  // Volume-based bag names (no straps/belt)
+  const char* volumeNames[] = {
+    "pouch", "sack", "bag", "duffle bag", "travel bag"
+  };
+  
+  // Strap-based bag names (WEAR_BACK)
+  const char* strapNames[] = {
+    "bindle", "knapsack", "backpack", "haversack", "rucksack"
+  };
+  
+  // Belt-based bag names (WEAR_WAIST)
+  const char* beltNames[] = {
+    "purse", "fanny pack", "belt pouch", "sling bag"
+  };
+  
+  // Structure-based descriptors
+  const char* structureDesc[] = {
+    "flimsy", "lightweight", "standard", "thick", "sturdy", "fortified"
+  };
+  
+  // Determine volume index (0-4)
+  int volumeIndex = 0;
+  int carriedVolume = carryVolumeLimit();
+  
+  if (carriedVolume > 60000)
+    volumeIndex = 4;
+  else if (carriedVolume > 40000)
+    volumeIndex = 3;
+  else if (carriedVolume > 20000)
+    volumeIndex = 2;
+  else if (carriedVolume > 10000)
+    volumeIndex = 1;
+  else
+    volumeIndex = 0;
+  
+  // Determine structure index (0-5)
+  int structIndex = 0;
+  int maxStruct = getMaxStructPoints();
+  
+  if (maxStruct > 100)
+    structIndex = 5;
+  else if (maxStruct > 80)
+    structIndex = 4;
+  else if (maxStruct > 60)
+    structIndex = 3;
+  else if (maxStruct > 40)
+    structIndex = 2;
+  else if (maxStruct > 20)
+    structIndex = 1;
+  else
+    structIndex = 0;
+  
+  // Get material name
+  sstring materialName = material_nums[getMaterial()].mat_name;
+  
+  // Check for back or waist wearability
+  bool canWearBack = canWear(ITEM_WEAR_BACK);
+  bool canWearWaist = canWear(ITEM_WEAR_WAIST);
+  
+  // Build the descriptive name
+  sstring descriptiveName;
+  
+  // Add structure descriptor
+  descriptiveName = structureDesc[structIndex];
+  
+  // Add material
+  descriptiveName += " " + materialName;
+  
+  // Add appropriate bag type based on features
+  if (canWearWaist) {
+    // Use belt names (capped at array size)
+    descriptiveName += " " + sstring(beltNames[min(volumeIndex, 3)]);
+  } else if (canWearBack) {
+    // Use strap names (capped at array size)
+    descriptiveName += " " + sstring(strapNames[min(volumeIndex, 4)]);
+  } else {
+    // Use regular volume names
+    descriptiveName += " " + sstring(volumeNames[volumeIndex]);
+  }
+  
+  // Split the name into parts for different description formats
+  sstring structMat = descriptiveName.word(0) + " " + descriptiveName.word(1);
+  sstring bagType = descriptiveName.substr(descriptiveName.find(descriptiveName.word(2)));
+  
+  // Set the object as strung (custom descriptions)
+  if (!isObjStat(ITEM_STRUNG)) {
+    addObjStat(ITEM_STRUNG);
+  }
+  
+  // Update name (used for commands)
+  name = format("%s %s") % bagType % structMat;
+  
+  // Update short description (seen in inventory)
+  shortDescr = format("a %s") % descriptiveName;
+  
+  // Update long description (seen in room)
+  descr = format("A %s lies here.") % descriptiveName;
+  
+  // Clear any existing extra descriptions
+  extraDescription* exd;
+  while ((exd = ex_description)) {
+    ex_description = exd->next;
+    delete exd;
+  }
+  ex_description = NULL;
+  action_description = "";
 }

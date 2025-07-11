@@ -86,6 +86,14 @@ extern int task_trap_arrow(TBeing*, cmdTypeT cmd, const char*, int, TRoom*,
 extern int task_ride(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_painting(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_preen(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_harvestReagents(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_tinker_patch(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_tinker_stretch(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_tinker_strap(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_tinker_reinforce(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_tinker_camo(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_tinker_mark(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_tinker_belt(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 
 typedef struct _tasks_entry {
     const char* const name;
@@ -145,6 +153,14 @@ enum taskTypeT {
   TASK_RIDE,
   TASK_PAINT,
   TASK_PREEN,
+  TASK_HARVEST_REAGENTS,
+  TASK_TINKER_PATCH,
+  TASK_TINKER_STRETCH,
+  TASK_TINKER_STRAP,
+  TASK_TINKER_REINFORCE,
+  TASK_TINKER_CAMO,
+  TASK_TINKER_MARK,
+  TASK_TINKER_BELT,
   NUM_TASKS  // keep this as max
 };
 

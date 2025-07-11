@@ -20,7 +20,7 @@ class TBag : public TExpandableContainer {
 
     virtual int getMe(TBeing*, TThing*);
     virtual bool objectRepair(TBeing*, TMonster*, silentTypeT);
-
+    
     TBag();
     TBag(const TBag& a);
     TBag& operator=(const TBag& a);
