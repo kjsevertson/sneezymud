@@ -1893,7 +1893,8 @@ class TBeing : public TThing {
     void doCommand(const char*);
     int doAssist(const char*, TBeing*, bool flags = FALSE);
     void doRoll(TBeing*, dirTypeT);
-    double gainTaskExp(int baseLevel, double scaleFactor);
+    double gainTaskExp(spellNumT skill, int baseLevel, double scaleFactor,
+      bool cooldown);
     void doRoll(TObj*, dirTypeT);
     void doRoll(const sstring&);
     void doEcho(const char*);
