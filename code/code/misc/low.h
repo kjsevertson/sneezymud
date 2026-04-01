@@ -206,6 +206,21 @@ class Obj {
     static constexpr int LOUPE_WARD_KEY = 46593;
     static constexpr int BOLO_WARD_KEY = 46590;
 
+    // Bulk loot system
+    static constexpr int BULK_CLOTHING = 29925;
+    static constexpr int BULK_ARMOR = 29926;
+    static constexpr int BULK_WEAPON = 29927;
+    static constexpr int FLAME_WEAPON = 29928;
+    static constexpr int FROST_WEAPON = 29929;
+    static constexpr int ENERGY_WEAPON = 29930;
+    static constexpr int SHADOW_WEAPON = 29931;
+    static constexpr int SONIC_WEAPON = 29932;
+    static constexpr int ICE_WEAPON = 29933;
+    static constexpr int ELEMENTAL_WEAPON = 29934;
+    static constexpr int DRAGON_SLAYER = 29935;
+    static constexpr int DAY_WEAPON = 29936;
+    static constexpr int NIGHT_WEAPON = 29937;
+
     Obj() = delete;
 };
 

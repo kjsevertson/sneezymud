@@ -172,6 +172,10 @@ int customizer(TBeing* ch, cmdTypeT cmd, const char* arg, TMonster* me, TObj* o,
             format("This is the personalized object of %s") % job->char_name;
           final->action_description = buf;
 
+          // Monogramming a bulk item makes it rentable
+          if (final->isBulk())
+            final->remObjStat(ITEM_NORENT);
+
           if ((final_pers->getCarriedVolume() + final->getTotalVolume()) >
               final_pers->carryVolumeLimit()) {
             me->doSay("You can't carry it! I'll just drop it here for you!");
