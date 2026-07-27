@@ -63,7 +63,7 @@ This codebase is poorly organized. Related code is scattered across many files. 
 
 ## Environment & Preferences
 
-- `.claude/` is its own git repo, separate from the main project. Commit config changes there, not in the main repo.
+- `.claude/` is NOT version-controlled in place — it has no `.git` of its own and is ignored by `~/.gitignore_global`. Never commit config changes to the main repo. The backup lives on the `claude-config` orphan branch of the `fork` remote (https://github.com/kjsevertson/sneezymud/tree/claude-config); to update it, copy `.claude/` into a clone of that branch and stage with `git -c core.excludesFile=/dev/null add -A` — a plain `git add` silently skips everything because of the global ignore. `settings.local.json` is excluded from the backup on purpose: it is machine-local and holds credentials and absolute paths.
 - Git remotes: `origin` = upstream production (`sneezymud/sneezymud`), `fork` = the working fork (`kjsevertson/sneezymud`). Development targets `fork`; `origin` is for pulling upstream and opening PRs to the team. Use `--no-track` when branching from upstream so a stray `git push` doesn't target production: `git checkout -b <branch> origin/master --no-track`
 
 ## Database
