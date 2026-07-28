@@ -167,8 +167,13 @@ int TBeing::backstabHit(TBeing* victim, TThing* obj, int modifier) {
         }
 
         // poison — weapon may be null if checkSpec destroyed it
-        if (weapon && weapon->isPoisoned())
-          weapon->applyPoison(victim);
+        if (weapon && weapon->isPoisoned()) {
+          int poisonRc = weapon->applyPoison(victim);
+          if (IS_SET_DELETE(poisonRc, DELETE_VICT))
+            return DELETE_VICT;
+          if (IS_SET_DELETE(poisonRc, DELETE_THIS))
+            return DELETE_THIS;
+        }
       }
     }
   } else {
@@ -562,8 +567,13 @@ int TBeing::throatSlitHit(TBeing* victim, TThing* obj, int modifier) {
         }
 
         // poison — weapon may be null if checkSpec destroyed it
-        if (weapon && weapon->isPoisoned())
-          weapon->applyPoison(victim);
+        if (weapon && weapon->isPoisoned()) {
+          int poisonRc = weapon->applyPoison(victim);
+          if (IS_SET_DELETE(poisonRc, DELETE_VICT))
+            return DELETE_VICT;
+          if (IS_SET_DELETE(poisonRc, DELETE_THIS))
+            return DELETE_THIS;
+        }
       }
     }
   } else {

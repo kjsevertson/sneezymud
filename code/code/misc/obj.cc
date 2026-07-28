@@ -10,6 +10,59 @@
 
 bool TObj::isPluralItem() const { return FALSE; }
 
+bool TObj::isPoisoned() const {
+  if (poison >= LIQ_WATER)
+    return true;
+
+  return false;
+}
+
+// Returns DELETE_VICT if the poison killed the victim, DELETE_THIS if it
+// killed the wielder (spells crit-fail back onto their caster).  Callers must
+// check: the liquid can cast harm, bone breaker, or boiling blood.
+int TObj::applyPoison(TBeing* vict) {
+  TBeing* ch;
+  int rc = 0;
+
+  if (!isPoisoned())
+    return 0;
+
+  if ((ch = dynamic_cast<TBeing*>(equippedBy))) {
+    act("There was something nasty on that $o!", FALSE, ch, this, vict, TO_VICT,
+      ANSI_RED);
+    act("You inflict something nasty on $N!", FALSE, ch, this, vict, TO_CHAR,
+      ANSI_RED);
+    act("There was something nasty on that $o!", FALSE, ch, this, vict,
+      TO_NOTVICT, ANSI_RED);
+    rc = doLiqSpell(ch, vict, poison, 1);
+  } else {
+    // no wielder: the victim is both caster and target, so either death flag
+    // means the same person died
+    rc = doLiqSpell(vict, vict, poison, 1);
+    if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD)) {
+      poison = (liqTypeT)-1;
+      return DELETE_VICT;
+    }
+    poison = (liqTypeT)-1;
+    return 0;
+  }
+
+  // clear the coating before returning either way; the poison is spent
+  poison = (liqTypeT)-1;
+
+  // spell flags and delete flags are different bit positions - translate
+  if (IS_SET(rc, VICTIM_DEAD))
+    return DELETE_VICT;
+  if (IS_SET(rc, CASTER_DEAD))
+    return DELETE_THIS;
+  return 0;
+}
+
+void TObj::setPoison(liqTypeT liq) {
+  if (!isPoisoned())
+    poison = liq;
+}
+
 bool TObj::engraveMe(TBeing*, TMonster*, bool) { return FALSE; }
 
 bool TObj::isUnique() const { return (!obj_index[getItemIndex()].getNumber()); }

@@ -59,9 +59,11 @@ static void stabMissMsg(TBeing* thief, TBeing* victim, TGenWeapon* weapon) {
   act("$n misses $s thrust into $N.", FALSE, thief, weapon, victim, TO_NOTVICT);
 }
 
-static void stabPoisonCheck(TBeing* victim, TGenWeapon* weapon) {
-  if (weapon->isPoisoned())
-    weapon->applyPoison(victim);
+// Returns DELETE_VICT / DELETE_THIS if the poison killed someone.
+static int stabPoisonCheck(TBeing* victim, TGenWeapon* weapon) {
+  if (!weapon->isPoisoned())
+    return 0;
+  return weapon->applyPoison(victim);
 }
 
 static void stabBleedCheck(TBeing* thief, TBeing* victim, TGenWeapon* weapon,
@@ -129,7 +131,12 @@ static int stabCore(TBeing* thief, TBeing* victim, TGenWeapon* weapon) {
     return DELETE_VICT;
 
   stabBleedCheck(thief, victim, weapon, limb);
-  stabPoisonCheck(victim, weapon);
+
+  int poisonRc = stabPoisonCheck(victim, weapon);
+  if (IS_SET_DELETE(poisonRc, DELETE_VICT))
+    return DELETE_VICT;
+  if (IS_SET_DELETE(poisonRc, DELETE_THIS))
+    return DELETE_THIS;
 
   int specRc =
     weapon->checkSpec(victim, CMD_STAB, reinterpret_cast<char*>(limb), thief);

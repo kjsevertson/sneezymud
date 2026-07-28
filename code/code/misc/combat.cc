@@ -4804,8 +4804,17 @@ int TBeing::oneHit(TBeing* vict, primaryTypeT isprimary, TThing* weapon,
       // poison
       TBaseWeapon* tow;
       if (weapon && (tow = dynamic_cast<TBaseWeapon*>(weapon)) &&
-          tow->isPoisoned())
-        tow->applyPoison(vict);
+          tow->isPoisoned()) {
+        int poisonRc = tow->applyPoison(vict);
+        if (IS_SET_DELETE(poisonRc, DELETE_VICT)) {
+          retCode |= DELETE_VICT;
+          return retCode;
+        }
+        if (IS_SET_DELETE(poisonRc, DELETE_THIS)) {
+          retCode |= DELETE_THIS;
+          return retCode;
+        }
+      }
 
       // more absorbtion stuff..
       //      affectedData *af;

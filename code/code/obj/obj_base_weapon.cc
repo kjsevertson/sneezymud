@@ -32,16 +32,14 @@ TBaseWeapon::TBaseWeapon() :
   maxSharp(0),
   curSharp(0),
   damLevel(0),
-  damDev(0),
-  poison((liqTypeT)-1) {}
+  damDev(0) {}
 
 TBaseWeapon::TBaseWeapon(const TBaseWeapon& a) :
   TObj(a),
   maxSharp(a.maxSharp),
   curSharp(a.curSharp),
   damLevel(a.damLevel),
-  damDev(a.damDev),
-  poison(a.poison) {}
+  damDev(a.damDev) {}
 
 TBaseWeapon& TBaseWeapon::operator=(const TBaseWeapon& a) {
   if (this == &a)
@@ -51,7 +49,6 @@ TBaseWeapon& TBaseWeapon::operator=(const TBaseWeapon& a) {
   curSharp = a.curSharp;
   damLevel = a.damLevel;
   damDev = a.damDev;
-  poison = a.poison;
   return *this;
 }
 
@@ -1549,8 +1546,19 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
 
         d = get_range_actual_damage(ch, tb, this, d, damtype);
 
-        if (isPoisoned())
-          applyPoison(tb);
+        // An arrow in flight has no wielder, so applyPoison takes its
+        // victim-is-also-caster branch and can only report DELETE_VICT.
+        if (isPoisoned()) {
+          if (IS_SET_DELETE(applyPoison(tb), DELETE_VICT)) {
+            if (true_targ) {
+              ADD_DELETE(resCode, DELETE_VICT);
+              return resCode;
+            }
+            delete tb;
+            tb = nullptr;
+            return resCode;
+          }
+        }
 
         TArrow* arrow;
         if ((arrow = dynamic_cast<TArrow*>(this)) &&
@@ -1690,35 +1698,3 @@ void TBaseWeapon::sellMeMoney(TBeing* ch, TMonster* keeper, int cost,
   tso.doSellTransaction(cost, getName(), TX_SELLING);
 }
 
-bool TBaseWeapon::isPoisoned() const {
-  if (poison >= LIQ_WATER)
-    return true;
-
-  return false;
-}
-
-void TBaseWeapon::applyPoison(TBeing* vict) {
-  TBeing* ch;
-
-  if (!isPoisoned())
-    return;
-
-  if ((ch = dynamic_cast<TBeing*>(equippedBy))) {
-    act("There was something nasty on that $o!", FALSE, ch, this, vict, TO_VICT,
-      ANSI_RED);
-    act("You inflict something nasty on $N!", FALSE, ch, this, vict, TO_CHAR,
-      ANSI_RED);
-    act("There was something nasty on that $o!", FALSE, ch, this, vict,
-      TO_NOTVICT, ANSI_RED);
-    doLiqSpell(ch, vict, poison, 1);
-  } else {
-    doLiqSpell(vict, vict, poison, 1);
-  }
-
-  poison = (liqTypeT)-1;
-}
-
-void TBaseWeapon::setPoison(liqTypeT liq) {
-  if (!isPoisoned())
-    poison = liq;
-}

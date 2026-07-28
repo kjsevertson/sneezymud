@@ -16,17 +16,13 @@ class TBaseWeapon : public TObj {
     int curSharp;
     int damLevel;
     int damDev;
-    liqTypeT poison;
 
   public:
     virtual void assignFourValues(int, int, int, int);
     virtual void getFourValues(int*, int*, int*, int*) const;
     virtual sstring statObjInfo() const = 0;
 
-    virtual bool isPoisoned() const;
-    virtual void applyPoison(TBeing*);
-    virtual void setPoison(liqTypeT);
-    virtual liqTypeT getPoison() const { return poison; }
+    // poison state lives on TObj so spiked non-weapons can carry it too
     virtual int editAverageMe(TBeing*, const char*);
     virtual double baseDamage() const;
     virtual int swungObjectDamage(const TBeing*, const TBeing*) const;

@@ -531,6 +531,11 @@ class TObj : public TThing {
                     // temporarily
 
   protected:
+    // The liquid coating this object, or -1 for none.  Lives on TObj rather
+    // than TBaseWeapon so that anything which can break skin - spiked armour
+    // as much as a blade - can carry a poison.  Runtime only; not saved.
+    liqTypeT poison;
+
     TObj();
 
   public:
@@ -539,6 +544,13 @@ class TObj : public TThing {
     TObj& operator=(const TObj&);
     virtual TThing& operator+=(TThing& t);
     virtual ~TObj();
+
+    virtual bool isPoisoned() const;
+    virtual liqTypeT getPoison() const { return poison; }
+    virtual void setPoison(liqTypeT);
+    // Delivers the coating and spends it.  Returns DELETE_VICT if the poison
+    // killed the victim, DELETE_THIS if it killed the wielder.
+    virtual int applyPoison(TBeing*);
 
     // VIRTUAL FUNCTIONS
     virtual sstring showModifier(showModeT, const TBeing*) const { return ""; }
