@@ -319,10 +319,7 @@ int TBeing::bashSuccess(TBeing* victim, spellNumT skill, bool isHoldingShield,
     limb = WEAR_HEAD;
   }
 
-  // Use impactSpec to handle all impact effects (spikes, thornflesh, hardness)
-  // This handles messaging, bleeding, equipment damage, etc.
   wearSlotT attackerLimb = isHoldingShield ? getSecondaryHold() : atkLimb;
-  shieldDam += impactSpec(this, victim, attackerLimb, limb);
 
   int dealt = 0;
   int rc = reconcileDamage(victim, shieldDam, SKILL_BASH, &dealt);
@@ -331,6 +328,16 @@ int TBeing::bashSuccess(TBeing* victim, spellNumT skill, bool isHoldingShield,
     nullptr, victim, TO_CHAR);
 
   if (rc == -1)
+    return DELETE_VICT;
+
+  // impactSpec applies its own damage (spikes, thornflesh, hardness), so it
+  // runs after the bash itself has landed.  Its damage is not part of the
+  // "deals N damage" figure above.  Poisoned spikes can crit-fail back onto
+  // us, so it can report either death.
+  int impactRc = impactSpec(this, victim, attackerLimb, limb);
+  if (IS_SET_DELETE(impactRc, DELETE_THIS))
+    return DELETE_THIS;
+  if (IS_SET_DELETE(impactRc, DELETE_VICT))
     return DELETE_VICT;
 
   int distractionBonus = 1;

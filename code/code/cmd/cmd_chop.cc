@@ -12,7 +12,6 @@
 #include "disc_monk.h"
 #include "obj_general_weapon.h"
 
-
 static int chopMiss(TBeing* c, TBeing* v) {
   act("$n swings wildly as $e tries to chop $N.", FALSE, c, 0, v, TO_NOTVICT);
   act("You miss your chop attack at $N.", FALSE, c, 0, v, TO_CHAR);
@@ -40,7 +39,7 @@ static int chopHit(TBeing* c, TBeing* v, int score) {
       pos = WEAR_ARM_R;
       slot = 1;
     } else {
-      pos = WEAR_BODY; 
+      pos = WEAR_BODY;
       slot = 2;
     }
   } else if (temp < 80) {
@@ -54,8 +53,8 @@ static int chopHit(TBeing* c, TBeing* v, int score) {
     slot = 4;  // head shot
   }
   if (!v->isHumanoid()) {
-   pos = WEAR_WAIST; 
-   slot = 5;  // non-human side shot
+    pos = WEAR_WAIST;
+    slot = 5;  // non-human side shot
   }
   // Set default damage
   int dam = c->getSkillDam(v, SKILL_CHOP, c->getSkillLevel(SKILL_CHOP),
@@ -116,14 +115,20 @@ static int chopHit(TBeing* c, TBeing* v, int score) {
       act("Your chop lands square on $N's side!", FALSE, c, 0, v, TO_CHAR);
       break;
   }
-  if (!c->isRightHanded()){
+  if (!c->isRightHanded()) {
     handSlot = WEAR_HAND_L;
   }
 
-  // Use impactSpec to handle all impact effects (spikes, thornflesh, hardness)
-  dam += impactSpec(c, v, handSlot, pos);
-
   if (c->reconcileDamage(v, dam, SKILL_CHOP) == -1)
+    return DELETE_VICT;
+
+  // impactSpec applies its own damage (spikes, thornflesh, hardness), so it
+  // runs after the skill's blow has landed.  Poisoned spikes can crit-fail
+  // back onto the chopper, so it can report either death.
+  int impactRc = impactSpec(c, v, handSlot, pos);
+  if (IS_SET_DELETE(impactRc, DELETE_THIS))
+    return DELETE_THIS;
+  if (IS_SET_DELETE(impactRc, DELETE_VICT))
     return DELETE_VICT;
 
   return TRUE;
@@ -193,6 +198,8 @@ static int chop(TBeing* c, TBeing* v) {
   if (!v->awake() ||
       (i && i != GUARANTEED_FAILURE && c->bSuccess(bKnown, SKILL_CHOP))) {
     rc = chopHit(c, v, bKnown + percent);
+    if (IS_SET_DELETE(rc, DELETE_THIS))
+      return DELETE_THIS;
     if (IS_SET_DELETE(rc, DELETE_VICT))
       return DELETE_VICT;
   } else {

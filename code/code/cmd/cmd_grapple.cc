@@ -119,10 +119,17 @@ static int grapple(TBeing* c, TBeing* victim, spellNumT skill) {
 
       int dam = c->getSkillDam(victim, skill, c->getSkillLevel(skill),
         c->getAdvLearning(skill));
-      // Use impactSpec to handle all impact effects (spikes, thorns, hardness)
       wearSlotT targetLimb = victim->getPartHit(c, TRUE);
-      dam += impactSpec(c, victim, WEAR_BODY, targetLimb);
       if (c->reconcileDamage(victim, dam, SKILL_GRAPPLE) == -1)
+        return DELETE_VICT;
+
+      // impactSpec applies its own damage (spikes, thornflesh, hardness), so
+      // it runs after the skill's blow has landed.  Poisoned spikes can
+      // crit-fail back onto the grappler, so it can report either death.
+      int impactRc = impactSpec(c, victim, WEAR_BODY, targetLimb);
+      if (IS_SET_DELETE(impactRc, DELETE_THIS))
+        return DELETE_THIS;
+      if (IS_SET_DELETE(impactRc, DELETE_VICT))
         return DELETE_VICT;
 
       // Both end up pinned on the ground. Use setPosition + pin-specific
@@ -242,6 +249,8 @@ int TBeing::doGrapple(const char* argument, TBeing* vict) {
   rc = grapple(this, victim, skill);
   if (rc)
     addSkillLag(skill, rc);
+  if (IS_SET_DELETE(rc, DELETE_THIS))
+    return DELETE_THIS;
   if (IS_SET_DELETE(rc, DELETE_VICT)) {
     if (vict)
       return rc;
