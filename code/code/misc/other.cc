@@ -2233,6 +2233,11 @@ int TBeing::doQuaff(sstring argument) {
 int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
   int rc = 0, i;
   int level = max(30, amt * 6), learn = max(100, amt * 20);
+  // A poisoner trained in the skill delivers the liquid at their own level
+  // when that beats the liquid's baseline, so a high-level thief's coating
+  // bites harder than a novice's.
+  if (ch && ch->doesKnowSkill(SKILL_POISON_WEAPON))
+    level = max(level, static_cast<int>(ch->GetMaxLevel()));
   int duration = (level << 2) * Pulse::UPDATES_PER_MUDHOUR;
   affectedData aff, aff5[5];
   statTypeT whichStat;
