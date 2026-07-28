@@ -391,7 +391,7 @@ void TBaseWeapon::changeObjValue3(TBeing* ch) {
   ch->sendTo(format(VT_CURSPOS) % 10 % 1);
   ch->sendTo("Enter new value.\n\r--> ");
 }
-  
+
 int getHardnessSpec(const TBeing* ch, wearSlotT limb) {
   if (!ch || limb == WEAR_NOWHERE) {
     return 0;
@@ -402,30 +402,34 @@ int getHardnessSpec(const TBeing* ch, wearSlotT limb) {
   }
 
   int hardness = material_nums[ch->getMaterial(limb)].hardness;
-  
+
   if (ch->affectedBySpell(SPELL_THORNFLESH)) {
     hardness = material_nums[MAT_WOOD].hardness;
   }
-  
+
   if (ch->affectedBySpell(SPELL_STONE_SKIN)) {
     hardness = material_nums[MAT_STONE].hardness;
   }
-  
+
   if (ch->doesKnowSkill(SKILL_IRON_FLESH)) {
     int skillValue = ch->getSkillValue(SKILL_IRON_FLESH);
-    int ironFleshHardness = (skillValue * material_nums[MAT_IRON].hardness) / 100;
+    int ironFleshHardness =
+      (skillValue * material_nums[MAT_IRON].hardness) / 100;
     if (ironFleshHardness > hardness) {
       hardness = ironFleshHardness;
     }
   }
-  
-  if ((limb == WEAR_HAND_R || limb == WEAR_HAND_L) && ch->doesKnowSkill(SKILL_IRON_FIST)) {
-    int ironFistHardness = (ch->getSkillValue(SKILL_IRON_FIST) * material_nums[MAT_IRON].hardness) / 100;
+
+  if ((limb == WEAR_HAND_R || limb == WEAR_HAND_L) &&
+      ch->doesKnowSkill(SKILL_IRON_FIST)) {
+    int ironFistHardness =
+      (ch->getSkillValue(SKILL_IRON_FIST) * material_nums[MAT_IRON].hardness) /
+      100;
     if (ironFistHardness > hardness) {
       hardness = ironFistHardness;
     }
   }
-  
+
   return hardness;
 }
 
@@ -676,9 +680,7 @@ bool TBaseWeapon::isPierceWeapon() const {
 
 // Pierce weapon currently wielded two-handed. ITEM_PAIRED is a per-instance
 // wear flag, not a type marker — small paired pierce weapons qualify too.
-bool TBaseWeapon::isPolearm() const {
-  return isPierceWeapon() && isPaired();
-}
+bool TBaseWeapon::isPolearm() const { return isPierceWeapon() && isPaired(); }
 
 void TBaseWeapon::divinateMe(TBeing* caster) const {
 #if 1
@@ -1046,19 +1048,18 @@ int TGenWeapon::smiteWithMe(TBeing* ch, TBeing* v) {
 }
 
 int TBaseWeapon::poisonWeaponWeapon(TBeing* ch, TThing* poison) {
-  int rc;
-
-  if (isBluntWeapon()) {
-    ch->sendTo("Blunt weapons can't be poisoned effectively.\n\r");
-    return FALSE;
+  // A blunt weapon has no edge to hold a coating - unless it is spiked, in
+  // which case the spikes carry it the same way an armour's would.
+  if (isBluntWeapon() && !isSpiked()) {
+    act("$p has no edge to hold a coating.", false, ch, this, nullptr, TO_CHAR);
+    return false;
   }
   if (isPoisoned()) {
-    ch->sendTo("That is already poisoned!\n\r");
-    return FALSE;
+    act("$p is already poisoned!", false, ch, this, nullptr, TO_CHAR);
+    return false;
   }
 
-  rc = poison->poisonMePoison(ch, this);
-  return rc;
+  return poison->poisonMePoison(ch, this);
 }
 
 void TBaseWeapon::curseMe() {
@@ -1247,8 +1248,9 @@ int TBaseWeapon::suggestedPrice() const {
   }
   if (tohit) {
     // this formula is from balance notes
-    double amt_d = weapon_lev * max(weapon_lev, 20.0) * 450.0 / 4.0
-                 - (weapon_lev - tohit) * max(weapon_lev - tohit, 20.0) * 450.0 / 4.0;
+    double amt_d =
+      weapon_lev * max(weapon_lev, 20.0) * 450.0 / 4.0 -
+      (weapon_lev - tohit) * max(weapon_lev - tohit, 20.0) * 450.0 / 4.0;
     int amt = saturate_to_int(amt_d);
     price += amt;
   }
@@ -1620,8 +1622,8 @@ sstring TBaseWeapon::showModifier(showModeT mode, const TBeing* ch) const {
     }
   }
 
-  if (isPoisoned())
-    a += " (poisoned)";
+  // "(poisoned)" is appended generically for every object in show.cc, since
+  // poison is no longer weapon-only.
 
   return a;
 }
@@ -1697,4 +1699,3 @@ void TBaseWeapon::sellMeMoney(TBeing* ch, TMonster* keeper, int cost,
   TShopOwned tso(shop_nr, keeper, ch);
   tso.doSellTransaction(cost, getName(), TX_SELLING);
 }
-

@@ -108,6 +108,9 @@ void TObj::show_me_to_char(TBeing* ch, showModeT mode) const {
   // this is an item-type-specific modifier
   buffer += showModifier(mode, ch);
 
+  // Only a trained poisoner recognises a coating at a glance.
+  if (isPoisoned() && ch && ch->doesKnowSkill(SKILL_POISON_WEAPON))
+    buffer += " (poisoned)";
   if (isObjStat(ITEM_INVISIBLE))
     buffer += " (invisible)";
   if (isObjStat(ITEM_MAGIC) && ch->isAffected(AFF_DETECT_MAGIC)) {
@@ -191,6 +194,9 @@ void TObj::show_me_mult_to_char(TBeing* ch, showModeT mode,
       mode == SHOW_MODE_PLUS) {
     buffer += showModifier(mode, ch);
 
+    // Only a trained poisoner recognises a coating at a glance.
+    if (isPoisoned() && ch && ch->doesKnowSkill(SKILL_POISON_WEAPON))
+      buffer += " (poisoned)";
     if (isObjStat(ITEM_INVISIBLE))
       buffer += " (invisible)";
     if (isObjStat(ITEM_MAGIC) && ch->isAffected(AFF_DETECT_MAGIC)) {

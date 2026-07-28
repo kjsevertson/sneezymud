@@ -12,7 +12,6 @@
 #include "obj_general_weapon.h"
 #include "obj_base_weapon.h"
 #include "obj_base_cup.h"
-#include "obj_arrow.h"
 #include "liquids.h"
 #include "combat.h"
 
@@ -796,28 +795,75 @@ int throatSlit(TBeing* thief, TBeing* victim) {
 
 //////////
 
+// Rinsing a coating off needs water: standing in it, a pool underfoot, or a
+// container of it to hand.  Anyone can do this - it takes no skill to wash a
+// blade - so it runs before doPoisonWeapon's skill check.
+static int washPoison(TBeing* ch, TObj* obj) {
+  if (!obj->isPoisoned()) {
+    act("$p isn't coated with anything.", false, ch, obj, nullptr, TO_CHAR);
+    return FALSE;
+  }
+
+  bool standingInWater = ch->roomp && ch->roomp->isWaterSector();
+  TBaseCup* source = nullptr;
+
+  if (!standingInWater) {
+    // a pool in the room first, then anything carried or worn
+    if (ch->roomp) {
+      for (StuffIter it = ch->roomp->stuff.begin();
+           !source && it != ch->roomp->stuff.end(); ++it) {
+        TBaseCup* cup = dynamic_cast<TBaseCup*>(*it);
+        if (cup && cup->getDrinkType() == LIQ_WATER && cup->getDrinkUnits() > 0)
+          source = cup;
+      }
+    }
+    for (StuffIter it = ch->stuff.begin(); !source && it != ch->stuff.end();
+         ++it) {
+      TBaseCup* cup = dynamic_cast<TBaseCup*>(*it);
+      if (cup && cup->getDrinkType() == LIQ_WATER && cup->getDrinkUnits() > 0)
+        source = cup;
+    }
+  }
+
+  if (!standingInWater && !source) {
+    ch->sendTo("You have no water to wash that off with.\n\r");
+    return FALSE;
+  }
+
+  if (source)
+    source->addToDrinkUnits(-1);
+
+  obj->clearPoison();
+  act("You rinse the coating off $p.", false, ch, obj, nullptr, TO_CHAR);
+  act("$n rinses something off $p.", false, ch, obj, nullptr, TO_ROOM);
+  return TRUE;
+}
+
 int TBeing::doPoisonWeapon(sstring arg) {
   TObj *obj = nullptr, *poison = nullptr;
   sstring namebuf;
   int rc;
 
-  if (!doesKnowSkill(SKILL_POISON_WEAPON)) {
-    sendTo("You know nothing about poisoning weapons.\n\r");
-    return FALSE;
-  }
   if (checkBusy())
     return FALSE;
 
   arg = one_argument(arg, namebuf);
 
-  if (arg.empty() ||
+  // NB: test namebuf, not arg - arg holds the *remainder*, so checking it here
+  // rejected the one-argument form outright.
+  if (namebuf.empty() ||
       !(obj = generic_find_obj(namebuf, FIND_OBJ_INV | FIND_OBJ_EQUIP, this))) {
     sendTo("Poison what?\n\r");
     return FALSE;
   }
 
-  if (!doesKnowSkill(SKILL_POISON_WEAPON) && !(dynamic_cast<TArrow*>(obj))) {
-    sendTo("You are only skilled at poisoning arrows.\n\r");
+  sstring second;
+  one_argument(arg, second);
+  if (second == "remove" || second == "wash" || second == "clean")
+    return washPoison(this, obj);
+
+  if (!doesKnowSkill(SKILL_POISON_WEAPON)) {
+    sendTo("You know nothing about poisoning weapons.\n\r");
     return FALSE;
   }
 
@@ -850,7 +896,7 @@ int TBeing::doPoisonWeapon(sstring arg) {
   return rc;
 }
 
-int TThing::poisonMePoison(TBeing* ch, TBaseWeapon*) {
+int TThing::poisonMePoison(TBeing* ch, TObj*) {
   act("$p isn't the proper kind of poison for this.", FALSE, ch, this, 0,
     TO_CHAR);
   return FALSE;
@@ -980,8 +1026,7 @@ bool addPoison(affectedData aff[5], liqTypeT liq, int level, int duration) {
   return true;
 }
 
-int TBaseCup::poisonMePoison(TBeing* ch, TBaseWeapon* weapon) {
-  int j;
+int TBaseCup::poisonMePoison(TBeing* ch, TObj* weapon) {
   sstring s;
   spellNumT skill = SKILL_POISON_WEAPON;
 
@@ -992,11 +1037,10 @@ int TBaseCup::poisonMePoison(TBeing* ch, TBaseWeapon* weapon) {
   int bKnown = ch->getSkillValue(skill);
 
   if (ch->bSuccess(bKnown, skill)) {
-    for (j = 0; j < MAX_SWING_AFFECT; j++) {
-      if (weapon->isPoisoned()) {
-        ch->sendTo("That weapon is already affected by poison!\n\r");
-        return FALSE;
-      }
+    if (weapon->isPoisoned()) {
+      act("$p is already affected by poison!", false, ch, weapon, nullptr,
+        TO_CHAR);
+      return false;
     }
 
     weapon->setPoison(getDrinkType());
@@ -1021,12 +1065,13 @@ int TBaseCup::poisonMePoison(TBeing* ch, TBaseWeapon* weapon) {
 
       doLiqSpell(ch, ch, getDrinkType(), 1);
     } else {
-      weapon->setPoison(LIQ_WATER);
-
-      s = format("You coat $p with %s.") % liquidInfo[getDrinkType()]->name;
-      act(s, FALSE, ch, weapon, NULL, TO_CHAR);
-      s = format("$n coats $p with %s.") % liquidInfo[getDrinkType()]->name;
-      act(s, FALSE, ch, weapon, NULL, TO_ROOM);
+      // The coating simply doesn't take.  It used to leave plain water on the
+      // object while telling the player they had poisoned it, so the failure
+      // only surfaced later when the poison did nothing.
+      act("The coating beads up and runs off $p.", false, ch, weapon, nullptr,
+        TO_CHAR);
+      act("$n's coating beads up and runs off $p.", false, ch, weapon, nullptr,
+        TO_ROOM);
     }
   }
 

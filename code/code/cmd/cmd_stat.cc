@@ -13,6 +13,7 @@
 #include "low.h"
 #include "account.h"
 #include "materials.h"
+#include "liquids.h"
 #include "disease.h"
 #include "spec_rooms.h"
 #include "monster.h"
@@ -686,6 +687,9 @@ void TBeing::statObj(const TObj* j) {
          j->getCarriedWeight() % j->getCarriedVolume();
 
   str += j->statObjInfo();
+  if (j->isPoisoned())
+    str +=
+      format("Poisoned with:      %s\n\r") % liquidInfo[j->getPoison()]->name;
 
   str += format("\n\rSpecial procedure: %s   ") %
          (j->spec ? objSpecials[GET_OBJ_SPE_INDEX(j->spec)].name : "none");
@@ -796,6 +800,9 @@ void TBeing::statObjForDivman(const TObj* j) {
          j->getMaxStructPoints() % j->getVolume();
   str += format("Base value in talens: %d\n\r") % j->obj_flags.cost;
   str += j->statObjInfo();
+  if (j->isPoisoned())
+    str +=
+      format("Poisoned with:      %s\n\r") % liquidInfo[j->getPoison()]->name;
   if (j->spec) {
     str += format("It possesses the special trait known as %s.\n\r\n\r") %
            objSpecials[GET_OBJ_SPE_INDEX(j->spec)].name;
@@ -2288,8 +2295,8 @@ void TBeing::statBeing(TBeing* k) {
       case AFFECT_HOLY_BEAM:
         str += "Holy Beam.\n\r";
         str += format("     Modifies %s to %s by %ld points\n\r") %
-               apply_types[aff->location].name %
-               immunity_names[aff->modifier] % aff->modifier2;
+               apply_types[aff->location].name % immunity_names[aff->modifier] %
+               aff->modifier2;
         str += format("     Expires in %6d updates.\n\r") % aff->duration;
         break;
       case AFFECT_GUARDIANS_LIGHT:
@@ -2348,8 +2355,8 @@ void TBeing::statBeing(TBeing* k) {
       case SPELL_CONSECRATE_AFFECT:
         str += "Consecration.\n\r";
         str += format("     Modifies %s to %s by %ld points\n\r") %
-               apply_types[aff->location].name %
-               immunity_names[aff->modifier] % aff->modifier2;
+               apply_types[aff->location].name % immunity_names[aff->modifier] %
+               aff->modifier2;
         str += format("     Expires in %6d updates.\n\r") % aff->duration;
         break;
 

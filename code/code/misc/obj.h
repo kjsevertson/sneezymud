@@ -42,7 +42,6 @@ extern currencyInfoT currencyInfo;
 const float SIP_WEIGHT = 0.065;
 const float SIP_VOLUME = 1.8046875;
 
-const int MAX_SWING_AFFECT = 5;
 // const int MAX_OBJ_AFFECT    = 5;
 const int OBJ_NOTIMER = -1;
 const int MAX_TOUNGE = 3;
@@ -548,6 +547,10 @@ class TObj : public TThing {
     virtual bool isPoisoned() const;
     virtual liqTypeT getPoison() const { return poison; }
     virtual void setPoison(liqTypeT);
+    // setPoison refuses to overwrite an existing coating, so removing one
+    // needs its own door.
+    void clearPoison() { poison = (liqTypeT)-1; }
+    virtual int poisonWeaponWeapon(TBeing*, TThing*);
     // Delivers the coating and spends it.  Returns DELETE_VICT if the poison
     // killed the victim, DELETE_THIS if it killed the wielder.
     virtual int applyPoison(TBeing*);

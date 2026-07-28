@@ -127,9 +127,6 @@ sstring TGenWeapon::statObjInfo() const {
       a += format(" Attack Frequency:  %d%%") % getWeaponFreq(wt);
     a += "\n\r";
   }
-  if (isPoisoned()) {
-    a += format("Poisoned with:      %s\n\r") % liquidInfo[getPoison()]->name;
-  }
   return a;
 }
 
