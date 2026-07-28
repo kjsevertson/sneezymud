@@ -264,6 +264,11 @@ int TBeing::reconcileDamage(TBeing* v, int dam, spellNumT how, int* damDealt) {
   int rc = 0;
   spellNumT how2;
 
+  // applyDamage sets this, but the combat specials below can return first;
+  // callers must not read a stale count from an earlier attack.
+  if (damDealt)
+    *damDealt = 0;
+
   // trigger specials for starting a fight
   if (fight() != v && (rc = checkSpec(v, CMD_MOB_COMBAT_ONATTACK, NULL, NULL)))
     return rc;

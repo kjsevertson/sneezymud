@@ -611,7 +611,8 @@ class TBeing : public TThing {
     static SpecialAttackStats specialAttackStats(spellNumT skill);
     // The circumstantial +/- level modifier a specific skill contributes to its
     // specialAttack roll (on top of specAttackMod's baseline). 0 for most.
-    int skillSituationalModifier(TBeing* victim, spellNumT skill);
+    int skillSituationalModifier(TBeing* victim, spellNumT skill,
+      bool* spotted = nullptr);
     int bashSituationalModifier(TBeing* victim);
     // Stealth-strike detection predicates (backstab/throatslit): whether the
     // victim hears this thief's noisy gear, and whether a suspicious mob spots

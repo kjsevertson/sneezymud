@@ -380,7 +380,9 @@ int backstab(TBeing* thief, TBeing* victim) {
   }
   thief->reconcileHurt(victim, 0.04);
 
-  int modifier = thief->skillSituationalModifier(victim, SKILL_BACKSTAB);
+  bool spotted = false;
+  int modifier =
+    thief->skillSituationalModifier(victim, SKILL_BACKSTAB, &spotted);
 
   if (thief->canHearThief(victim)) {
     act(
@@ -394,7 +396,7 @@ int backstab(TBeing* thief, TBeing* victim) {
       "backstab you.",
       FALSE, thief, 0, victim, TO_VICT);
   }
-  if (thief->spottedBySuspiciousMob(victim)) {
+  if (spotted) {
     act("$E is able to see you and notices you coming at the last moment.",
       FALSE, thief, 0, victim, TO_CHAR);
     act("You sense $m coming as $n attempts to murder you.", FALSE, thief, 0,
@@ -736,7 +738,9 @@ int throatSlit(TBeing* thief, TBeing* victim) {
   }
   thief->reconcileHurt(victim, 0.04);
 
-  int modifier = thief->skillSituationalModifier(victim, SKILL_THROATSLIT);
+  bool spotted = false;
+  int modifier =
+    thief->skillSituationalModifier(victim, SKILL_THROATSLIT, &spotted);
 
   if (thief->canHearThief(victim)) {
     act(
@@ -750,7 +754,7 @@ int throatSlit(TBeing* thief, TBeing* victim) {
       "you.",
       FALSE, thief, 0, victim, TO_VICT);
   }
-  if (thief->spottedBySuspiciousMob(victim)) {
+  if (spotted) {
     act("$E is able to see you and notices you coming at the last moment.",
       FALSE, thief, 0, victim, TO_CHAR);
     act("You sense $m coming as $n attempts to murder you.", FALSE, thief, 0,

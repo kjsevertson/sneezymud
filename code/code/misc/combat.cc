@@ -3286,7 +3286,11 @@ bool TBeing::spottedBySuspiciousMob(TBeing* victim) {
 
 // The per-skill situational modifier passed to specialAttack. Most skills add
 // nothing; the ones that do compute it from the attacker/victim matchup.
-int TBeing::skillSituationalModifier(TBeing* victim, spellNumT skill) {
+// spottedBySuspiciousMob() rolls dice, so its outcome is reported back through
+// `spotted` for callers that also want to narrate it -- calling it a second
+// time at the call site would be an independent roll of the same event.
+int TBeing::skillSituationalModifier(TBeing* victim, spellNumT skill,
+  bool* spotted) {
   switch (skill) {
     // getSkillNum(SKILL_BASH) yields the deikhan variant for that class.
     case SKILL_BASH:
@@ -3300,8 +3304,11 @@ int TBeing::skillSituationalModifier(TBeing* victim, spellNumT skill) {
       int mod = -(noise(this) / 20) + visibility() / 15;
       if (canHearThief(victim))
         mod -= 10;
-      if (spottedBySuspiciousMob(victim))
+      if (spottedBySuspiciousMob(victim)) {
         mod -= 10;
+        if (spotted)
+          *spotted = true;
+      }
       return mod;
     }
     case SKILL_SUBTERFUGE: {

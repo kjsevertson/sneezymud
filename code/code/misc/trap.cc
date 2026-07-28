@@ -24,6 +24,7 @@
 #include "obj_arrow.h"
 #include "obj_trap_component.h"
 #include "obj_trapcomp_bag.h"
+#include "loadset.h"
 #include "trap.h"
 
 extern const char* const GRENADE_EX_DESC = "__grenade_puller";
@@ -160,6 +161,14 @@ void recordTrapSetter(TObj* carrier, const TBeing* setter) {
   if (!carrier || !setter)
     return;
   carrier->swapToStrung();
+  // Overwrite an existing entry rather than shadowing it: disarm-and-retrap
+  // would otherwise stack a node per trap, and nothing ever prunes them.
+  for (extraDescription* ed = carrier->ex_description; ed; ed = ed->next) {
+    if (ed->keyword == TRAP_EX_DESC) {
+      ed->description = setter->getName();
+      return;
+    }
+  }
   auto* ed = new extraDescription();
   ed->next = carrier->ex_description;
   carrier->ex_description = ed;
@@ -213,6 +222,58 @@ doorTrapT parseTrapType(const char* name, trap_targ_t target) {
       return DOOR_TRAP_DISK;
   }
   return MAX_TRAP_TYPES;
+}
+
+namespace {
+  // Which targets each type may be rigged to, mirroring parseTrapType's rules,
+  // plus how often a randomly generated trap should pick it. Frequencies are
+  // the mob trap-bag values: sleep and teleport are aggravating and TNT and
+  // energy are punishing, so all four are damped well below the ordinary types.
+  // Teleport is additionally held back to higher-level content.
+  struct randomTrapEntry {
+      doorTrapT type;
+      unsigned targets;
+      int minLevel;  // -1 for no restriction
+      int frequency;
+  };
+
+  constexpr unsigned TT_DOOR = 1u << TRAP_TARG_DOOR;
+  constexpr unsigned TT_CONT = 1u << TRAP_TARG_CONT;
+  constexpr unsigned TT_MINE = 1u << TRAP_TARG_MINE;
+  constexpr unsigned TT_GREN = 1u << TRAP_TARG_GRENADE;
+  constexpr unsigned TT_ARRW = 1u << TRAP_TARG_ARROW;
+  constexpr unsigned TT_ALL = TT_DOOR | TT_CONT | TT_MINE | TT_GREN | TT_ARRW;
+
+  constexpr randomTrapEntry randomTrapTable[] = {
+    {DOOR_TRAP_POISON, TT_ALL & ~TT_ARRW, -1, 100},
+    {DOOR_TRAP_FIRE, TT_ALL, -1, 100},
+    {DOOR_TRAP_DISEASE, TT_ALL, -1, 100},
+    {DOOR_TRAP_SPIKE, TT_DOOR | TT_CONT | TT_ARRW, -1, 100},
+    {DOOR_TRAP_BLADE, TT_DOOR | TT_CONT | TT_ARRW, -1, 100},
+    {DOOR_TRAP_HAMMER, TT_DOOR, -1, 100},
+    {DOOR_TRAP_PEBBLE, TT_CONT | TT_MINE | TT_GREN | TT_ARRW, -1, 100},
+    {DOOR_TRAP_BOLT, TT_MINE | TT_GREN, -1, 100},
+    {DOOR_TRAP_DISK, TT_MINE | TT_GREN, -1, 100},
+    {DOOR_TRAP_ACID, TT_ALL, -1, 75},
+    {DOOR_TRAP_FROST, TT_ALL, -1, 75},
+    {DOOR_TRAP_TNT, TT_ALL, -1, 25},
+    {DOOR_TRAP_ENERGY, TT_ALL, -1, 25},
+    {DOOR_TRAP_SLEEP, TT_ALL, -1, 15},
+    {DOOR_TRAP_TELEPORT, TT_ALL, 30, 15},
+  };
+}  // namespace
+
+doorTrapT randomTrapType(trap_targ_t target, int level) {
+  weightedRandomizer wr;
+  for (const auto& e : randomTrapTable) {
+    if (e.targets & (1u << target))
+      wr.add(e.type, e.minLevel, e.frequency);
+  }
+
+  // getRandomIndex gives up after a bounded number of draws and returns -1;
+  // fire is legal on every target, so it is the safe fallback.
+  int i = wr.getRandomIndex(level);
+  return i < 0 ? DOOR_TRAP_FIRE : static_cast<doorTrapT>(wr.getItem(i));
 }
 
 int TBeing::springTrap(TTrap* obj) {
@@ -497,6 +558,8 @@ int TBeing::triggerArrowTrap(TArrow* obj) {
 // returns DELETE_THIS or FALSE
 int TBeing::triggerDoorTrap(dirTypeT door) {
   roomDirData* exitp = exitDir(door);
+  if (!exitp)
+    return false;
   int dam = exitp->trap_dam;  // raw power; applyTrapEffect rolls dice(dam, 8)
   doorTrapT type = static_cast<doorTrapT>(exitp->trap_info);
   // The setter (player-set traps only) earns the damage credit. Doors have no
@@ -510,12 +573,17 @@ int TBeing::triggerDoorTrap(dirTypeT door) {
   //  rawOpenDoor(door);
 
   // Clear the trapped flag on both sides before anything else so
-  // the damage loops can't re-trigger the same trap.
+  // the damage loops can't re-trigger the same trap.  The setter goes with it:
+  // a spent trap must not leave a name behind for the next trap on this exit
+  // to be credited to.
   REMOVE_BIT(exitp->condition, EXIT_TRAPPED);
+  exitp->trap_setter.clear();
   TRoom* far = real_roomp(exitp->to_room);
   roomDirData* back = far ? far->dir_option[rev_dir(door)] : nullptr;
-  if (back)
+  if (back) {
     REMOVE_BIT(back->condition, EXIT_TRAPPED);
+    back->trap_setter.clear();
+  }
 
   act("You hear a strange noise...", true, this, nullptr, nullptr, TO_ROOM);
   act("You hear a strange noise...", true, this, nullptr, nullptr, TO_CHAR);
@@ -547,8 +615,10 @@ int TBeing::triggerDoorTrap(dirTypeT door) {
     }
   }
 
-  // Far-side room occupants take half damage.
-  if (far) {
+  // Far-side room occupants take half damage.  A mis-linked exit can point
+  // back at the opener's own room; skip it then, so nobody is hit twice and
+  // the loop can't free `this` out from under the full-damage hit below.
+  if (far && far != roomp) {
     for (StuffIter it = far->stuff.begin(); it != far->stuff.end();) {
       TThing* t = *(it++);
       TBeing* tbt = dynamic_cast<TBeing*>(t);
@@ -789,6 +859,11 @@ int TBeing::dealTrapDamage(spellNumT damageClass, int dam, TThing* carrier,
 int TBeing::applyTrapEffect(doorTrapT type, int trapLevel, TThing* carrier,
   TBeing* setter, int denom) {
   int rc;
+  // World data can flag a door or container trapped while leaving trap_info at
+  // 0. That's untyped builder data, not a code bug, so bail before the switch's
+  // default arm logs it on every single trigger.
+  if (type == DOOR_TRAP_NONE)
+    return 0;
   int dam = dice(trapLevel, 8) / denom;
 
   // An agile victim rolls with a trap's physical force, taking only half.
@@ -1756,6 +1831,15 @@ bool trapComponents(const char* type, trap_targ_t targ, int& item1, int& item2,
     vlogf(LOG_MISC, format("Bad call to hasTrapComps() : %s") % type);
     return false;
   }
+  // A recognized type with no recipe for this target leaves the vnums at 0.
+  // Callers feed these to real_object(), which answers -1 and then indexes
+  // obj_index out of bounds, so fail the same way an unknown type does.
+  if (!item1 || !item2 || !item3) {
+    vlogf(LOG_MISC,
+      format("trapComponents(): no recipe for type %s on target %d") % type %
+        targ);
+    return false;
+  }
   return true;
 }
 
@@ -1804,7 +1888,9 @@ bool TBeing::hasTrapComps(const char* type, trap_targ_t targ, int amt,
   auto unitCost = [](TThing* com) -> int {
     if (auto* comp = dynamic_cast<TTrapComponent*>(com))
       return comp->pricePerUnit();
-    return dynamic_cast<TObj*>(com)->obj_flags.cost;
+    if (auto* o = dynamic_cast<TObj*>(com))
+      return o->obj_flags.cost;
+    return 0;
   };
 
   if (price) {

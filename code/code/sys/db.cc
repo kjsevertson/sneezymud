@@ -2624,12 +2624,16 @@ void zoneData::trapDoors() {
       if (chance == 0 || number(1, 100) > chance)
         continue;
 
-      const short trapInfo = number(DOOR_TRAP_POISON, DOOR_TRAP_PEBBLE);
+      const short trapInfo = randomTrapType(TRAP_TARG_DOOR, maxDam);
       const short trapDam = number(1, maxDam);
 
       SET_BIT(exitp->condition, EXIT_TRAPPED);
       exitp->trap_info = trapInfo;
       exitp->trap_dam = trapDam;
+      // Nobody set this one, so it must not inherit the name of whoever last
+      // trapped this exit -- otherwise they take the damage credit (and the
+      // resulting hatred) for a trap they had no part in.
+      exitp->trap_setter.clear();
 
       // mirror onto the far side so the trap fires from either direction
       if (TRoom* rp2 = real_roomp(exitp->to_room)) {
@@ -2638,6 +2642,7 @@ void zoneData::trapDoors() {
           SET_BIT(back->condition, EXIT_TRAPPED);
           back->trap_info = trapInfo;
           back->trap_dam = trapDam;
+          back->trap_setter.clear();
         }
       }
     }

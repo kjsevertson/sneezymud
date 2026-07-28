@@ -86,6 +86,12 @@ TBeing* trapSetter(const TThing* carrier);
 // them. Strings the object first (prototype-safe), mirroring TTrap::dropMe.
 void recordTrapSetter(TObj* carrier, const TBeing* setter);
 doorTrapT parseTrapType(const char* name, trap_targ_t target);
+
+// Picks a trap type for randomly generated traps (mob trap bags, zone-reset
+// door traps). Restricted to the types that are legal on `target`, weighted so
+// the aggravating ones stay rare. `level` gates the types that shouldn't show
+// up on low-level content; pass 0 or less to skip that gate.
+doorTrapT randomTrapType(trap_targ_t target, int level);
 // Single source of trap component vnums for a (type, target); fills the three
 // reagent vnums and returns false for an unrecognized type. Shared by trap
 // gating/consumption, the set-trap flavor messages, and disarm reclaim.

@@ -1801,8 +1801,8 @@ void shopping_list(sstring argument, TBeing* ch, TMonster* keeper,
                   as short_desc, \
                 coalesce(rs.name, o.name) as name, \
                 case o.type when %i then r.price/(r.weight*10) \
-                            when %i then r.price/r.val0  \
-                            when %i then r.price/r.val0  \
+                            when %i then r.price/greatest(r.val0, 1)  \
+                            when %i then r.price/greatest(r.val0, 1)  \
                             else r.price end as price, \
                 r.cur_struct as cur_struct, r.max_struct as max_struct, \
                 r.volume as volume, r.extra_flags as extra_flags, \

@@ -357,25 +357,7 @@ void TMonster::createWealth(void) {
       num /= 4;
     if (num < GetMaxLevel()) {
       bag->addContainerFlag(CONT_TRAPPED | CONT_CLOSED);
-      weightedRandomizer wr;
-
-      // pick a random damage type
-      // sleep is aggravating, avoid
-      // teleport also aggravating, slightly avoid
-      wr.add(DOOR_TRAP_TNT, -1, 25);
-      wr.add(DOOR_TRAP_ENERGY, -1, 25);
-      wr.add(DOOR_TRAP_SLEEP, -1, 15);
-      wr.add(DOOR_TRAP_POISON, -1, 100);
-      wr.add(DOOR_TRAP_FIRE, -1, 100);
-      wr.add(DOOR_TRAP_ACID, -1, 75);
-      wr.add(DOOR_TRAP_DISEASE, -1, 100);
-      wr.add(DOOR_TRAP_SPIKE, -1, 100);
-      wr.add(DOOR_TRAP_BLADE, -1, 100);
-      wr.add(DOOR_TRAP_PEBBLE, -1, 100);
-      wr.add(DOOR_TRAP_FROST, -1, 75);
-      wr.add(DOOR_TRAP_TELEPORT, 30, 15);
-
-      bag->setContainerTrapType(doorTrapT(wr.getRandomItem(GetMaxLevel())));
+      bag->setContainerTrapType(randomTrapType(TRAP_TARG_CONT, GetMaxLevel()));
       bag->setContainerTrapDam(
         min(150, ::number(1 * GetMaxLevel(), 3 * GetMaxLevel())));
     }

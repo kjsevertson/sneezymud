@@ -228,8 +228,11 @@ int TPortal::disarmMe(TBeing* thief) {
 
   sstring trap_type = trap_types[getPortalTrapType()];
   int bKnown = thief->getSkillValue(SKILL_DISARM_TRAP);
+  // Same disarm bonus containers and arrows give; portals were the only
+  // disarmMe rolling against raw learnedness.
+  int learnedness = min((int)MAX_SKILL_LEARNEDNESS, 3 * bKnown / 2);
 
-  if (thief->bSuccess(bKnown, SKILL_DISARM_TRAP)) {
+  if (thief->bSuccess(learnedness, SKILL_DISARM_TRAP)) {
     act(format("Click.  You disarm the %s trap on $p.") % trap_type, false,
       thief, this, nullptr, TO_CHAR);
     act("$n disarms the trap on $p.", false, thief, this, nullptr, TO_ROOM);
