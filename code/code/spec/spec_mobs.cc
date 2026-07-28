@@ -2733,6 +2733,9 @@ int horse(TBeing*, cmdTypeT cmd, const char*, TMonster* me, TObj*) {
     delete vict;
     vict = NULL;
   }
+  // Poisoned spikes on the target's gear can kill the kicker outright.
+  if (IS_SET_DELETE(rc, DELETE_THIS))
+    return DELETE_THIS;
 
   return TRUE;
 }

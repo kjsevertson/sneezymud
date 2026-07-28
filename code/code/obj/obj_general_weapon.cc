@@ -264,6 +264,10 @@ int hardHit(TBeing* victim, TBeing* ch, TObj* obj, wearSlotT vicLimb,
       vicEq->damageItem(eqDamage);
 
       if (vicEq->getStructPoints() <= 0 && !vicEq->makeScraps()) {
+        // makeScraps detaches the object itself; the fallback must too, since
+        // vicEq is still worn - deleting it in place leaves a dangling pointer
+        // in the victim's equipment.
+        --(*vicEq);
         delete vicEq;
       }
 
@@ -301,6 +305,8 @@ int hardHit(TBeing* victim, TBeing* ch, TObj* obj, wearSlotT vicLimb,
         victim, TO_NOTVICT);
       vicEq->damageItem(eqDamage);
       if (vicEq->getStructPoints() <= 0 && !vicEq->makeScraps()) {
+        // See case 1: vicEq is worn, so detach before deleting.
+        --(*vicEq);
         delete vicEq;
       }
     }

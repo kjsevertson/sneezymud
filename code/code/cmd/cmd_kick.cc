@@ -401,6 +401,8 @@ int TBeing::doKick(const char* argument, TBeing* vict) {
   }
   spellNumT skill = getSkillNum(SKILL_KICK);
   rc = kick(this, victim, skill);
+  if (IS_SET_DELETE(rc, DELETE_THIS))
+    return DELETE_THIS;
   if (rc)
     addSkillLag(skill, rc);
   if (IS_SET_DELETE(rc, DELETE_VICT)) {
