@@ -2256,9 +2256,9 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       break;
     case LIQ_HOLYWATER:
       if (vict->isUndead())
-        harm(ch, vict, level, learn, SPELL_HARM, 0);
+        rc = harm(ch, vict, level, learn, SPELL_HARM, 0);
       else if (vict->isDiabolic())
-        harmLight(ch, vict, level, learn, SPELL_HARM, 0);
+        rc = harmLight(ch, vict, level, learn, SPELL_HARM, 0);
       else
         bless(ch, vict, level / 10, learn / 10, SPELL_BLESS);
       break;
@@ -2441,7 +2441,7 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       poison(ch, vict, level, learn, SPELL_POISON);
       break;
     case LIQ_POT_BONE_BREAKER:
-      boneBreaker(ch, vict, level, learn, SPELL_BONE_BREAKER);
+      rc = boneBreaker(ch, vict, level, learn, SPELL_BONE_BREAKER);
       break;
     case LIQ_POT_AQUALUNG:
       aqualung(ch, vict, level, learn);
@@ -2503,7 +2503,7 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       clarity(ch, vict, level, learn);
       break;
     case LIQ_POT_BOILING_BLOOD:
-      bloodBoil(ch, vict, level, learn, SPELL_BLOOD_BOIL);
+      rc = bloodBoil(ch, vict, level, learn, SPELL_BLOOD_BOIL);
       break;
     case LIQ_POT_STUPIDITY:
       stupidity(ch, vict, level, learn);
@@ -2518,7 +2518,10 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       cleanse(ch, vict, level, learn, SPELL_CLEANSE);
       break;
     case LIQ_POT_MULTI1:  // harm crit, infravision, armor
-      harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
+      rc = harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
+      // the harm can kill either party; don't cast on a corpse
+      if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD))
+        break;
       infravision(ch, vict, level, learn);
       armor(ch, vict, level, learn, SPELL_ARMOR);
       break;
@@ -2552,7 +2555,10 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       gillsOfFlesh(ch, vict, level, learn);
       break;
     case LIQ_POT_MULTI5:  // harm, stealth, invis
-      harm(ch, vict, level, learn, SPELL_HARM, 0);
+      rc = harm(ch, vict, level, learn, SPELL_HARM, 0);
+      // the harm can kill either party; don't cast on a corpse
+      if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD))
+        break;
       stealth(ch, vict, level, learn);
       invisibility(ch, vict, level, learn);
       break;
@@ -2563,11 +2569,11 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       break;
     case LIQ_POT_MULTI7:  // sanc, harm crit
       sanctuary(ch, vict, level, learn);
-      harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
+      rc = harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
       break;
     case LIQ_POT_MULTI8:  // sanc, harm ser
       sanctuary(ch, vict, level, learn);
-      harmSerious(ch, vict, level, learn, SPELL_HARM_SERIOUS, 0);
+      rc = harmSerious(ch, vict, level, learn, SPELL_HARM_SERIOUS, 0);
       break;
     case LIQ_POT_MULTI9:  // sanc, armor, bless
       sanctuary(ch, vict, level, learn);
