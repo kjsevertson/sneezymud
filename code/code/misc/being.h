@@ -2051,6 +2051,7 @@ class TBeing : public TThing {
     void doCrawl();
     void doFollow(const char*);
     void doTestCode(const char*);
+    void mobGearList(TBeing*) const;
     int doGoto(const sstring&);
     int doMortalGoto(const sstring&);
     void doNewbieEqLoad(race_t, unsigned short, bool);
