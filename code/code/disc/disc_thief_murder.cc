@@ -12,7 +12,6 @@
 #include "obj_general_weapon.h"
 #include "obj_base_weapon.h"
 #include "obj_base_cup.h"
-#include "obj_arrow.h"
 #include "liquids.h"
 #include "combat.h"
 
@@ -156,8 +155,8 @@ int TBeing::backstabHit(TBeing* victim, TThing* obj, int modifier) {
         auto weapon = dynamic_cast<TBaseWeapon*>(obj);
 
         if (weapon) {
-          int specRc = weapon->checkSpec(victim, CMD_BACKSTAB,
-            "-special-", this);
+          int specRc =
+            weapon->checkSpec(victim, CMD_BACKSTAB, "-special-", this);
           if (IS_SET_DELETE(specRc, DELETE_THIS))
             weapon = nullptr;  // weapon destroyed, skip poison
           if (IS_SET_DELETE(specRc, DELETE_ITEM))
@@ -167,8 +166,13 @@ int TBeing::backstabHit(TBeing* victim, TThing* obj, int modifier) {
         }
 
         // poison — weapon may be null if checkSpec destroyed it
-        if (weapon && weapon->isPoisoned())
-          weapon->applyPoison(victim);
+        if (weapon && weapon->isPoisoned()) {
+          int poisonRc = weapon->applyPoison(victim);
+          if (IS_SET_DELETE(poisonRc, DELETE_VICT))
+            return DELETE_VICT;
+          if (IS_SET_DELETE(poisonRc, DELETE_THIS))
+            return DELETE_THIS;
+        }
       }
     }
   } else {
@@ -242,7 +246,9 @@ int TBeing::doBackstab(const char* argument, TBeing* vict) {
   if (!vict && !victim) {
     arg = one_argument(arg, namebuf);
 
-    if (!(victim = get_char_room_vis(this, namebuf))) {
+    // Fall back to the current opponent so a bare "backstab" mid-fight targets
+    // whom you're already fighting (as bash and the other attacks do).
+    if (!(victim = get_char_room_vis(this, namebuf)) && !(victim = fight())) {
       sendTo("Backstab whom?\n\r");
       return FALSE;
     }
@@ -315,14 +321,18 @@ int backstab(TBeing* thief, TBeing* victim) {
     return false;
   }
   if (thiefMount && thief->getSkillValue(SKILL_RIDE) < 80) {
-    thief->sendTo("You aren't a skilled enough rider to backstab while mounted!\n\r");
+    thief->sendTo(
+      "You aren't a skilled enough rider to backstab while mounted!\n\r");
     return false;
   }
   TBeing* victimMount = dynamic_cast<TBeing*>(victim->riding);
-  bool thiefAirborne = thief->isFlying() || (thiefMount && thiefMount->isFlying());
-  bool victimAirborne = victim->isFlying() || (victimMount && victimMount->isFlying());
+  bool thiefAirborne =
+    thief->isFlying() || (thiefMount && thiefMount->isFlying());
+  bool victimAirborne =
+    victim->isFlying() || (victimMount && victimMount->isFlying());
   if (victimAirborne && !thiefAirborne) {
-    thief->sendTo("You can't backstab a flying person with your feet on the ground!\n\r");
+    thief->sendTo(
+      "You can't backstab a flying person with your feet on the ground!\n\r");
     return FALSE;
   }
   if (dynamic_cast<TBeing*>(victim->rider)) {
@@ -342,7 +352,9 @@ int backstab(TBeing* thief, TBeing* victim) {
       return FALSE;
     }
     if (victim->getPosition() > POSITION_SITTING) {
-      thief->sendTo("Your target must be off their feet to backstab while under attack.\n\r");
+      thief->sendTo(
+        "Your target must be off their feet to backstab while under "
+        "attack.\n\r");
       return FALSE;
     }
   }
@@ -360,24 +372,23 @@ int backstab(TBeing* thief, TBeing* victim) {
 
   if (thief->fight()) {
     if (bKnown <= 65) {
-      thief->sendTo("You aren't skilled enough to backstab during a fight.\n\r");
+      thief->sendTo(
+        "You aren't skilled enough to backstab during a fight.\n\r");
       return FALSE;
     }
     if (victim->getPosition() > POSITION_SITTING) {
-      thief->sendTo("Your target must be off their feet to backstab mid-fight.\n\r");
+      thief->sendTo(
+        "Your target must be off their feet to backstab mid-fight.\n\r");
       return FALSE;
     }
   }
   thief->reconcileHurt(victim, 0.04);
 
-  int modifier = 0;
+  bool spotted = false;
+  int modifier =
+    thief->skillSituationalModifier(victim, SKILL_BACKSTAB, &spotted);
 
-  modifier -= noise(thief) / 20;
-  modifier += thief->visibility() / 15;
-
-  if (thief->makesNoise() && victim->awake()) {
-    modifier -= 10;
-
+  if (thief->canHearThief(victim)) {
     act(
       "$n's armor makes too much noise, and $N is alerted to $n's backstab "
       "attempt.",
@@ -389,10 +400,7 @@ int backstab(TBeing* thief, TBeing* victim) {
       "backstab you.",
       FALSE, thief, 0, victim, TO_VICT);
   }
-  if (victim->awake() && victim->canSee(thief) && !victim->isPc() &&
-      dynamic_cast<TMonster*>(victim)->isSusp()) {
-    modifier -= 10;
-
+  if (spotted) {
     act("$E is able to see you and notices you coming at the last moment.",
       FALSE, thief, 0, victim, TO_CHAR);
     act("You sense $m coming as $n attempts to murder you.", FALSE, thief, 0,
@@ -548,8 +556,7 @@ int TBeing::throatSlitHit(TBeing* victim, TThing* obj, int modifier) {
         auto weapon = dynamic_cast<TGenWeapon*>(heldInPrimHand());
 
         if (weapon) {
-          int specRc = weapon->checkSpec(victim, CMD_SLIT,
-            "-special-", this);
+          int specRc = weapon->checkSpec(victim, CMD_SLIT, "-special-", this);
           if (IS_SET_DELETE(specRc, DELETE_THIS))
             weapon = nullptr;  // weapon destroyed, skip poison
           if (IS_SET_DELETE(specRc, DELETE_ITEM))
@@ -559,8 +566,13 @@ int TBeing::throatSlitHit(TBeing* victim, TThing* obj, int modifier) {
         }
 
         // poison — weapon may be null if checkSpec destroyed it
-        if (weapon && weapon->isPoisoned())
-          weapon->applyPoison(victim);
+        if (weapon && weapon->isPoisoned()) {
+          int poisonRc = weapon->applyPoison(victim);
+          if (IS_SET_DELETE(poisonRc, DELETE_VICT))
+            return DELETE_VICT;
+          if (IS_SET_DELETE(poisonRc, DELETE_THIS))
+            return DELETE_THIS;
+        }
       }
     }
   } else {
@@ -692,7 +704,8 @@ int throatSlit(TBeing* thief, TBeing* victim) {
     return FALSE;
   }
   if (6 * thief->getHeight() < 3 * victim->getHeight() &&
-      !(thief->isFlying() || (victim->getPosition() < POSITION_STANDING && victim->getPosition() != POSITION_FIGHTING))) {
+      !(thief->isFlying() || (victim->getPosition() < POSITION_STANDING &&
+                               victim->getPosition() != POSITION_FIGHTING))) {
     thief->sendTo("You don't stand a chance, that creature is too tall.\n\r");
     return FALSE;
   }
@@ -734,14 +747,11 @@ int throatSlit(TBeing* thief, TBeing* victim) {
   }
   thief->reconcileHurt(victim, 0.04);
 
-  int modifier = 0;
+  bool spotted = false;
+  int modifier =
+    thief->skillSituationalModifier(victim, SKILL_THROATSLIT, &spotted);
 
-  modifier -= noise(thief) / 20;
-  modifier += thief->visibility() / 15;
-
-  if (thief->makesNoise() && victim->awake()) {
-    modifier -= 10;
-
+  if (thief->canHearThief(victim)) {
     act(
       "$n's armor makes too much noise, and $N is alerted to $n's murder "
       "attempt.",
@@ -753,10 +763,7 @@ int throatSlit(TBeing* thief, TBeing* victim) {
       "you.",
       FALSE, thief, 0, victim, TO_VICT);
   }
-  if (victim->awake() && victim->canSee(thief) && !victim->isPc() &&
-      dynamic_cast<TMonster*>(victim)->isSusp()) {
-    modifier -= 10;
-
+  if (spotted) {
     act("$E is able to see you and notices you coming at the last moment.",
       FALSE, thief, 0, victim, TO_CHAR);
     act("You sense $m coming as $n attempts to murder you.", FALSE, thief, 0,
@@ -788,28 +795,75 @@ int throatSlit(TBeing* thief, TBeing* victim) {
 
 //////////
 
+// Rinsing a coating off needs water: standing in it, a pool underfoot, or a
+// container of it to hand.  Anyone can do this - it takes no skill to wash a
+// blade - so it runs before doPoisonWeapon's skill check.
+static int washPoison(TBeing* ch, TObj* obj) {
+  if (!obj->isPoisoned()) {
+    act("$p isn't coated with anything.", false, ch, obj, nullptr, TO_CHAR);
+    return FALSE;
+  }
+
+  bool standingInWater = ch->roomp && ch->roomp->isWaterSector();
+  TBaseCup* source = nullptr;
+
+  if (!standingInWater) {
+    // a pool in the room first, then anything carried or worn
+    if (ch->roomp) {
+      for (StuffIter it = ch->roomp->stuff.begin();
+           !source && it != ch->roomp->stuff.end(); ++it) {
+        TBaseCup* cup = dynamic_cast<TBaseCup*>(*it);
+        if (cup && cup->getDrinkType() == LIQ_WATER && cup->getDrinkUnits() > 0)
+          source = cup;
+      }
+    }
+    for (StuffIter it = ch->stuff.begin(); !source && it != ch->stuff.end();
+         ++it) {
+      TBaseCup* cup = dynamic_cast<TBaseCup*>(*it);
+      if (cup && cup->getDrinkType() == LIQ_WATER && cup->getDrinkUnits() > 0)
+        source = cup;
+    }
+  }
+
+  if (!standingInWater && !source) {
+    ch->sendTo("You have no water to wash that off with.\n\r");
+    return FALSE;
+  }
+
+  if (source)
+    source->addToDrinkUnits(-1);
+
+  obj->clearPoison();
+  act("You rinse the coating off $p.", false, ch, obj, nullptr, TO_CHAR);
+  act("$n rinses something off $p.", false, ch, obj, nullptr, TO_ROOM);
+  return TRUE;
+}
+
 int TBeing::doPoisonWeapon(sstring arg) {
   TObj *obj = nullptr, *poison = nullptr;
   sstring namebuf;
   int rc;
 
-  if (!doesKnowSkill(SKILL_POISON_WEAPON)) {
-    sendTo("You know nothing about poisoning weapons.\n\r");
-    return FALSE;
-  }
   if (checkBusy())
     return FALSE;
 
   arg = one_argument(arg, namebuf);
 
-  if (arg.empty() ||
+  // NB: test namebuf, not arg - arg holds the *remainder*, so checking it here
+  // rejected the one-argument form outright.
+  if (namebuf.empty() ||
       !(obj = generic_find_obj(namebuf, FIND_OBJ_INV | FIND_OBJ_EQUIP, this))) {
     sendTo("Poison what?\n\r");
     return FALSE;
   }
 
-  if (!doesKnowSkill(SKILL_POISON_WEAPON) && !(dynamic_cast<TArrow*>(obj))) {
-    sendTo("You are only skilled at poisoning arrows.\n\r");
+  sstring second;
+  one_argument(arg, second);
+  if (second == "remove" || second == "wash" || second == "clean")
+    return washPoison(this, obj);
+
+  if (!doesKnowSkill(SKILL_POISON_WEAPON)) {
+    sendTo("You know nothing about poisoning weapons.\n\r");
     return FALSE;
   }
 
@@ -842,7 +896,7 @@ int TBeing::doPoisonWeapon(sstring arg) {
   return rc;
 }
 
-int TThing::poisonMePoison(TBeing* ch, TBaseWeapon*) {
+int TThing::poisonMePoison(TBeing* ch, TObj*) {
   act("$p isn't the proper kind of poison for this.", FALSE, ch, this, 0,
     TO_CHAR);
   return FALSE;
@@ -972,8 +1026,7 @@ bool addPoison(affectedData aff[5], liqTypeT liq, int level, int duration) {
   return true;
 }
 
-int TBaseCup::poisonMePoison(TBeing* ch, TBaseWeapon* weapon) {
-  int j;
+int TBaseCup::poisonMePoison(TBeing* ch, TObj* weapon) {
   sstring s;
   spellNumT skill = SKILL_POISON_WEAPON;
 
@@ -984,11 +1037,10 @@ int TBaseCup::poisonMePoison(TBeing* ch, TBaseWeapon* weapon) {
   int bKnown = ch->getSkillValue(skill);
 
   if (ch->bSuccess(bKnown, skill)) {
-    for (j = 0; j < MAX_SWING_AFFECT; j++) {
-      if (weapon->isPoisoned()) {
-        ch->sendTo("That weapon is already affected by poison!\n\r");
-        return FALSE;
-      }
+    if (weapon->isPoisoned()) {
+      act("$p is already affected by poison!", false, ch, weapon, nullptr,
+        TO_CHAR);
+      return false;
     }
 
     weapon->setPoison(getDrinkType());
@@ -1013,12 +1065,13 @@ int TBaseCup::poisonMePoison(TBeing* ch, TBaseWeapon* weapon) {
 
       doLiqSpell(ch, ch, getDrinkType(), 1);
     } else {
-      weapon->setPoison(LIQ_WATER);
-
-      s = format("You coat $p with %s.") % liquidInfo[getDrinkType()]->name;
-      act(s, FALSE, ch, weapon, NULL, TO_CHAR);
-      s = format("$n coats $p with %s.") % liquidInfo[getDrinkType()]->name;
-      act(s, FALSE, ch, weapon, NULL, TO_ROOM);
+      // The coating simply doesn't take.  It used to leave plain water on the
+      // object while telling the player they had poisoned it, so the failure
+      // only surfaced later when the poison did nothing.
+      act("The coating beads up and runs off $p.", false, ch, weapon, nullptr,
+        TO_CHAR);
+      act("$n's coating beads up and runs off $p.", false, ch, weapon, nullptr,
+        TO_ROOM);
     }
   }
 

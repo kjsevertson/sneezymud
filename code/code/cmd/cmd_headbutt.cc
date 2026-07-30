@@ -152,9 +152,16 @@ int TBeing::headbuttHit(TBeing* victim) {
     }
   }
 
-  // Use impactSpec to handle all impact effects (spikes, thorns, hardness)
-  dam += impactSpec(this, victim, WEAR_HEAD, pos);
   if ((rc = reconcileDamage(victim, dam, dam_type)) == -1)
+    return DELETE_VICT;
+
+  // impactSpec applies its own damage (spikes, thornflesh, hardness), so it
+  // runs after the skill's blow has landed.  Poisoned spikes can crit-fail
+  // back onto us, so it can report either death.
+  int impactRc = impactSpec(this, victim, WEAR_HEAD, pos);
+  if (IS_SET_DELETE(impactRc, DELETE_THIS))
+    return DELETE_THIS;
+  if (IS_SET_DELETE(impactRc, DELETE_VICT))
     return DELETE_VICT;
 
   return TRUE;

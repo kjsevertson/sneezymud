@@ -2018,9 +2018,8 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       // Not in discarray since it's not a skill
       case SPELL_CONSECRATE_AFFECT:
         if (show && aff->shouldGenerateText()) {
-          str +=
-            format("Affected: Consecration.  Approx. duration : %s\n\r") %
-            describeDuration(this, aff->duration);
+          str += format("Affected: Consecration.  Approx. duration : %s\n\r") %
+                 describeDuration(this, aff->duration);
         }
         break;
       case SPELL_AURA_MIGHT:
@@ -4647,6 +4646,17 @@ void TObj::describeMe(TBeing* ch) const {
         format("A monogram on it indicates it belongs to %s.\n\r") % name_buf);
   }
   describeObjectSpecifics(ch);
+
+  // Evaluating reveals a coating to anyone; only a trained poisoner can name
+  // what it actually is.
+  if (isPoisoned()) {
+    if (ch->doesKnowSkill(SKILL_POISON_WEAPON))
+      ch->sendTo(COLOR_OBJECTS, format("It has been coated with %s.\n\r") %
+                                  liquidInfo[getPoison()]->name);
+    else
+      ch->sendTo(COLOR_OBJECTS, "It has been coated with poison.\n\r");
+  }
+
   evaluateMe(ch);
 }
 
@@ -5387,10 +5397,9 @@ void TWand::descMagicSpells(TBeing* ch) const {
           sstring(capbuf).cap() % discNames[das].properName);
   }
 
-  ch->sendTo(COLOR_OBJECTS, format("%s has %d out of %d charge%s left.\n\r") %
-                              sstring(capbuf).cap() % getCurCharges() %
-                              getMaxCharges() %
-                              (getMaxCharges() == 1 ? "" : "s"));
+  ch->sendTo(COLOR_OBJECTS,
+    format("%s has %d out of %d charge%s left.\n\r") % sstring(capbuf).cap() %
+      getCurCharges() % getMaxCharges() % (getMaxCharges() == 1 ? "" : "s"));
 }
 
 void TStaff::descMagicSpells(TBeing* ch) const {
@@ -5411,10 +5420,9 @@ void TStaff::descMagicSpells(TBeing* ch) const {
           sstring(capbuf).cap() % discNames[das].properName);
   }
 
-  ch->sendTo(COLOR_OBJECTS, format("%s has %d out of %d charge%s left.\n\r") %
-                              sstring(capbuf).cap() % getCurCharges() %
-                              getMaxCharges() %
-                              (getMaxCharges() == 1 ? "" : "s"));
+  ch->sendTo(COLOR_OBJECTS,
+    format("%s has %d out of %d charge%s left.\n\r") % sstring(capbuf).cap() %
+      getCurCharges() % getMaxCharges() % (getMaxCharges() == 1 ? "" : "s"));
 }
 
 void TScroll::descMagicSpells(TBeing* ch) const {

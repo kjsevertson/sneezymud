@@ -42,7 +42,6 @@ extern currencyInfoT currencyInfo;
 const float SIP_WEIGHT = 0.065;
 const float SIP_VOLUME = 1.8046875;
 
-const int MAX_SWING_AFFECT = 5;
 // const int MAX_OBJ_AFFECT    = 5;
 const int OBJ_NOTIMER = -1;
 const int MAX_TOUNGE = 3;
@@ -128,6 +127,8 @@ enum itemTypeT {
   ITEM_WAGON,
   ITEM_MONEYPOUCH,
   ITEM_FRUIT,
+  ITEM_TRAP_COMPONENT,
+  ITEM_TRAPCOMP_BAG,
   MAX_OBJ_TYPES
 };
 const itemTypeT MIN_OBJ_TYPE = itemTypeT(0);
@@ -529,6 +530,11 @@ class TObj : public TThing {
                     // temporarily
 
   protected:
+    // The liquid coating this object, or -1 for none.  Lives on TObj rather
+    // than TBaseWeapon so that anything which can break skin - spiked armour
+    // as much as a blade - can carry a poison.  Runtime only; not saved.
+    liqTypeT poison;
+
     TObj();
 
   public:
@@ -537,6 +543,17 @@ class TObj : public TThing {
     TObj& operator=(const TObj&);
     virtual TThing& operator+=(TThing& t);
     virtual ~TObj();
+
+    virtual bool isPoisoned() const;
+    virtual liqTypeT getPoison() const { return poison; }
+    virtual void setPoison(liqTypeT);
+    // setPoison refuses to overwrite an existing coating, so removing one
+    // needs its own door.
+    void clearPoison() { poison = (liqTypeT)-1; }
+    virtual int poisonWeaponWeapon(TBeing*, TThing*);
+    // Delivers the coating and spends it.  Returns DELETE_VICT if the poison
+    // killed the victim, DELETE_THIS if it killed the wielder.
+    virtual int applyPoison(TBeing*);
 
     // VIRTUAL FUNCTIONS
     virtual sstring showModifier(showModeT, const TBeing*) const { return ""; }

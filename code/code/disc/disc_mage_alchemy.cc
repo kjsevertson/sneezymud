@@ -11,6 +11,7 @@
 #include "monster.h"
 #include "disease.h"
 #include "materials.h"
+#include "liquids.h"
 #include "combat.h"
 #include "spelltask.h"
 #include "disc_mage_alchemy.h"
@@ -246,6 +247,9 @@ int divinationObj(TBeing* caster, const TObj* obj, int, short bKnown) {
       format("It is %s.\n\r") % ItemInfo[obj->itemType()]->common_name);
     caster->sendTo(obj->wear_flags_to_sentence());
     caster->sendTo(format("%s\n\r") % obj->statObjInfo());
+    if (obj->isPoisoned())
+      caster->sendTo(format("Poisoned with:      %s\n\r") %
+                     liquidInfo[obj->getPoison()]->name);
     obj->divinateMe(caster);
 
     // caster->sendTo("It will give you following abilities when equipped:  ");
@@ -460,43 +464,47 @@ sstring genPathString(pathDataList path) {
 // Namespace for Eyes of Fertman helper functions
 namespace {
   void printObjLocation(TBeing* caster, TObj* obj) {
-
     if (dynamic_cast<TBeing*>(obj->parent)) {
       if (strlen(caster->pers(obj->parent)) > 0) {
         act("$p carried by $N.", TRUE, caster, obj, obj->parent, TO_CHAR);
       }
     } else if (obj->equippedBy) {
       if (strlen(caster->pers(obj->equippedBy)) > 0) {
-        act("$p equipped by $N.", TRUE, caster, obj, obj->equippedBy,
-          TO_CHAR);
+        act("$p equipped by $N.", TRUE, caster, obj, obj->equippedBy, TO_CHAR);
       }
     } else if (obj->parent) {
       act("$p in $N.", TRUE, caster, obj, obj->parent, TO_CHAR);
 
-      if (obj->parent->parent &&
-          dynamic_cast<TMonster*>(obj->parent->parent))
+      if (obj->parent->parent && dynamic_cast<TMonster*>(obj->parent->parent))
         act("...carried by $N.", TRUE, caster, NULL, obj->parent->parent,
           TO_CHAR);
 
     } else {
       if (obj->in_room == Room::NOWHERE || !caster->canSee(obj)) {
-        act("$p is in use but you can't tell the location.", TRUE, caster,
-          obj, NULL, TO_CHAR);
+        act("$p is in use but you can't tell the location.", TRUE, caster, obj,
+          NULL, TO_CHAR);
       } else {
         if (IS_SET(caster->desc->plr_color, PLR_COLOR_ROOM_NAME)) {
           if (hasColorStrings(NULL, obj->roomp->getName(), 2)) {
             caster->sendTo(COLOR_ROOM_NAME,
-              format("%s is in %s.\n\r") % colorString(caster, caster->desc, obj->getName(), NULL, COLOR_OBJECTS, TRUE) %
+              format("%s is in %s.\n\r") %
+                colorString(caster, caster->desc, obj->getName(), NULL,
+                  COLOR_OBJECTS, TRUE) %
                 caster->dynColorRoom(obj->roomp, 1, TRUE));
           } else {
             caster->sendTo(COLOR_ROOM_NAME,
-              format("%s is in %s%s%s.\n\r") % colorString(caster, caster->desc, obj->getName(), NULL, COLOR_OBJECTS, TRUE) %
-                caster->addColorRoom(obj->roomp, 1) %
-                obj->roomp->getName() % caster->norm());
+              format("%s is in %s%s%s.\n\r") %
+                colorString(caster, caster->desc, obj->getName(), NULL,
+                  COLOR_OBJECTS, TRUE) %
+                caster->addColorRoom(obj->roomp, 1) % obj->roomp->getName() %
+                caster->norm());
           }
         } else {
           caster->sendTo(COLOR_BASIC,
-            format("%s is in %s%s%s.\n\r") % colorString(caster, caster->desc, obj->getName(), NULL, COLOR_OBJECTS, TRUE) % caster->purple() %
+            format("%s is in %s%s%s.\n\r") %
+              colorString(caster, caster->desc, obj->getName(), NULL,
+                COLOR_OBJECTS, TRUE) %
+              caster->purple() %
               colorString(caster, caster->desc, obj->roomp->getName(), NULL,
                 COLOR_NONE, TRUE) %
               caster->norm());
@@ -506,7 +514,6 @@ namespace {
   }
 
   void printCharLocation(TBeing* caster, TBeing* ch) {
-
     if (ch->in_room == Room::NOWHERE || !caster->canSee(ch)) {
       act("$N is somewhere but you can't tell the location.", TRUE, caster,
         NULL, ch, TO_CHAR);
@@ -514,17 +521,24 @@ namespace {
       if (IS_SET(caster->desc->plr_color, PLR_COLOR_ROOM_NAME)) {
         if (hasColorStrings(NULL, ch->roomp->getName(), 2)) {
           caster->sendTo(COLOR_ROOM_NAME,
-            format("%s is in %s.\n\r") % colorString(caster, caster->desc, ch->getName(), NULL, COLOR_MOBS, TRUE) %
+            format("%s is in %s.\n\r") %
+              colorString(caster, caster->desc, ch->getName(), NULL, COLOR_MOBS,
+                TRUE) %
               caster->dynColorRoom(ch->roomp, 1, TRUE));
         } else {
           caster->sendTo(COLOR_ROOM_NAME,
-            format("%s is in %s%s%s.\n\r") % colorString(caster, caster->desc, ch->getName(), NULL, COLOR_MOBS, TRUE) %
+            format("%s is in %s%s%s.\n\r") %
+              colorString(caster, caster->desc, ch->getName(), NULL, COLOR_MOBS,
+                TRUE) %
               caster->addColorRoom(ch->roomp, 1) % ch->roomp->getName() %
               caster->norm());
         }
       } else {
         caster->sendTo(COLOR_BASIC,
-          format("%s is in %s%s%s.\n\r") % colorString(caster, caster->desc, ch->getName(), NULL, COLOR_MOBS, TRUE) % caster->purple() %
+          format("%s is in %s%s%s.\n\r") %
+            colorString(caster, caster->desc, ch->getName(), NULL, COLOR_MOBS,
+              TRUE) %
+            caster->purple() %
             colorString(caster, caster->desc, ch->roomp->getName(), NULL,
               COLOR_NONE, TRUE) %
             caster->norm());
@@ -532,9 +546,10 @@ namespace {
     }
   }
 
-} // namespace
+}  // namespace
 
-int eyesOfFertuman(TBeing* caster, const char* tofind, int level, short bKnown) {
+int eyesOfFertuman(TBeing* caster, const char* tofind, int level,
+  short bKnown) {
   TObj* obj;
   TBeing* ch;
   int j = 0;
@@ -546,7 +561,8 @@ int eyesOfFertuman(TBeing* caster, const char* tofind, int level, short bKnown) 
     return SPELL_FAIL;
   }
 
-  caster->sendTo("The eyes of Fertuman look far and wide across the world and find:\n\r");
+  caster->sendTo(
+    "The eyes of Fertuman look far and wide across the world and find:\n\r");
 
   switch (critSuccess(caster, SPELL_EYES_OF_FERTUMAN)) {
     case CRIT_S_KILL:
@@ -560,7 +576,8 @@ int eyesOfFertuman(TBeing* caster, const char* tofind, int level, short bKnown) 
       break;
   }
 
-  for (TObjIter iter = object_list.begin(); iter != object_list.end() && j; ++iter) {
+  for (TObjIter iter = object_list.begin(); iter != object_list.end() && j;
+       ++iter) {
     obj = *iter;
     if (isname(search_string, obj->getName())) {
       if (obj->isObjStat(ITEM_MAGIC)) {
@@ -606,15 +623,14 @@ int eyesOfFertuman(TBeing* caster, const char* tofind, int level, short bKnown) 
   }
 
   if (found) {
-    act("$n finishes chanting and smiles to $mself.", TRUE, caster, NULL,
-      NULL, TO_ROOM);
+    act("$n finishes chanting and smiles to $mself.", TRUE, caster, NULL, NULL,
+      TO_ROOM);
   } else {
     caster->sendTo("You are unable to detect anything like that.\n\r");
     act("$n finishs chanting and a frown appears on $s face.", TRUE, caster,
       NULL, NULL, TO_ROOM);
   }
   return SPELL_SUCCESS;
-
 }
 
 int eyesOfFertuman(TBeing* caster, const char* tofind) {
@@ -635,8 +651,8 @@ int eyesOfFertuman(TBeing* caster, const char* tofind) {
   if (caster->GetMaxLevel() > MAX_MORT &&
       caster->GetMaxLevel() < commandArray[CMD_WHERE]->minLevel) {
     caster->sendTo("You are unable to locate things at your level.\n\r");
-    vlogf(LOG_CHEAT, format("%s using %s to locate '%s'") %  
-      caster->getName() % discArray[SPELL_EYES_OF_FERTUMAN]->name % tofind);
+    vlogf(LOG_CHEAT, format("%s using %s to locate '%s'") % caster->getName() %
+                       discArray[SPELL_EYES_OF_FERTUMAN]->name % tofind);
     return FALSE;
   }
 
@@ -646,7 +662,8 @@ int eyesOfFertuman(TBeing* caster, const char* tofind) {
   lag_t rounds = discArray[SPELL_EYES_OF_FERTUMAN]->lag;
   diff = discArray[SPELL_EYES_OF_FERTUMAN]->task;
 
-  start_cast(caster, NULL, NULL, caster->roomp, SPELL_EYES_OF_FERTUMAN, diff, 1, tofind, rounds, caster->in_room, 0, 0,TRUE, 0);
+  start_cast(caster, NULL, NULL, caster->roomp, SPELL_EYES_OF_FERTUMAN, diff, 1,
+    tofind, rounds, caster->in_room, 0, 0, TRUE, 0);
   return TRUE;
 }
 
@@ -660,7 +677,8 @@ int castEyesOfFertuman(TBeing* caster, const char* tofind) {
 
   level = caster->getSkillLevel(SPELL_EYES_OF_FERTUMAN);
 
-  ret = eyesOfFertuman(caster, tofind, level, caster->getSkillValue(SPELL_EYES_OF_FERTUMAN));
+  ret = eyesOfFertuman(caster, tofind, level,
+    caster->getSkillValue(SPELL_EYES_OF_FERTUMAN));
   return ret;
 }
 
@@ -1264,7 +1282,8 @@ int dispelMagic(TBeing* caster, TBeing* victim, TMagicItem* obj) {
       NULL, TO_CHAR);
     act("$p dispels the magical forces affecting $n...", FALSE, victim, obj,
       NULL, TO_ROOM);
-    int rc = generic_dispel_magic(caster, victim, level, caster->isImmortal(), SAFE_NO);
+    int rc = generic_dispel_magic(caster, victim, level, caster->isImmortal(),
+      SAFE_NO);
     if (IS_SET_DELETE(rc, DELETE_VICT))
       return DELETE_VICT;
   }
@@ -1309,7 +1328,8 @@ int castDispelMagic(TBeing* caster, TBeing* victim) {
       act("$n dispels the magical forces affecting $m...", FALSE, caster, NULL,
         0, TO_ROOM);
     }
-    int rc = generic_dispel_magic(caster, victim, level, caster->isImmortal(), SAFE_NO);
+    int rc = generic_dispel_magic(caster, victim, level, caster->isImmortal(),
+      SAFE_NO);
     if (IS_SET_DELETE(rc, DELETE_VICT))
       return DELETE_VICT;
   }

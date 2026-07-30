@@ -260,9 +260,14 @@ namespace {
 }  // namespace
 
 // -1 = v is dead, needs to go bye-bye
-int TBeing::reconcileDamage(TBeing* v, int dam, spellNumT how) {
+int TBeing::reconcileDamage(TBeing* v, int dam, spellNumT how, int* damDealt) {
   int rc = 0;
   spellNumT how2;
+
+  // applyDamage sets this, but the combat specials below can return first;
+  // callers must not read a stale count from an earlier attack.
+  if (damDealt)
+    *damDealt = 0;
 
   // trigger specials for starting a fight
   if (fight() != v && (rc = checkSpec(v, CMD_MOB_COMBAT_ONATTACK, NULL, NULL)))
@@ -348,7 +353,7 @@ int TBeing::reconcileDamage(TBeing* v, int dam, spellNumT how) {
     }
   }
 
-  rc = applyDamage(v, dam, how);
+  rc = applyDamage(v, dam, how, damDealt);
 
   if (IS_SET_DELETE(rc, DELETE_VICT)) {
     //    if (desc);
@@ -365,12 +370,17 @@ int TBeing::reconcileDamage(TBeing* v, int dam, spellNumT how) {
 }
 
 // returns DELETE_VICT if v died
-int TBeing::applyDamage(TBeing* v, int dam, spellNumT dmg_type) {
+int TBeing::applyDamage(TBeing* v, int dam, spellNumT dmg_type, int* damDealt) {
   double percent = 0;
   int learn = 0;
   int rc = 0;
   int questmob;
   bool found = FALSE;
+
+  // Default to zero so early returns (immortal target, bogus fight) report no
+  // damage dealt.
+  if (damDealt)
+    *damDealt = 0;
 
   // ranged damage comes through here via reconcileDamage
   // lets not set them fighting unless we need to
@@ -385,6 +395,12 @@ int TBeing::applyDamage(TBeing* v, int dam, spellNumT dmg_type) {
   int protection = v->getProtection();
   dam *= 100 - protection;
   dam = (dam + 50) / 100;  // the 50 is here to round appropriately
+
+  // Report the gross post-mitigation damage (resistance, magic-weapon immunity,
+  // and protection already applied) before any overkill clamp below. This is
+  // the value the consider estimate predicts, so predict and live agree.
+  if (damDealt)
+    *damDealt = max(0, dam);
 
   if (this != v) {
     if (v->getHit() <= -11) {

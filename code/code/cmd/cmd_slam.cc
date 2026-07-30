@@ -146,8 +146,7 @@ int TBeing::slamSuccess(TBeing* victim) {
 
   // $o resolves to the implement's first keyword ("sword", "gauntlet"); for
   // bare hands fall back to the race-appropriate body-part noun.
-  sstring noun =
-    implement ? sstring("$o") : describeBodySlot(getPrimaryHand());
+  sstring noun = implement ? sstring("$o") : describeBodySlot(getPrimaryHand());
 
   // Send description text to players in the room
   if (getCombatMode() == ATTACK_BERSERK) {
@@ -160,13 +159,12 @@ int TBeing::slamSuccess(TBeing* victim) {
                "considerable damage!") %
           noun,
       false, this, implement, victim, TO_CHAR);
-    act(format("$n slams $s %s into you with a <r>berserker's <z>zeal!") %
-          noun,
+    act(format("$n slams $s %s into you with a <r>berserker's <z>zeal!") % noun,
       false, this, implement, victim, TO_VICT);
 
   } else {
-    act(format("$n slams $N with $s %s, inflicting considerable damage!") %
-          noun,
+    act(
+      format("$n slams $N with $s %s, inflicting considerable damage!") % noun,
       false, this, implement, victim, TO_NOTVICT);
     act(format("You slam your %s into $N, inflicting considerable damage!") %
           noun,
@@ -190,10 +188,17 @@ int TBeing::slamSuccess(TBeing* victim) {
   // worn gauntlet contributes via the hand slot when unarmed.
   wearSlotT targetLimb = victim->getPartHit(this, true);
   wearSlotT damSource = weapon ? getPrimaryHold() : getPrimaryHand();
-  dam += impactSpec(this, victim, damSource, targetLimb);
-
   // Reconcile damage
   if (reconcileDamage(victim, dam, damageType) == -1)
+    return DELETE_VICT;
+
+  // impactSpec applies its own damage (spikes, thornflesh, hardness), so it
+  // runs after the skill's blow has landed.  Poisoned spikes can crit-fail
+  // back onto us, so it can report either death.
+  int impactRc = impactSpec(this, victim, damSource, targetLimb);
+  if (IS_SET_DELETE(impactRc, DELETE_THIS))
+    return DELETE_THIS;
+  if (IS_SET_DELETE(impactRc, DELETE_VICT))
     return DELETE_VICT;
 
   return true;
@@ -211,12 +216,11 @@ int TBeing::slamFail(TBeing* victim) {
       format("$n's attempt at slamming $N with $s %s fails to make contact.") %
         noun,
       false, this, implement, victim, TO_NOTVICT);
-    act(
-      format("Your attempt at slamming $N with your %s fails to make contact.") %
-        noun,
-      false, this, implement, victim, TO_CHAR);
-    act(format("$n attempts to slam you with $s %s but comes up short.") %
+    act(format(
+          "Your attempt at slamming $N with your %s fails to make contact.") %
           noun,
+      false, this, implement, victim, TO_CHAR);
+    act(format("$n attempts to slam you with $s %s but comes up short.") % noun,
       false, this, implement, victim, TO_VICT);
   }
 

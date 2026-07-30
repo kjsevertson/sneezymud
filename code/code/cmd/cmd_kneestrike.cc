@@ -134,11 +134,18 @@ int TBeing::kneestrikeMiss(TBeing* v, int type) {
       cantHit += v->loseRound(0.25);
       addToWait(combatRound(0.25));
 
-      // Use impactSpec to handle all impact effects (spikes, thornflesh, hardness)
-      dam += impactSpec(v, this, v->getPrimaryFoot(), WEAR_BODY);
-
       if (v->reconcileDamage(this, dam, DAMAGE_KICK_HEAD) == -1)
         return DELETE_THIS;
+
+      // impactSpec applies its own damage and runs after the blow lands.  The
+      // roles are reversed here - v is the attacker and we are the victim - so
+      // both flags mean the opposite of usual: its DELETE_VICT is us dying,
+      // its DELETE_THIS is v dying.
+      int impactRc = impactSpec(v, this, v->getPrimaryFoot(), WEAR_BODY);
+      if (IS_SET_DELETE(impactRc, DELETE_VICT))
+        return DELETE_THIS;
+      if (IS_SET_DELETE(impactRc, DELETE_THIS))
+        return DELETE_VICT;
     } break;
   }
 
@@ -342,11 +349,17 @@ int TBeing::kneestrikeHit(TBeing* victim) {
   // advance learning gave increased success, this seems bad idea
   //  dam += c->getAdvLearning(SKILL_KNEESTRIKE)/10;
 
-  // Use impactSpec to handle all impact effects (spikes, thornflesh, hardness)
-  // This includes automatic hardness-based damage to equipment/limbs
   caster_pos = (::number(0, 1) ? WEAR_LEG_L : WEAR_LEG_R);
-  dam += impactSpec(this, victim, caster_pos, pos);
   if ((rc = reconcileDamage(victim, dam, dam_type)) == -1)
+    return DELETE_VICT;
+
+  // impactSpec applies its own damage (spikes, thornflesh, hardness), so it
+  // runs after the skill's blow has landed.  Poisoned spikes can crit-fail
+  // back onto us, so it can report either death.
+  int impactRc = impactSpec(this, victim, caster_pos, pos);
+  if (IS_SET_DELETE(impactRc, DELETE_THIS))
+    return DELETE_THIS;
+  if (IS_SET_DELETE(impactRc, DELETE_VICT))
     return DELETE_VICT;
 
   return TRUE;

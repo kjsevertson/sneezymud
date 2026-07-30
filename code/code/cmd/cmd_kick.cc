@@ -294,7 +294,7 @@ static int kickHit(TBeing* caster, TBeing* victim, int score, int level,
       break;
     }
     case KICK_NONE: {
-      slot = WEAR_BODY; // Default to body for non-humanoids
+      slot = WEAR_BODY;  // Default to body for non-humanoids
       act("$n kicks $N in the side.", FALSE, caster, 0, victim, TO_NOTVICT);
       act("You're kicked in the side by $n.   Ouch!", FALSE, caster, 0, victim,
         TO_VICT);
@@ -304,10 +304,16 @@ static int kickHit(TBeing* caster, TBeing* victim, int score, int level,
     }
   }
 
-  // Use impactSpec to handle all impact effects (spikes, thornflesh, hardness)
-  dam += impactSpec(caster, victim, caster->getPrimaryFoot(), slot);
-
   if (caster->reconcileDamage(victim, dam, dam_type) == -1)
+    return DELETE_VICT;
+
+  // impactSpec applies its own damage (spikes, thornflesh, hardness), so it
+  // runs after the skill's blow has landed.  Poisoned spikes can crit-fail
+  // back onto the kicker, so it can report either death.
+  int impactRc = impactSpec(caster, victim, caster->getPrimaryFoot(), slot);
+  if (IS_SET_DELETE(impactRc, DELETE_THIS))
+    return DELETE_THIS;
+  if (IS_SET_DELETE(impactRc, DELETE_VICT))
     return DELETE_VICT;
 
   if (victim->spelltask) {
@@ -356,11 +362,15 @@ static int kick(TBeing* ch, TBeing* victim, spellNumT skill) {
       return TRUE;
     }
     rc = kickHit(ch, victim, bKnown + percent, level, skill);
+    if (IS_SET_DELETE(rc, DELETE_THIS))
+      return DELETE_THIS;
     if (IS_SET_DELETE(rc, DELETE_VICT))
       return DELETE_VICT;
   } else {
     if (victim->getPosition() <= POSITION_SLEEPING) {
       rc = kickHit(ch, victim, bKnown + percent, level, skill);
+      if (IS_SET_DELETE(rc, DELETE_THIS))
+        return DELETE_THIS;
       if (IS_SET_DELETE(rc, DELETE_VICT))
         return DELETE_VICT;
     } else {
@@ -391,6 +401,8 @@ int TBeing::doKick(const char* argument, TBeing* vict) {
   }
   spellNumT skill = getSkillNum(SKILL_KICK);
   rc = kick(this, victim, skill);
+  if (IS_SET_DELETE(rc, DELETE_THIS))
+    return DELETE_THIS;
   if (rc)
     addSkillLag(skill, rc);
   if (IS_SET_DELETE(rc, DELETE_VICT)) {

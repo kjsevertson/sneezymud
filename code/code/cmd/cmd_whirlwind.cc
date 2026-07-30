@@ -8,6 +8,10 @@ static int whirlwind(TBeing* caster, TBeing* victim, int castLevel,
   spellNumT damageType) {
   int successfulHit = caster->specialAttack(victim, SKILL_WHIRLWIND);
   int dam = 0;
+  // impactSpec now applies its own damage, so it has to wait until after the
+  // skill's blow lands.  Remember whether we connected, and where.
+  bool landed = false;
+  wearSlotT damSource = WEAR_NOWHERE, targetLimb = WEAR_NOWHERE;
 
   // Success case
   if (!victim->awake() ||
@@ -21,12 +25,11 @@ static int whirlwind(TBeing* caster, TBeing* victim, int castLevel,
     dam = caster->getSkillDam(victim, SKILL_WHIRLWIND, castLevel,
       caster->getAdvLearning(SKILL_WHIRLWIND));
 
-    // Add weapon/gauntlet/bare-hand impact contribution per victim.
+    // Weapon/gauntlet/bare-hand impact contribution per victim, applied below.
     auto* weapon = dynamic_cast<TBaseWeapon*>(caster->heldInPrimHand());
-    wearSlotT damSource =
-      weapon ? caster->getPrimaryHold() : caster->getPrimaryHand();
-    wearSlotT targetLimb = victim->getPartHit(caster, true);
-    dam += impactSpec(caster, victim, damSource, targetLimb);
+    damSource = weapon ? caster->getPrimaryHold() : caster->getPrimaryHand();
+    targetLimb = victim->getPartHit(caster, true);
+    landed = true;
   }
   // Failure case
   else {
@@ -38,6 +41,16 @@ static int whirlwind(TBeing* caster, TBeing* victim, int castLevel,
 
   if (caster->reconcileDamage(victim, dam, damageType) == -1)
     return DELETE_VICT;
+
+  if (landed) {
+    int impactRc = impactSpec(caster, victim, damSource, targetLimb);
+    // poisoned spikes can crit-fail back onto the caster, so both directions
+    // are possible here
+    if (IS_SET_DELETE(impactRc, DELETE_THIS))
+      return DELETE_THIS;
+    if (IS_SET_DELETE(impactRc, DELETE_VICT))
+      return DELETE_VICT;
+  }
 
   return TRUE;
 }
@@ -152,6 +165,10 @@ int TBeing::whirlwindSuccess() {
 
     int castLevel = getSkillLevel(SKILL_WHIRLWIND);
     rc = whirlwind(this, being, castLevel, damageType);
+    // if the sweep killed us (poisoned spikes crit-failing), stop immediately -
+    // continuing the loop would keep using a deleted caster
+    if (IS_SET_DELETE(rc, DELETE_THIS))
+      return DELETE_THIS;
     if (!IS_SET_DELETE(rc, DELETE_VICT))
       continue;
 

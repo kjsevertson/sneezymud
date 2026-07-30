@@ -57,6 +57,8 @@
 #include "obj_board.h"
 #include "obj_book.h"
 #include "obj_component.h"
+#include "obj_trap_component.h"
+#include "obj_trapcomp_bag.h"
 #include "obj_gemstone.h"
 #include "obj_key.h"
 #include "obj_note.h"
@@ -2592,6 +2594,61 @@ void zoneData::closeDoors() {
   }
 }
 
+// Randomly trap closed locked and/or secret doors at zone reset.  Each locked
+// door has a 5% chance and each secret door a 5% chance (10% if both).  Damage
+// scales with the zone's average mob level; the trap type is fully random.
+// Already-trapped doors are skipped so builder- and player-set traps survive.
+void zoneData::trapDoors() {
+  const double avg = num_mobs ? mob_levels / num_mobs : 0.0;
+  const int maxDam = std::max(1, static_cast<int>(avg));
+  const int bottom = zone_nr ? (zone_table[zone_nr - 1].top + 1) : 0;
+
+  for (int rnum = bottom; rnum <= top; rnum++) {
+    TRoom* rp = real_roomp(rnum);
+    if (!rp)
+      continue;
+
+    for (dirTypeT dir = MIN_DIR; dir < MAX_DIR; dir++) {
+      roomDirData* exitp = rp->dir_option[dir];
+      if (!exitp || exitp->door_type == DOOR_NONE ||
+          !IS_SET(exitp->condition, EXIT_CLOSED) ||
+          IS_SET(exitp->condition,
+            EXIT_TRAPPED | EXIT_DESTROYED | EXIT_CAVED_IN))
+        continue;
+
+      int chance = 0;
+      if (IS_SET(exitp->condition, EXIT_LOCKED))
+        chance += 5;
+      if (IS_SET(exitp->condition, EXIT_SECRET))
+        chance += 5;
+      if (chance == 0 || number(1, 100) > chance)
+        continue;
+
+      const short trapInfo = randomTrapType(TRAP_TARG_DOOR, maxDam);
+      const short trapDam = number(1, maxDam);
+
+      SET_BIT(exitp->condition, EXIT_TRAPPED);
+      exitp->trap_info = trapInfo;
+      exitp->trap_dam = trapDam;
+      // Nobody set this one, so it must not inherit the name of whoever last
+      // trapped this exit -- otherwise they take the damage credit (and the
+      // resulting hatred) for a trap they had no part in.
+      exitp->trap_setter.clear();
+
+      // mirror onto the far side so the trap fires from either direction
+      if (TRoom* rp2 = real_roomp(exitp->to_room)) {
+        if (roomDirData* back = rp2->dir_option[rev_dir(dir)];
+            back && back->to_room == rnum) {
+          SET_BIT(back->condition, EXIT_TRAPPED);
+          back->trap_info = trapInfo;
+          back->trap_dam = trapDam;
+          back->trap_setter.clear();
+        }
+      }
+    }
+  }
+}
+
 // procZoneUpdate
 procZoneUpdate::procZoneUpdate(const int& p) {
   trigger_pulse = p;
@@ -3652,8 +3709,10 @@ void zoneData::resetZone(bool bootTime, bool findLoadPotential) {
       break;
   }
 
-  if (!findLoadPotential)
+  if (!findLoadPotential) {
     doGenericReset();  // sends CMD_GENERIC_RESET to all objects in zone
+    trapDoors();       // randomly trap locked/secret doors based on zone level
+  }
 
   this->age = 0;
 }
@@ -3897,10 +3956,14 @@ TObj* makeNewObj(itemTypeT tmp) {
       return new TCorpse();
     case ITEM_SPELLBAG:
       return new TSpellBag();
+    case ITEM_TRAPCOMP_BAG:
+      return new TTrapCompBag();
     case ITEM_KEYRING:
       return new TKeyring();
     case ITEM_COMPONENT:
       return new TComponent();
+    case ITEM_TRAP_COMPONENT:
+      return new TTrapComponent();
     case ITEM_BOOK:
       return new TBook();
     case ITEM_PORTAL:
