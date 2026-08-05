@@ -149,6 +149,21 @@ double TBaseWeapon::baseDamage() const {
   return amt;
 }
 
+// A material can only hold so fine an edge.  Steel lands exactly on the 100 the
+// object editor enforces, so softer stock is capped below the old ceiling while
+// anything harder simply reaches it more readily.
+int TBaseWeapon::maxSharpCap() const {
+  return min(material_nums[getMaterial()].hardness + 30, 100);
+}
+
+// Honing a weapon past the edge its maker managed is thief work, and only for
+// those with nothing left to learn about sharpening.
+bool TBaseWeapon::canHoneMaxSharp(const TBeing* ch) const {
+  return ch && ch->hasClass(CLASS_THIEF) &&
+         ch->getSkillValue(SKILL_SHARPEN) >= MAX_SKILL_LEARNEDNESS &&
+         getMaxSharp() < maxSharpCap();
+}
+
 void TBaseWeapon::sharpenMe(TBeing* ch, TTool* tool) {
   int sharp_move = dice(2, 3);
 
@@ -173,13 +188,29 @@ void TBaseWeapon::sharpenMe(TBeing* ch, TTool* tool) {
   }
   if (getMaxSharp() <= getCurSharp()) {
     ch->sendTo("It doesn't seem to be getting any sharper.\n\r");
-    act("$n stops sharpening $p.", FALSE, ch, this, 0, TO_ROOM);
+    act("$n stops sharpening $p.", false, ch, this, nullptr, TO_ROOM);
     ch->stopTask();
     return;
   }
 
-  if (ch->bSuccess(SKILL_SHARPEN))
+  if (ch->bSuccess(SKILL_SHARPEN)) {
     addToCurSharp((itemType() == ITEM_ARROW) ? 2 : 1);
+
+    // Only while there is still edge to restore.  A weapon already at its
+    // ceiling stops the task above, so honing follows genuine use and
+    // re-sharpening rather than idle grinding.  Headroom shrinks as the
+    // ceiling nears what the material can hold, and harder stock gives ground
+    // more readily, so the last points are the real work.
+    if (canHoneMaxSharp(ch) &&
+        percentChance((maxSharpCap() - getMaxSharp()) *
+                      material_nums[getMaterial()].hardness / 100)) {
+      addToMaxSharp(1);
+      act("You coax $p's edge past what its maker managed.", false, ch, this,
+        nullptr, TO_CHAR);
+      act("$n works $p with an unusual patience.", true, ch, this, nullptr,
+        TO_ROOM);
+    }
+  }
 
   // task can continue forever, so don't bother decrementing the timer
 }
