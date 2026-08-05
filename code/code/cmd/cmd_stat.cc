@@ -1925,6 +1925,7 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_FAST_LOAD:
       case SKILL_SHARPEN:
       case SKILL_DULL:
+      case SKILL_SERRATE:
       case SKILL_ATTUNE:
       case SKILL_STAVECHARGE:
       case SKILL_SACRIFICE:

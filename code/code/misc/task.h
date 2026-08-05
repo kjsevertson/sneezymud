@@ -89,6 +89,7 @@ extern int task_preen(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_skulk(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_debriding(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_trap_portal(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_serrate(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 
 typedef struct _tasks_entry {
     const char* const name;
@@ -151,6 +152,7 @@ enum taskTypeT {
   TASK_PREEN,
   TASK_SKULK,
   TASK_TRAP_PORTAL,
+  TASK_SERRATE,
   NUM_TASKS  // keep this as max
 };
 
