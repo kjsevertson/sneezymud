@@ -1,0 +1,24 @@
+Syntax: keycut <direction>
+
+A looter who cannot pick a lock may still copy it.  Keycut takes a wax
+impression of a door's lock and casts a working duplicate of its key.
+
+The door must have a real keyhole.  Doors barred, stuck or held shut by
+something other than a lock offer nothing to take an impression from.
+
+Casting consumes wax from your inventory.  The amount needed scales with the
+size of the key being copied, and an unpracticed hand spoils a good deal more
+of it than a master does.  The wax is spent whether or not the casting takes,
+so a failed attempt is a real loss.
+
+A wax key works exactly as the true key does, and will open every lock the
+original opens.  It is also plainly a wax casting to anyone who looks at it,
+and it will not last.  Within a few minutes it softens and falls apart in your
+hands, so cast it where you mean to use it.
+
+Taking an impression demands a steadiness of hand that is not quickly
+recovered.  Once you have made the attempt you will be unable to make another
+for about an hour.  This holds whether the casting succeeded or failed, so do
+not begin one you are not prepared to see through.
+
+See Also: PICKLOCK, JAM
