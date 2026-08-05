@@ -79,6 +79,10 @@ class BaseRepair {
       return false;
     }
 
+    // Fires on each pulse that actually restores a structure point. Default
+    // is nothing; only warrior metalworking currently does anything here.
+    virtual void OnRepairSuccess(TObj* o) {}
+
     // more behavior, although you probably don't want to override these
     bool OnError();
     bool OnPulse(TObj* o);
@@ -317,9 +321,10 @@ int BaseRepair::PumpMessage(cmdTypeT cmd, int pulse) {
         percent -= m_ch->getDexReaction() * 3;
 
       // repair the object
-      if (percent < m_ch->getSkillValue(m_skill))
+      if (percent < m_ch->getSkillValue(m_skill)) {
         o->addToStructPoints(1);
-      else if (o->getStructPoints() > 0)
+        OnRepairSuccess(o);
+      } else if (o->getStructPoints() > 0)
         o->addToStructPoints(-1);
       else if (DamageTool(true, o, true)) {
         m_ch->stopTask();
@@ -337,7 +342,7 @@ int BaseRepair::PumpMessage(cmdTypeT cmd, int pulse) {
         m_ch->stopTask();
         return FALSE;
       }  // (o->getStructPoints() <= 1)
-    }    // OnSuccess > 0
+    }  // OnSuccess > 0
     else if (succ < 0) {
       m_ch->stopTask();
       return 0;
@@ -389,6 +394,7 @@ class MetalRepair : public BaseRepair {
     virtual bool OnStop(TObj* o);
     virtual bool OnComplete(TObj* o);
     virtual bool OnDrain(TObj* o);
+    virtual void OnRepairSuccess(TObj* o);
 
     virtual int OnSuccess(TObj* o);
 };
@@ -402,6 +408,50 @@ bool MetalRepair::OnStop(TObj* o) {
     act("$n lets $p cool down.", FALSE, m_ch, o, 0, TO_ROOM);
   }
   return true;  // stop
+}
+
+namespace {
+  // A master smith occasionally leaves a piece better than it started.
+  // Gated on advanced blacksmithing being fully learned -- both a complete
+  // practice allotment in DISC_BLACKSMITHING and the skill honed to its
+  // ceiling by use.
+  inline constexpr int kSmithMasteryRequired = 100;
+  inline constexpr int kSmithImproveChance = 10;  // 1 in N
+  // One commodity unit is a tenth of a point of weight (numUnits() == 10x
+  // weight), spent on top of what the repair itself consumes.
+  inline constexpr double kSmithImproveCost = 0.1;
+  // max_struct_points is a short; growth is otherwise deliberately uncapped.
+  inline constexpr short kMaxStructCeiling = 32000;
+}  // namespace
+
+// Called on each pulse that actually restores a structure point, never on
+// task completion -- an undamaged item completes instantly (repairMetal in
+// repair.cc:1206 does not check for damage first) and must not earn a roll.
+void MetalRepair::OnRepairSuccess(TObj* o) {
+  if (m_ch->getSkillValue(SKILL_BLACKSMITHING_ADVANCED) < kSmithMasteryRequired)
+    return;
+  if (o->getMaxStructPoints() >= kMaxStructCeiling)
+    return;
+
+  // Re-fetch rather than cache: ConsumeRepairMats runs earlier in this same
+  // pulse and deletes the stack when it empties.
+  TCommodity* mat = getRepairMaterial(m_ch->stuff, o->getMaterial());
+  if (!mat || mat->numUnits() < 1)
+    return;
+
+  if (::number(0, kSmithImproveChance - 1))
+    return;
+  if (!m_ch->isLucky(m_ch->spellLuckModifier(SKILL_BLACKSMITHING_ADVANCED)))
+    return;
+
+  mat->setWeight(mat->getWeight() - kSmithImproveCost);
+  if (mat->numUnits() <= 0)
+    delete mat;
+
+  o->addToMaxStructPoints(1);
+  act("$p rings true under your hammer -- it is sturdier than it was.", false,
+    m_ch, o, 0, TO_CHAR);
+  act("$n's $p rings oddly true under the blow.", true, m_ch, o, 0, TO_ROOM);
 }
 
 bool MetalRepair::OnComplete(TObj* o) {
