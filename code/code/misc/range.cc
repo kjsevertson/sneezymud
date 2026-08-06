@@ -528,7 +528,16 @@ int TThing::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
             format("Range debug: (2) %s damaging %s with %s for %d dam") %
               ch->getName() % tbt->getName() % tobj->getName() % d);
 #endif
-          if (ch->reconcileDamage(tbt, d, getWtype()) == -1) {
+          // applyDamage, not reconcileDamage, for the same reason the weapon
+          // version of catchSmack uses it: reconcileDamage runs
+          // getActualDamage, which re-checks damDetailsOk with ranged = false
+          // and zeroes the blow whenever the thrower is not in the victim's
+          // room - which is every throw worth making.  It would also apply
+          // immunity and magic-tier resistance a second time, since
+          // get_range_actual_damage above is the ranged copy of that same
+          // work.  Hatred still develops: pissOff() below handles it.
+          int rc = ch->applyDamage(tbt, d, getWtype());
+          if (IS_SET_DELETE(rc, DELETE_VICT)) {
             if (true_targ) {
               ADD_DELETE(resCode, DELETE_VICT);
               return resCode;
