@@ -9,6 +9,39 @@
 #include "shopowned.h"
 #include "being.h"
 
+namespace {
+  // Only long stalks are drawn by muscle; every other family gets its edge
+  // somewhere other than the archer's back.
+  bool longStalkBow(const TBow* bow) {
+    return arrowFamily(bow->getArrowType()) == ARROW_FAM_STALK &&
+           arrowIsLong(bow->getArrowType());
+  }
+
+  // Average strength (105 on the 5-205 scale) draws the entry-level long bow,
+  // and every further 25 points is worth another room of reach - so the great
+  // bows need a genuinely strong archer behind them.
+  int maxDrawableRange(const TBeing* ch) {
+    return 5 + (ch->getStat(STAT_CURRENT, STAT_STR) - 105) / 25;
+  }
+
+  // A long stalk turns the archer's strength into penetrating power, and a
+  // longer bow converts more of it.  Returned as a percentage because the bow
+  // is out of reach by the time the shaft lands, so the figure has to travel
+  // on the arrow itself.
+  int launchPowerPct(const TBeing* ch, const TBow* bow) {
+    if (!longStalkBow(bow))
+      return 0;
+
+    const double strFactor =
+      ch->plotStat(STAT_CURRENT, STAT_STR, -0.5, 0.5, 0.0);
+    if (strFactor <= 0.0)
+      return 0;
+
+    const double draw = min(1.0, bow->getMaxRange() / 8.0);
+    return static_cast<int>(draw * strFactor * 100.0);
+  }
+}  // namespace
+
 TBow::TBow() : TObj(), arrowType(0), flags(0), max_range(0) {}
 
 TBow::TBow(const TBow& a) :
@@ -106,44 +139,8 @@ void TBow::evaluateMe(TBeing* ch) const {
   ch->describeNoise(this, learn);
 
   if (learn > 10)
-    switch (arrowType) {
-      case 0:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s can hold hunting type arrows.\n\r") % getName());
-        break;
-      case 1:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s can hold fighting type arrows.\n\r") % getName());
-        break;
-      case 2:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s can hold squabble type quarrels.\n\r") % getName());
-        break;
-      case 3:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s can hold common type quarrels.\n\r") % getName());
-        break;
-      case 4:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s can hold sniper type blowdarts.\n\r") % getName());
-        break;
-      case 5:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s can hold common type blowdarts.\n\r") % getName());
-        break;
-      case 6:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s can hold heavy type sling ammo.\n\r") % getName());
-        break;
-      case 7:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s can hold common type sling ammo.\n\r") % getName());
-        break;
-      default:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s seems to have a messy arrow size.\r") % getName());
-        break;
-    }
+    ch->sendTo(COLOR_OBJECTS, format("%s fires %s.\n\r") % getName() %
+                                arrowTypeNames(arrowType).plural);
 
   if (learn > 20)
     ch->describeMaxStructure(this, learn);
@@ -189,6 +186,15 @@ void TBow::bloadArrowBow(TBeing* ch, TArrow* the_arrow) {
       format("That arrow is just too %s to fit properly.\n\r") %
       ((getArrowType() < the_arrow->getArrowType()) ? "small" : "big"));
 
+    return;
+  }
+
+  // Only a long stalk has to be hauled back by main strength - a crossbow's
+  // mechanism does the work for you and a blowpipe wants breath, not muscle.
+  if (longStalkBow(this) && (int)getMaxRange() > maxDrawableRange(ch)) {
+    act("You haul at $p, but you haven't the strength to draw it full length.",
+      false, ch, this, nullptr, TO_CHAR);
+    act("$n hauls at $p, and can't draw it.", true, ch, this, nullptr, TO_ROOM);
     return;
   }
 
@@ -308,15 +314,24 @@ int TBow::shootMeBow(TBeing* ch, TBeing* targ, unsigned int count, dirTypeT dir,
     }
   }
 
+  // Fast load is nocking the next shaft while the first is still in the air,
+  // and only the short ammunition can be handled that way: a quarrel needs the
+  // bow cranked back again, a dart needs another breath, and a long stalk is a
+  // deliberate single shot that trades rate of fire for power.
+  const arrowFamilyT family = arrowFamily(getArrowType());
+  const bool fastLoadable =
+    !arrowIsLong(getArrowType()) &&
+    (family == ARROW_FAM_STALK || family == ARROW_FAM_PELLET);
+
   // determine how many arrows we can shoot in a round
   float nattacks = 1.0;
-  nattacks +=
-    max((double)0, ((float)ch->getSkillValue(SKILL_FAST_LOAD) / 100.0));
-  nattacks +=
-    max((double)0, ((float)ch->getSkillValue(SKILL_RANGED_SPEC) / 100.0));
+  if (fastLoadable)
+    nattacks += max(0.0, ch->getSkillValue(SKILL_FAST_LOAD) / 100.0);
+  nattacks += max(0.0, ch->getSkillValue(SKILL_RANGED_SPEC) / 100.0);
 
-  // for learning - ranged spec is learned elsewhere
-  if (ch->doesKnowSkill(SKILL_FAST_LOAD))
+  // for learning - ranged spec is learned elsewhere.  No credit for practising
+  // fast load on a bow that can't use it.
+  if (fastLoadable && ch->doesKnowSkill(SKILL_FAST_LOAD))
     ch->bSuccess(SKILL_FAST_LOAD);
   while (nattacks > 0 && targ) {
     // use remainder as a percentage chance of another arrow
@@ -348,6 +363,11 @@ int TBow::shootMeBow(TBeing* ch, TBeing* targ, unsigned int count, dirTypeT dir,
     // as sanity check, verify that person has an arrow to reload at this
     // point too.
     sprintf(buf, "%s", fname(the_arrow->name).c_str());
+
+    // Stamp the shot's power on the shaft before it leaves - once it is in
+    // flight there is no way back to the bow that launched it.
+    if (TArrow* shaft = dynamic_cast<TArrow*>(the_arrow))
+      shaft->setLaunchPower(launchPowerPct(ch, this));
 
     rc = throwThing(the_arrow, dir, ch->in_room, &targ, shoot_dist,
       max_distance, ch);

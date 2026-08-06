@@ -12,6 +12,28 @@
 #include "task.h"
 #include "disc_thief_looting.h"
 
+namespace {
+  // Even values are the long version of a family, odd the short one.
+  constexpr std::array<ArrowTypeNames, 8> kArrowTypeNames = {{
+    {"Hunting Arrow", "Hunting arrows"},
+    {"Fighting Arrow", "Fighting arrows"},
+    {"Squabble Quarrel", "Squabble quarrels"},
+    {"Common Quarrel", "Common quarrels"},
+    {"Sniper Blowdart", "Sniper blowdarts"},
+    {"Common Blowdart", "Common blowdarts"},
+    {"Heavy Pellet", "Heavy pellets"},
+    {"Common Pellet", "Common pellets"},
+  }};
+
+  constexpr ArrowTypeNames kMalformedArrowType = {"malformed projectile",
+    "ammunition that does not exist"};
+}  // namespace
+
+const ArrowTypeNames& arrowTypeNames(unsigned int arrowType) {
+  return arrowType < kArrowTypeNames.size() ? kArrowTypeNames[arrowType]
+                                            : kMalformedArrowType;
+}
+
 TArrow::TArrow() :
   TBaseWeapon(),
   arrowType(0),
@@ -23,6 +45,7 @@ TArrow::TArrow() :
 
 TArrow::TArrow(const TArrow& a) :
   TBaseWeapon(a),
+  launchPower(a.launchPower),
   arrowType(a.arrowType),
   arrowHead(a.arrowHead),
   arrowHeadMat(a.arrowHeadMat),
@@ -34,6 +57,7 @@ TArrow& TArrow::operator=(const TArrow& a) {
   if (this == &a)
     return *this;
   TBaseWeapon::operator=(a);
+  launchPower = a.launchPower;
   arrowType = a.arrowType;
   arrowHead = a.arrowHead;
   arrowHeadMat = a.arrowHeadMat;
@@ -196,6 +220,11 @@ spellNumT TArrow::getWtype(int which) const {
     return TYPE_SHOOT;
   else if (objVnum() == 19090)
     return TYPE_CANNON;
+  else if (arrowFamily(arrowType) == ARROW_FAM_PELLET)
+    // A pellet has nothing to pierce with.  Reporting it blunt is what makes
+    // isBluntWeapon() true, which in turn keeps it from embedding and routes
+    // its damage through blunt resistance rather than pierce.
+    return TYPE_BLUDGEON;
   else
     return TYPE_PIERCE;
 }
@@ -214,43 +243,8 @@ void TArrow::evaluateMe(TBeing* ch) const {
     ch->describeMaxSharpness(this, learn);
 
   if (learn > 10)
-    switch (arrowType) {
-      case 0:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s is a hunting type arrow.\n\r") % getName());
-        break;
-      case 1:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s is a fighting type arrow.\n\r") % getName());
-        break;
-      case 2:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s is a squabble type quarrel.\n\r") % getName());
-        break;
-      case 3:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s is a common type quarrel.\n\r") % getName());
-        break;
-      case 4:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s is a sniper type blowdart.\n\r") % getName());
-        break;
-      case 5:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s is a common type blowdart.\n\r") % getName());
-        break;
-      case 6:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s is a heavy type sling ammo.\n\r") % getName());
-        break;
-      case 7:
-        ch->sendTo(COLOR_OBJECTS,
-          format("%s is a common type sling ammo.\n\r") % getName());
-        break;
-      default:
-        ch->sendTo(format("%s is a messed up arrow type.\n\r") % getName());
-        break;
-    }
+    ch->sendTo(COLOR_OBJECTS, format("%s is a %s.\n\r") % getName() %
+                                arrowTypeNames(arrowType).singular);
 
   if (learn > 15)
     ch->describeArrowSharpness(this, learn);

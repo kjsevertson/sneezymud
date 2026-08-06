@@ -3300,7 +3300,11 @@ int TBeing::skillSituationalModifier(TBeing* victim, spellNumT skill,
     // less visible is better, minus penalties when the victim hears or spots
     // you. The matching warning messages live at each skill's call site.
     case SKILL_BACKSTAB:
-    case SKILL_THROATSLIT: {
+    case SKILL_THROATSLIT:
+    // A blowdart rewards the same patient approach, so it borrows the math.
+    // Whether a given shot qualifies is decided at the call site, which is the
+    // only place that knows what was loaded.
+    case SKILL_RANGED_PROF: {
       int mod = -(noise(this) / 20) + visibility() / 15;
       if (canHearThief(victim))
         mod -= 10;
@@ -3375,8 +3379,8 @@ int TBeing::specialAttackChance(TBeing* victim, spellNumT skill) {
 
 // Skill-agnostic sibling of specialAttackChance: the same d100 count reduced to
 // its level-gap term only -- no situational modifier, and a stat ratio fixed at
-// 1.0. Models the "bonus vs lower-level foes" asymmetry the live roll applies (a
-// PC gains a full point per level it out-levels the target, but loses only a
+// 1.0. Models the "bonus vs lower-level foes" asymmetry the live roll applies
+// (a PC gains a full point per level it out-levels the target, but loses only a
 // fifth of a point per level under). A coarse "does my level let me land
 // specials here" gauge for basic `consider`. Keep the level-diff formula in
 // lockstep with specialAttack() below.

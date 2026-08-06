@@ -1413,6 +1413,80 @@ double TBaseWeapon::specializationCheck(const TBeing* ch) const {
   return 1.0 * skill / 100.0;
 }
 
+namespace {
+  // The head is what strikes, so the head's material is what has to survive
+  // the impact.  Arrows whose head material was never set fall back to the
+  // object's own material - that is where builders have historically encoded
+  // the tip ("a silver tipped flight arrow", "a bronze headed arrow").
+  // A quarrel is driven flat and hard by the bow's mechanism rather than by
+  // the archer, so it bites where a loosed shaft would glance.
+  constexpr int QUARREL_EMBED_BONUS = 20;
+
+  int strikingHardness(const TBaseWeapon* w) {
+    const TArrow* arrow = dynamic_cast<const TArrow*>(w);
+    const int mat = (arrow && arrow->getArrowHeadMat())
+                      ? arrow->getArrowHeadMat()
+                      : w->getMaterial();
+    return material_nums[mat].hardness;
+  }
+
+  // A pellet has no edge to bite with, so it batters instead.  Mirrors
+  // hardHit's material differential - what struck against what was struck,
+  // armour if there is any and flesh if not - with the victim's constitution
+  // soaking part of the blow.
+  void bludgeonBruise(const TBaseWeapon* w, TBeing* victim, wearSlotT partHit) {
+    if (victim->isTough())
+      return;
+
+    const int chance = strikingHardness(w) - getHardnessSpec(victim, partHit) -
+                       static_cast<int>(victim->plotStat(STAT_CURRENT, STAT_CON,
+                         0.0, 25.0, 12.0));
+
+    if (!percentChance(chance))
+      return;
+
+    if (victim->isLimbFlags(partHit, PART_BRUISED))
+      victim->incrementBruiseStack(partHit, 100);
+    else
+      victim->rawBruise(partHit, 100, SILENT_NO, CHECK_IMMUNITY_NO);
+  }
+
+  // A shot weapon gives up its edge first and its shaft only once the edge is
+  // already going.  Returns DELETE_ITEM if the impact finished it off.
+  int wearFromImpact(TBaseWeapon* w, TBeing* shooter, TBeing* victim,
+    wearSlotT partHit) {
+    // Dulling gets likelier the duller the thing already is, so it decays
+    // slowly at first and then falls apart.  Floored because sharpening an
+    // arrow can overshoot its maximum.
+    if (!percentChance(max(10, 10 + w->getMaxSharp() - w->getCurSharp())))
+      return 0;
+
+    const sstring before = w->describeMySharp(shooter);
+    w->addToCurSharp(-::number(1, 4));
+    if (w->getCurSharp() < 0)
+      w->setCurSharp(0);
+
+    // Report only when it crosses into a new condition, never point by point -
+    // a fast archer puts several of these downrange every round.
+    const sstring after = w->describeMySharp(shooter);
+    if (before != after)
+      shooter->sendTo(COLOR_OBJECTS, format("%s.\n\r") % sstring(after).cap());
+
+    // A hard head shrugs off soft targets and a soft one comes apart on hard
+    // ones, so what the arrow is tipped with decides how long it lasts.
+    if (!percentChance(
+          max(5, 55 + getHardnessSpec(victim, partHit) - strikingHardness(w))))
+      return 0;
+
+    if (IS_SET_DELETE(w->damageItem(::number(1, 2)), DELETE_THIS)) {
+      act("$p is spent, and comes apart.", false, shooter, w, nullptr, TO_CHAR);
+      return DELETE_ITEM;
+    }
+
+    return 0;
+  }
+}  // namespace
+
 int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
   int mdist) {
   int rc;
@@ -1424,11 +1498,20 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
   wearSlotT phit;
   int range;
 
-  if (dynamic_cast<TArrow*>(this)) {
+  // Thrown weapons are not ammunition; they take the plain path throughout and
+  // stand in as stalks so the family checks below simply never fire for them.
+  const TArrow* ammo = dynamic_cast<const TArrow*>(this);
+  const arrowFamilyT family =
+    ammo ? arrowFamily(ammo->getArrowType()) : ARROW_FAM_STALK;
+
+  if (ammo) {
     if (objVnum() == 31864 || objVnum() == 31869)
       damtype = TYPE_SHOOT;
     else if (objVnum() == 19090)
       damtype = TYPE_CANNON;
+    else if (family == ARROW_FAM_PELLET)
+      // DAMAGE_ARROWS resolves to pierce immunity, which is wrong for a stone.
+      damtype = TYPE_BLUDGEON;
     else
       damtype = DAMAGE_ARROWS;
   } else
@@ -1465,9 +1548,22 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
       if (!true_targ && range != mdist)
         range++;
 
-      if (!ch->isImmortal() &&
-          (!(i = ch->specialAttack(tb, SKILL_RANGED_PROF)) ||
-            i == GUARANTEED_FAILURE)) {
+      // A thief with a blowpipe is stalking rather than shooting, so a quiet,
+      // unseen approach pays the same way it does for a backstab.  No warning
+      // messages: a dart is silent, and an archer rooms away would have no way
+      // to know they had been heard.
+      const int approachMod =
+        (family == ARROW_FAM_DART && ch->hasClass(CLASS_THIEF))
+          ? ch->skillSituationalModifier(tb, SKILL_RANGED_PROF)
+          : 0;
+
+      // The modifier overload hands back specialAttack's raw status where the
+      // plain one collapses it to hit/miss, so collapse it here the same way
+      // rather than letting a partial success read as a clean hit.
+      i = ch->specialAttack(tb, SKILL_RANGED_PROF, approachMod);
+      const bool landed = (i == COMPLETE_SUCCESS || i == GUARANTEED_SUCCESS);
+
+      if (!ch->isImmortal() && !landed) {
         if (::number(0, 1)) {
           act("$n dodges out of the way of $p.", FALSE, tb, this, NULL,
             TO_ROOM);
@@ -1502,8 +1598,18 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
           TO_CHAR);
         resCode = TRUE;
         phit = tb->getPartHit(NULL, FALSE);
+
+        // Families behave differently on contact: a quarrel is driven hard and
+        // straight so it bites more readily, while a pellet cannot bite
+        // at all and batters instead.  Sling stones need no guard on the embed
+        // branch - they report as blunt, so isBluntWeapon() already rules it
+        // out.
+        const bool batters = family == ARROW_FAM_PELLET;
+        const int embedBonus =
+          (family == ARROW_FAM_QUARREL) ? QUARREL_EMBED_BONUS : 0;
+
         if (!isBluntWeapon() && !tb->getStuckIn(phit) &&
-            ::number(1, 100) < getCurSharp()) {
+            ::number(1, 100) < getCurSharp() + embedBonus) {
           --(*this);
           rc = tb->stickIn(this, phit);
           if (rc) {
@@ -1537,7 +1643,16 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
               TO_CHAR);
         }
 
+        if (batters)
+          bludgeonBruise(this, tb, phit);
+
         int d = (int)damageLevel();
+
+        // A strong archer with a long bow drives the shaft home harder.  Added
+        // before get_range_actual_damage so the extra is subject to the
+        // victim's resistances like the rest of the blow.
+        if (ammo && ammo->getLaunchPower() > 0)
+          d += d * ammo->getLaunchPower() / 100;
 
         // d *= mdist - range + 1;  // modify for point blank range - bat
         // worst idea ever - peel
@@ -1571,14 +1686,8 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
         }
 
         if (c->roomp && !c->roomp->isRoomFlag(ROOM_ARENA)) {
-          if (::number(1, d) <= getStructPoints()) {
-            if (IS_SET_DELETE(damageItem(1), DELETE_THIS)) {
-              if (!ch->sameRoom(*tb))
-                act("In the distance, $p is destroyed.", TRUE, ch, this, 0,
-                  TO_CHAR);
-              ADD_DELETE(resCode, DELETE_ITEM);
-            }
-          }
+          if (IS_SET_DELETE(wearFromImpact(this, ch, tb, phit), DELETE_ITEM))
+            ADD_DELETE(resCode, DELETE_ITEM);
         }
 #if RANGE_DEBUG
         vlogf(LOG_MISC,
