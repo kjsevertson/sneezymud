@@ -1661,6 +1661,25 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
         if (damtype == TYPE_CANNON)
           d *= 10;
 
+        // Ammunition only.  A thrown dagger reaches this same function, but it
+        // is not TArrow, so it would fall through to the melee crit tables and
+        // start severing limbs - which throwing has never done.  Rolled before
+        // resistances, the way oneHit does it, so a crit multiplies the raw
+        // blow and the victim's armour still bites into the result.  critRanged
+        // only scales damage, but check for a kill anyway: critSuccessChance's
+        // contract allows one and the tables it fronts can deliver it.
+        if (ammo &&
+            IS_SET_DELETE(ch->critSuccessChance(tb, this, &phit, damtype, &d),
+              DELETE_VICT)) {
+          if (true_targ) {
+            ADD_DELETE(resCode, DELETE_VICT);
+            return resCode;
+          }
+          delete tb;
+          tb = nullptr;
+          return resCode;
+        }
+
         d = get_range_actual_damage(ch, tb, this, d, damtype);
 
         // An arrow in flight has no wielder, so applyPoison takes its
