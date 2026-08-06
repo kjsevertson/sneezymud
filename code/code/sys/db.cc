@@ -21,6 +21,7 @@
 #include "obj_component.h"
 #include "extern.h"
 #include "loadset.h"
+#include "bulkLoadOut.h"
 #include "sys_loot.h"
 #include "shop.h"
 #include "process.h"
@@ -3315,6 +3316,11 @@ void runResetCmdE(zoneData& zd, resetCom& rs, resetFlag flags, bool&,
 
 void runResetCmdM(zoneData& zone, resetCom& rs, resetFlag flags, bool& mobload,
   TMonster*& mob, bool& objload, TObj*& obj, bool& last_cmd) {
+  // Generate bulk loot on the previous mob before starting a new one.
+  // Always runs regardless of LoadOnDeath — bulk loot is worn, not dropped.
+  if (mob && mobload)
+    bulkLoadOut(mob);
+
   mob = NULL;
   last_cmd = mobload = false;
 
@@ -3970,6 +3976,10 @@ void zoneData::resetZone(bool bootTime, bool findLoadPotential) {
     if (!ret)
       break;
   }
+
+  // Generate bulk loot on the last mob in the zone.
+  if (mob && mobload)
+    bulkLoadOut(mob);
 
   if (!findLoadPotential) {
     doGenericReset();  // sends CMD_GENERIC_RESET to all objects in zone

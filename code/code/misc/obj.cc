@@ -118,6 +118,31 @@ void TObj::remObjStat(unsigned int num) { obj_flags.extra_flags &= ~num; }
 
 void TObj::addObjStat(unsigned int num) { obj_flags.extra_flags |= num; }
 
+bool TObj::isBulk() const { return name.find("[bulk]") != sstring::npos; }
+
+// Returns the commodity yield fraction for bulk loot items based on quality
+// tier keywords in the item name. Non-bulk items return 0.
+float TObj::bulkQualityFraction() const {
+  if (!isBulk())
+    return 0.0f;
+
+  // Quality keywords from highest to lowest — order matters because
+  // "superior" must not false-match on a substring of another word.
+  if (isname("masterwork", name) || isname("superb", name))
+    return 5.0f / 5.0f;
+  if (isname("superior", name) || isname("excellent", name))
+    return 5.0f / 5.0f;
+  if (isname("honed", name) || isname("well-made", name))
+    return 4.0f / 5.0f;
+  if (isname("dented", name) || isname("patched", name))
+    return 2.0f / 5.0f;
+  if (isname("flimsy", name) || isname("cheap", name))
+    return 1.0f / 5.0f;
+
+  // Default quality (no quality keyword in name)
+  return 3.0f / 5.0f;
+}
+
 bool TObj::isPaired() const { return (isObjStat(ITEM_PAIRED)); }
 
 bool TObj::usedAsPaired() const {

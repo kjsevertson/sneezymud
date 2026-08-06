@@ -6022,7 +6022,7 @@ bool okForCommodMaker(TObj* o, sstring& ret) {
     return false;
   }
 
-  if (!o->isRentable()) {
+  if (!o->isRentable() && !o->isBulk()) {
     ret =
       format("%s: That isn't rentable so I can't convert it.") % o->getName();
     return false;
@@ -6065,7 +6065,7 @@ bool okForCommodMaker(TObj* o, sstring& ret) {
       return false;
     }
 
-    if (!obj->isRentable()) {
+    if (!obj->isRentable() && !obj->isBulk()) {
       ret = format("%s: That isn't rentable so I can't convert it.") %
             obj->getName();
       return false;
@@ -6099,11 +6099,14 @@ bool okForCommodMaker(TObj* o, sstring& ret) {
 std::map<ubyte, int> commodMakerValue(TObj* o, float& value) {
   std::map<ubyte, int> mat_list;
   const float wastage = 0.90;
+  float bulkScale = o->bulkQualityFraction();
+  if (bulkScale <= 0.0f)
+    bulkScale = 1.0f;
   value = 0;
   int amt = 0;
   TObj* obj;
 
-  amt = (int)(o->getWeight() * 10.0 * wastage);
+  amt = (int)(o->getWeight() * 10.0 * wastage * bulkScale);
   mat_list[o->getMaterial()] += amt;
   value += max((float)1.0, amt * (float)material_nums[o->getMaterial()].price);
 
@@ -6111,7 +6114,10 @@ std::map<ubyte, int> commodMakerValue(TObj* o, float& value) {
     if (!(obj = dynamic_cast<TObj*>(*it)))
       continue;
 
-    amt = (int)(obj->getWeight() * 10.0 * wastage);
+    float childScale = obj->bulkQualityFraction();
+    if (childScale <= 0.0f)
+      childScale = 1.0f;
+    amt = (int)(obj->getWeight() * 10.0 * wastage * childScale);
     mat_list[obj->getMaterial()] += amt;
     value +=
       max((float)1.0, amt * (float)material_nums[obj->getMaterial()].price);
@@ -6148,6 +6154,13 @@ int commodMaker(TBeing* ch, cmdTypeT cmd, const char* arg, TMonster* me,
       return TRUE;
     }
 
+    if (o->isBulk()) {
+      me->doTell(ch->getName(),
+          "Normally, I wouldn't provide services for something so impermanent.");
+      me->doTell(ch->getName(),
+          "But, I want to encourage commerce.");
+    }
+
     mat_list = commodMakerValue(o, value);
 
     me->doTell(ch->getName(), "I can turn that into:");
@@ -6173,6 +6186,13 @@ int commodMaker(TBeing* ch, cmdTypeT cmd, const char* arg, TMonster* me,
       me->doTell(ch->getName(), buf);
       me->doGive(ch, o, GIVE_FLAG_DROP_ON_FAIL);
       return TRUE;
+    }
+
+    if (o->isBulk()) {
+      me->doTell(ch->getName(),
+          "Normally, I wouldn't provide services for something so impermanent.");
+      me->doTell(ch->getName(),
+          "But, I want to encourage commerce. So here's something for your trouble.");
     }
 
     mat_list = commodMakerValue(o, value);
