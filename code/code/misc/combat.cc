@@ -3514,6 +3514,11 @@ int TBeing::specialAttack(TBeing* target, spellNumT skill,
         }
       }
     }
+  } else {
+    // ...and build it when we don't, the same way missVictim does for an
+    // ordinary swing.  A special attack that whiffs is still a miss, so it
+    // should feed the same growing determination to connect.
+    doInevitability();
   }
 
   return result;
