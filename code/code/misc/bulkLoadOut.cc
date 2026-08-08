@@ -883,15 +883,14 @@ inline constexpr double RING_WEIGHT = 0.1;
 // Generate a single bulk loot item for a given slot on a mob
 // Returns the created object, or nullptr on failure
 // -----------------------------------------------------------------------
-[[nodiscard]] TObj* generateBulkItem(TMonster* mob, BulkSlot bulkSlot) {
-  auto classInd = mob->bestClass();
-
+[[nodiscard]] TObj* generateBulkItem(classIndT classInd, int level,
+    race_t race, BulkSlot bulkSlot) {
   // Dead classes produce no bulk loot
   if (classInd == RANGER_LEVEL_IND || classInd == COMMONER_LEVEL_IND)
     return nullptr;
 
   const auto& tierInfo = armorTierByClass[classInd];
-  auto quality = qualityFromLevel(mob->GetMaxLevel());
+  auto quality = qualityFromLevel(level);
   const auto& qi = qualityTable[static_cast<int>(quality)];
   auto stat = pickWeightedStat(classInd);
   const auto& smi = statMaterials[stat];
@@ -911,7 +910,7 @@ inline constexpr double RING_WEIGHT = 0.1;
   bool isShield = (bulkSlot == BulkSlot::Shield);
 
   // --- Determine racial size ---
-  const auto* raceSize = raceSizeInfo(mob->getRace());
+  const auto* raceSize = raceSizeInfo(race);
   if (!raceSize)
     return nullptr;
   // Rings and shields don't display race size
@@ -1025,7 +1024,7 @@ inline constexpr double RING_WEIGHT = 0.1;
     // setDefArmorLevel needs an APPLY_ARMOR slot to exist
     addObjApply(obj, APPLY_ARMOR, 0);
 
-    int cappedLevel = std::min(static_cast<int>(mob->GetMaxLevel()), 60);
+    int cappedLevel = std::min(level, 60);
     double acLevel = cappedLevel * tierInfo.acScale;
     if (isRing)
       acLevel *= 0.5;
@@ -1407,8 +1406,7 @@ struct WeaponPool {
 // Generate a bulk loot weapon for a mob
 // Returns the created weapon, or nullptr on failure
 // -----------------------------------------------------------------------
-[[nodiscard]] TObj* generateBulkWeapon(TMonster* mob) {
-  auto classInd = mob->bestClass();
+[[nodiscard]] TObj* generateBulkWeapon(classIndT classInd, int level) {
   if (classInd == RANGER_LEVEL_IND || classInd == COMMONER_LEVEL_IND)
     return nullptr;
 
@@ -1428,7 +1426,7 @@ struct WeaponPool {
 
   // Stat, quality, material (weapons always use metal/armor materials)
   auto stat = pickWeightedStat(classInd);
-  auto quality = qualityFromLevel(mob->GetMaxLevel());
+  auto quality = qualityFromLevel(level);
   const auto& smi = statMaterials[stat];
   const auto& qi = qualityTable[static_cast<int>(quality)];
   auto sec = pickSecondary(quality);
@@ -1491,11 +1489,12 @@ struct WeaponPool {
   // Same as oedit "average" command: given a level, derive struct, damage,
   // sharpness, and deviation. We use the weapon spec's sharpness instead of
   // the formula's.
-  double level = std::min(static_cast<double>(mob->GetMaxLevel()), 60.0);
+  double scaledLevel = std::min(static_cast<double>(level), 60.0);
   int maxStruct = std::max(
-      1, static_cast<int>(level * 1.5 + 10.0));
-  int damLevel = std::clamp(static_cast<int>(level * 4.0), 0, 255);
-  int damDev = std::max(0, static_cast<int>(10.0 - (level / 60.0) * 10.0));
+      1, static_cast<int>(scaledLevel * 1.5 + 10.0));
+  int damLevel = std::clamp(static_cast<int>(scaledLevel * 4.0), 0, 255);
+  int damDev =
+      std::max(0, static_cast<int>(10.0 - (scaledLevel / 60.0) * 10.0));
 
   // Scale struct by quality (flimsy weapons break faster)
   maxStruct = std::max(1, static_cast<int>(maxStruct * qi.structPct));
@@ -1636,7 +1635,8 @@ void bulkLoadOut(TMonster* mob) {
     if (!percentChance(BULK_LOAD_CHANCE_PCT))
       continue;
 
-    TObj* item = generateBulkItem(mob, bulkSlot);
+    TObj* item = generateBulkItem(classInd, mob->GetMaxLevel(),
+        mob->getRace(), bulkSlot);
     if (item) {
       buyCommodityForItem(mob, item->getMaterial(),
           static_cast<float>(item->getWeight()));
@@ -1653,7 +1653,7 @@ void bulkLoadOut(TMonster* mob) {
   if (!percentChance(BULK_LOAD_CHANCE_PCT))
     return;
 
-  if (auto* weapon = generateBulkWeapon(mob)) {
+  if (auto* weapon = generateBulkWeapon(classInd, mob->GetMaxLevel())) {
     if (weapon->isPaired() && !leftFree) {
       delete weapon;
       return;
@@ -1662,4 +1662,17 @@ void bulkLoadOut(TMonster* mob) {
         static_cast<float>(weapon->getWeight()));
     mob->equipChar(weapon, HOLD_RIGHT, SILENT_YES);
   }
+}
+
+// -----------------------------------------------------------------------
+// Public interface: generate one loose bulk loot item
+// -----------------------------------------------------------------------
+[[nodiscard]] TObj* bulkLoadOutItem(classIndT classInd, int level,
+    race_t race) {
+  // The weapon competes as one more slot alongside the armor slots
+  int roll = ::number(0, BULK_SLOT_COUNT);
+  if (roll == BULK_SLOT_COUNT)
+    return generateBulkWeapon(classInd, level);
+
+  return generateBulkItem(classInd, level, race, static_cast<BulkSlot>(roll));
 }

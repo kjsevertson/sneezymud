@@ -22,6 +22,7 @@
 #include "extern.h"
 #include "loadset.h"
 #include "bulkLoadOut.h"
+#include "chestLoadOut.h"
 #include "sys_loot.h"
 #include "shop.h"
 #include "process.h"
@@ -3318,8 +3319,10 @@ void runResetCmdM(zoneData& zone, resetCom& rs, resetFlag flags, bool& mobload,
   TMonster*& mob, bool& objload, TObj*& obj, bool& last_cmd) {
   // Generate bulk loot on the previous mob before starting a new one.
   // Always runs regardless of LoadOnDeath — bulk loot is worn, not dropped.
-  if (mob && mobload)
+  if (mob && mobload) {
     bulkLoadOut(mob);
+    mobBagLoadOut(mob);
+  }
 
   mob = NULL;
   last_cmd = mobload = false;
@@ -3978,12 +3981,19 @@ void zoneData::resetZone(bool bootTime, bool findLoadPotential) {
   }
 
   // Generate bulk loot on the last mob in the zone.
-  if (mob && mobload)
+  if (mob && mobload) {
     bulkLoadOut(mob);
+    mobBagLoadOut(mob);
+  }
 
   if (!findLoadPotential) {
     doGenericReset();  // sends CMD_GENERIC_RESET to all objects in zone
     trapDoors();       // randomly trap locked/secret doors based on zone level
+
+    // Runs on timed resets too, not just boot. Room containers persist, so
+    // chestLoadOut tapers a container's odds as it fills -- see
+    // tryFillContainer.
+    chestLoadOut(*this);
   }
 
   this->age = 0;

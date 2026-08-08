@@ -122,8 +122,21 @@ sstring TMonster::getStealLootNames() const {
   return loot;
 }
 
-// generates random steal loot obj for a particular mob
-TObj* generateStealLoot(TMonster* mob) {
+namespace {
+
+  // TBeing::hasClass against a bare bitvector. Takes unsigned short for the
+  // same reason hasClass does: CLASS_A | CLASS_B promotes to int, which
+  // IS_SET's same-type template won't deduce against.
+  [[nodiscard]] bool hasAnyClass(unsigned short classBits,
+    unsigned short want) {
+    return IS_SET(classBits, want);
+  }
+
+}  // anonymous namespace
+
+// generates random steal loot obj for a given set of class bits, restricted to
+// items worth no more than moneyCeiling
+TObj* generateStealLoot(unsigned short classBits, double moneyCeiling) {
   weightedRandomizer wr;
 
   // first, add potions
@@ -138,7 +151,7 @@ TObj* generateStealLoot(TMonster* mob) {
   wr.add(823, -1, 50);  // heal full
 
   // then comps for mage/shaman
-  if (mob->hasClass(CLASS_MAGE | CLASS_SHAMAN)) {
+  if (hasAnyClass(classBits, CLASS_MAGE | CLASS_SHAMAN)) {
     for (unsigned int cNum = 0; cNum < CompIndex.size(); cNum++) {
       spellNumT spell = CompIndex[cNum].spell_num;
       int comp = CompIndex[cNum].comp_vnum;
@@ -150,9 +163,11 @@ TObj* generateStealLoot(TMonster* mob) {
         continue;
 
       // only load my spell components
-      if (!mob->hasClass(CLASS_SHAMAN) && discArray[spell]->typ == SPELL_SHAMAN)
+      if (!hasAnyClass(classBits, CLASS_SHAMAN) &&
+          discArray[spell]->typ == SPELL_SHAMAN)
         continue;
-      if (!mob->hasClass(CLASS_MAGE) && discArray[spell]->typ == SPELL_MAGE)
+      if (!hasAnyClass(classBits, CLASS_MAGE) &&
+          discArray[spell]->typ == SPELL_MAGE)
         continue;
 
       // utility should load less often
@@ -177,7 +192,7 @@ TObj* generateStealLoot(TMonster* mob) {
   }
 
   // then symbols, holy water
-  if (mob->hasClass(CLASS_DEIKHAN | CLASS_CLERIC)) {
+  if (hasAnyClass(classBits, CLASS_DEIKHAN | CLASS_CLERIC)) {
     int syms[] = {514, 513, 512, 511, 510, 509, 508, 507, 506, 505, 504, 503,
       502, 501};
     int water[] = {165, 164, 163};
@@ -186,7 +201,7 @@ TObj* generateStealLoot(TMonster* mob) {
   }
 
   // then thief trap tools, poison
-  if (mob->hasClass(CLASS_THIEF)) {
+  if (hasAnyClass(classBits, CLASS_THIEF)) {
     for (int i = 900; i <= 923; ++i)  // trap1
       wr.add(i);
     for (int i = 926; i <= 934; ++i)  // trap2
@@ -214,7 +229,7 @@ TObj* generateStealLoot(TMonster* mob) {
     if (!obj)
       continue;
 
-    if (obj->getValue() / 4 <= mob->getLoadMoney())
+    if (obj->getValue() / 4 <= moneyCeiling)
       return obj;
   }
 
@@ -374,7 +389,7 @@ static int steal(TBeing* thief, TBeing* victim) {
   // if you crit, you nab a free item
   if (mob && Config::LoadOnDeath() &&
       critSuccess(thief, SKILL_STEAL) != CRIT_S_NONE) {
-    TObj* objLoot = generateStealLoot(mob);
+    TObj* objLoot = generateStealLoot(mob->getClass(), mob->getLoadMoney());
 
     if (objLoot) {
       *thief += *objLoot;
