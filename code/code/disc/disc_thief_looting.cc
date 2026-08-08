@@ -534,12 +534,15 @@ bool consumeWax(TBeing* thief, int units) {
   return true;
 }
 
+// AFFECT_SKILL_ATTEMPT is the codebase's cooldown carrier: the skill it gates
+// rides in the modifier, and checkForSkillAttempt() matches on it.  Same shape
+// as smite and forage.
 void installKeycutCooldown(TBeing* thief) {
   affectedData cd;
-  cd.type = SKILL_KEYCUT_COOLDOWN;
+  cd.type = AFFECT_SKILL_ATTEMPT;
   cd.duration = kKeycutCooldownHours * Pulse::UPDATES_PER_MUDHOUR;
   cd.location = APPLY_NONE;
-  cd.modifier = 0;
+  cd.modifier = SKILL_KEYCUT;
   cd.bitvector = 0;
   thief->affectTo(&cd, -1);
 }
@@ -550,7 +553,7 @@ int TBeing::doKeycut(const char* argument) {
     return false;
   }
 
-  if (affectedBySpell(SKILL_KEYCUT_COOLDOWN)) {
+  if (checkForSkillAttempt(SKILL_KEYCUT)) {
     sendTo("Your hands are still too unsteady to work a lock that finely.\n\r");
     return false;
   }

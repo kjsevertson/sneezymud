@@ -1925,6 +1925,7 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_FAST_LOAD:
       case SKILL_SHARPEN:
       case SKILL_DULL:
+      case SKILL_SERRATE:
       case SKILL_ATTUNE:
       case SKILL_STAVECHARGE:
       case SKILL_SACRIFICE:
@@ -2371,11 +2372,6 @@ void TBeing::statBeing(TBeing* k) {
 
       case SKILL_DROW_DARKNESS:
         str += "Drow Darkness (cooldown).\n\r";
-        str += format("     Expires in %6d updates.\n\r") % aff->duration;
-        break;
-
-      case SKILL_KEYCUT_COOLDOWN:
-        str += "Keycut (cooldown).\n\r";
         str += format("     Expires in %6d updates.\n\r") % aff->duration;
         break;
 

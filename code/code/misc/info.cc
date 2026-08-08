@@ -1127,13 +1127,6 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SKILL_DROW_DARKNESS:
         break;
 
-      // No discArray entry, so this cannot use the generic display below.
-      case SKILL_KEYCUT_COOLDOWN:
-        if (show)
-          str += format("Affected : 'keycut'\t: Cooldown : %s\n\r") %
-                 describeDuration(this, aff->duration);
-        break;
-
       case SKILL_TRACK:
       case SKILL_SEEKWATER:
         str += format("Tracking: %s\n\r") %
@@ -1612,6 +1605,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SKILL_FAST_LOAD:
       case SKILL_SHARPEN:
       case SKILL_DULL:
+      case SKILL_SERRATE:
       case SKILL_ATTUNE:
       case SKILL_STAVECHARGE:
       case SKILL_MANA:

@@ -2515,6 +2515,14 @@ void buildSpellArray() {
       SYMBOL_STRESS_0, "", "", "", "", START_33, LEARN_3, START_DO_1,
       LEARN_DO_2, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SKILLS, 0.0, 0, 0);
 
+  // Shares stab's START_33 so a thief picks up both at the same point in the
+  // basic discipline.
+  discArray[SKILL_SERRATE] =
+    new spellInfo(SKILL_THIEF, DISC_THIEF, DISC_THIEF_FIGHT, STAT_EXT,
+      "serrate", TASK_NORMAL, LAG_0, POSITION_STANDING, MANA_0, LIFEFORCE_0,
+      PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_33, LEARN_3, START_DO_1,
+      LEARN_DO_2, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SKILLS, 0.0, 0, 0);
+
   discArray[SKILL_RETREAT_THIEF] =
     new spellInfo(SKILL_THIEF, DISC_THIEF, DISC_THIEF_FIGHT, STAT_EXT,
       "retreat", TASK_NORMAL, LAG_0, POSITION_CRAWLING, MANA_0, LIFEFORCE_0,
@@ -2647,19 +2655,17 @@ void buildSpellArray() {
       SYMBOL_STRESS_0, "", "", "", "", START_50, LEARN_3, START_DO_1,
       LEARN_DO_1, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_UNUSUAL, 0.0, 0, 0);
 
-  discArray[SKILL_RESOURCEFULNESS] =
-    new spellInfo(SKILL_THIEF, DISC_LOOTING, DISC_LOOTING, STAT_EXT,
-      "resourcefulness", TASK_EASY, LAG_0, POSITION_DEAD, MANA_0,
-      LIFEFORCE_0, PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_30,
-      LEARN_3, START_DO_NO, LEARN_DO_NO, START_DO_NO, LEARN_DO_NO,
-      LEARN_DIFF_UNUSUAL, 0.0, 0, 0);
+  discArray[SKILL_RESOURCEFULNESS] = new spellInfo(SKILL_THIEF, DISC_LOOTING,
+    DISC_LOOTING, STAT_EXT, "resourcefulness", TASK_EASY, LAG_0, POSITION_DEAD,
+    MANA_0, LIFEFORCE_0, PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_30,
+    LEARN_3, START_DO_NO, LEARN_DO_NO, START_DO_NO, LEARN_DO_NO,
+    LEARN_DIFF_UNUSUAL, 0.0, 0, 0);
 
   discArray[SKILL_SCRUTINY] =
-    new spellInfo(SKILL_THIEF, DISC_LOOTING, DISC_LOOTING, STAT_EXT,
-      "scrutiny", TASK_EASY, LAG_0, POSITION_DEAD, MANA_0, LIFEFORCE_0,
-      PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_50, LEARN_5,
-      START_DO_NO, LEARN_DO_NO, START_DO_NO, LEARN_DO_NO,
-      LEARN_DIFF_UNUSUAL, 0.0, 0, 0);
+    new spellInfo(SKILL_THIEF, DISC_LOOTING, DISC_LOOTING, STAT_EXT, "scrutiny",
+      TASK_EASY, LAG_0, POSITION_DEAD, MANA_0, LIFEFORCE_0, PRAY_0, 0,
+      SYMBOL_STRESS_0, "", "", "", "", START_50, LEARN_5, START_DO_NO,
+      LEARN_DO_NO, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_UNUSUAL, 0.0, 0, 0);
 
   discArray[SKILL_JAM] =
     new spellInfo(SKILL_THIEF, DISC_LOOTING, DISC_LOOTING, STAT_EXT, "jam",
@@ -2698,16 +2704,13 @@ void buildSpellArray() {
       LEARN_1, START_DO_10, LEARN_DO_2, START_DO_NO, LEARN_DO_NO,
       LEARN_DIFF_SKILLS, 0.0, 0, 0);
 
-    discArray[SKILL_SKULK] =
-    new spellInfo(SKILL_THIEF, DISC_STEALTH, DISC_STEALTH, STAT_EXT, "skulk",
-      TASK_NORMAL, LAG_0, POSITION_STANDING, MANA_0, LIFEFORCE_0, PRAY_0, 0,
-      SYMBOL_STRESS_0,
-      "You are no longer skulking.",
-      "$n eases out of the shadows.",
-      "Your skulking is beginning to wear thin.",
-      "$n's stealthy posture begins to falter.",
-      START_1, LEARN_1, START_DO_10,
-      LEARN_DO_2, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SKILLS, 0.0, 0, 0);
+  discArray[SKILL_SKULK] = new spellInfo(SKILL_THIEF, DISC_STEALTH,
+    DISC_STEALTH, STAT_EXT, "skulk", TASK_NORMAL, LAG_0, POSITION_STANDING,
+    MANA_0, LIFEFORCE_0, PRAY_0, 0, SYMBOL_STRESS_0,
+    "You are no longer skulking.", "$n eases out of the shadows.",
+    "Your skulking is beginning to wear thin.",
+    "$n's stealthy posture begins to falter.", START_1, LEARN_1, START_DO_10,
+    LEARN_DO_2, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SKILLS, 0.0, 0, 0);
 
   // disc_traps
 
@@ -2955,11 +2958,11 @@ void buildSpellArray() {
       PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_1, LEARN_1, START_DO_1,
       LEARN_DO_1, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_UNUSUAL, 0.0, 0, 0);
 
-  discArray[SKILL_COOK] = new spellInfo(SKILL_GENERAL, DISC_ADVENTURING,
-    DISC_ADVENTURING, STAT_EXT, "cook", TASK_EASY, LAG_0, POSITION_SITTING,
-    MANA_0, LIFEFORCE_0, PRAY_0, 0, SYMBOL_STRESS_0, "", "", "", "", START_1,
-    LEARN_5, START_DO_1, LEARN_DO_3, START_DO_NO, LEARN_DO_NO,
-    LEARN_DIFF_UNUSUAL, 0.0, 0, 0);
+  discArray[SKILL_COOK] =
+    new spellInfo(SKILL_GENERAL, DISC_ADVENTURING, DISC_ADVENTURING, STAT_EXT,
+      "cook", TASK_EASY, LAG_0, POSITION_SITTING, MANA_0, LIFEFORCE_0, PRAY_0,
+      0, SYMBOL_STRESS_0, "", "", "", "", START_1, LEARN_5, START_DO_1,
+      LEARN_DO_3, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_UNUSUAL, 0.0, 0, 0);
 
   discArray[SKILL_WHITTLE] =
     new spellInfo(SKILL_GENERAL, DISC_ADVENTURING, DISC_ADVENTURING, STAT_EXT,
@@ -3155,25 +3158,27 @@ void buildSpellArray() {
         SPELL_TASKED,
       0);
 
-  discArray[SPELL_LEGBA] =
-    new spellInfo(SPELL_SHAMAN, DISC_SHAMAN, DISC_SHAMAN_ARMADILLO, STAT_INT,
-      "legba's guidance", TASK_EASY, LAG_2, POSITION_CRAWLING, MANA_0,
-      LIFEFORCE_70, PRAY_0, TAR_FIGHT_SELF | TAR_CHAR_ROOM, SYMBOL_STRESS_0, "Legba's presence leaves you.",
-      "The presence of Legba leaves $n.", "Legba's presence feels far from you.", "", START_80, LEARN_10, START_DO_30, LEARN_DO_5, START_DO_NO,
-      LEARN_DO_NO, LEARN_DIFF_SPELLS, 0.04,
-      COMP_GESTURAL | COMP_GESTURAL_RANDOM | COMP_VERBAL | COMP_VERBAL_RANDOM |
-        COMP_MATERIAL | COMP_MATERIAL_END | SPELL_TASKED,
-      0);
+  discArray[SPELL_LEGBA] = new spellInfo(SPELL_SHAMAN, DISC_SHAMAN,
+    DISC_SHAMAN_ARMADILLO, STAT_INT, "legba's guidance", TASK_EASY, LAG_2,
+    POSITION_CRAWLING, MANA_0, LIFEFORCE_70, PRAY_0,
+    TAR_FIGHT_SELF | TAR_CHAR_ROOM, SYMBOL_STRESS_0,
+    "Legba's presence leaves you.", "The presence of Legba leaves $n.",
+    "Legba's presence feels far from you.", "", START_80, LEARN_10, START_DO_30,
+    LEARN_DO_5, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SPELLS, 0.04,
+    COMP_GESTURAL | COMP_GESTURAL_RANDOM | COMP_VERBAL | COMP_VERBAL_RANDOM |
+      COMP_MATERIAL | COMP_MATERIAL_END | SPELL_TASKED,
+    0);
 
-  discArray[SPELL_DJALLA] =
-    new spellInfo(SPELL_SHAMAN, DISC_SHAMAN, DISC_SHAMAN_ARMADILLO, STAT_INT,
-      "djalla's protection", TASK_EASY, LAG_2, POSITION_CRAWLING, MANA_0,
-      LIFEFORCE_60, PRAY_0, TAR_FIGHT_SELF | TAR_CHAR_ROOM, SYMBOL_STRESS_0, "Djalla's presence leaves you.",
-      "The presence of Djalla leaves $n.", "Djalla's presence feels far from you.", "", START_75, LEARN_10, START_DO_30, LEARN_DO_5, START_DO_NO,
-      LEARN_DO_NO, LEARN_DIFF_SPELLS, 0.04,
-      COMP_GESTURAL | COMP_GESTURAL_RANDOM | COMP_VERBAL | COMP_VERBAL_RANDOM |
-        COMP_MATERIAL | COMP_MATERIAL_END | SPELL_TASKED,
-      0);
+  discArray[SPELL_DJALLA] = new spellInfo(SPELL_SHAMAN, DISC_SHAMAN,
+    DISC_SHAMAN_ARMADILLO, STAT_INT, "djalla's protection", TASK_EASY, LAG_2,
+    POSITION_CRAWLING, MANA_0, LIFEFORCE_60, PRAY_0,
+    TAR_FIGHT_SELF | TAR_CHAR_ROOM, SYMBOL_STRESS_0,
+    "Djalla's presence leaves you.", "The presence of Djalla leaves $n.",
+    "Djalla's presence feels far from you.", "", START_75, LEARN_10,
+    START_DO_30, LEARN_DO_5, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SPELLS, 0.04,
+    COMP_GESTURAL | COMP_GESTURAL_RANDOM | COMP_VERBAL | COMP_VERBAL_RANDOM |
+      COMP_MATERIAL | COMP_MATERIAL_END | SPELL_TASKED,
+    0);
 
   discArray[SPELL_SENSE_LIFE_SHAMAN] = new spellInfo(SPELL_SHAMAN, DISC_SHAMAN,
     DISC_SHAMAN_ARMADILLO, STAT_INT, "sense presence", TASK_EASY, LAG_1,
@@ -3604,8 +3609,8 @@ void buildSpellArray() {
     DISC_SHAMAN_SKUNK, DISC_SHAMAN_SKUNK, STAT_INT, "coronary", TASK_DANGEROUS,
     LAG_4, POSITION_SITTING, MANA_0, LIFEFORCE_240, PRAY_0,
     TAR_CHAR_ROOM | TAR_SELF_NONO | TAR_VIOLENT | TAR_FIGHT_VICT,
-    SYMBOL_STRESS_0, "", "", "", "", START_81, LEARN_5, START_DO_40,
-    LEARN_DO_5, START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SPELLS, 0.05,
+    SYMBOL_STRESS_0, "", "", "", "", START_81, LEARN_5, START_DO_40, LEARN_DO_5,
+    START_DO_NO, LEARN_DO_NO, LEARN_DIFF_SPELLS, 0.05,
     COMP_GESTURAL | COMP_GESTURAL_RANDOM | COMP_VERBAL | COMP_VERBAL_RANDOM |
       COMP_MATERIAL | COMP_MATERIAL_END | SPELL_TASKED,
     0);

@@ -103,8 +103,7 @@ namespace {
   // discArray entry. Add new cooldown tags here AND to the matching
   // fall-through case block in TBeing::getSkill().
   bool isCooldownTag(spellNumT skill) {
-    return skill == SKILL_DROW_INVIS || skill == SKILL_DROW_DARKNESS ||
-           skill == SKILL_KEYCUT_COOLDOWN;
+    return skill == SKILL_DROW_INVIS || skill == SKILL_DROW_DARKNESS;
   }
 }  // namespace
 
@@ -872,6 +871,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDThief*)cd)->skSneak;
     case SKILL_STABBING:  //                  484
       return &((CDThief*)cd)->skStabbing;
+    case SKILL_SERRATE:
+      return &((CDThief*)cd)->skSerrate;
     case SKILL_RETREAT_THIEF:  //             485
       return &((CDThief*)cd)->skRetreatThief;
     case SKILL_KICK:  //                486
@@ -1464,7 +1465,6 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
     // of the function); listed for -Wswitch coverage.
     case SKILL_DROW_INVIS:
     case SKILL_DROW_DARKNESS:
-    case SKILL_KEYCUT_COOLDOWN:
       break;
   }
 

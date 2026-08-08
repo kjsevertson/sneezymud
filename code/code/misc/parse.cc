@@ -1610,6 +1610,10 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
           doWhittle(newarg.c_str());
           addToLifeforce(1);
           break;
+        case CMD_SERRATE:
+          doSerrate(newarg.c_str());
+          addToLifeforce(1);
+          break;
         case CMD_MESSAGE:
           doMessage(newarg.c_str());
           addToLifeforce(1);
@@ -3027,6 +3031,7 @@ void buildCommandArray(void) {
   commandArray[CMD_POWERS] =
     new commandInfo("powers", POSITION_STANDING, GOD_LEVEL1);
   commandArray[CMD_WHITTLE] = new commandInfo("whittle", POSITION_STANDING, 0);
+  commandArray[CMD_SERRATE] = new commandInfo("serrate", POSITION_STANDING, 0);
   commandArray[CMD_MESSAGE] =
     new commandInfo("message", POSITION_DEAD, GOD_LEVEL1);
   commandArray[CMD_SMOKE] = new commandInfo("smoke", POSITION_RESTING, 0);

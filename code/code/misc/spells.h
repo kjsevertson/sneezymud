@@ -614,11 +614,9 @@ enum spellNumT {
   SKILL_SKULK,
   SKILL_RESOURCEFULNESS,
   SKILL_SCRUTINY,
+  SKILL_SERRATE,
   SKILL_JAM,
   SKILL_KEYCUT,
-  // Cooldown tag, not a learnable skill: no discipline, CSkill or
-  // discArray entry. See isCooldownTag() in skills.cc.
-  SKILL_KEYCUT_COOLDOWN,
 
   // keep this as the last of the true skills
   MAX_SKILL,
