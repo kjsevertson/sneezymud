@@ -157,14 +157,31 @@ int TBaseWeapon::maxSharpCap() const {
 }
 
 // Honing a weapon past the edge its maker managed is thief work, and only for
-// those with nothing left to learn about sharpening.
+// those with nothing left to learn about sharpening.  Both halves of that read
+// natural progression: getSkillValue() folds in APPLY_SPELL bonuses, and the
+// discipline cap it clamps against moves with APPLY_DISCIPLINE, so worn gear
+// could otherwise stand in for the practice and the use.
 bool TBaseWeapon::canHoneMaxSharp(const TBeing* ch) const {
-  return ch && ch->hasClass(CLASS_THIEF) &&
-         ch->getSkillValue(SKILL_SHARPEN) >= MAX_SKILL_LEARNEDNESS &&
-         getMaxSharp() < maxSharpCap();
+  if (!ch || !ch->hasClass(CLASS_THIEF) || getMaxSharp() >= maxSharpCap())
+    return false;
+
+  const CDiscipline* disc = ch->getDiscipline(DISC_COMBAT);
+  return disc && disc->getNatLearnedness() >= MAX_DISC_LEARNEDNESS &&
+         ch->getNatSkillValue(SKILL_SHARPEN) >= MAX_SKILL_LEARNEDNESS;
 }
 
 void TBaseWeapon::sharpenMe(TBeing* ch, TTool* tool) {
+  // Checked before anything is spent: the pass that reaches the ceiling can't
+  // know it has finished until it lands, so the stop falls to the next pulse
+  // and must not charge move or a whetstone use for work it won't do.  Honing
+  // raises the ceiling below, which is what keeps a master thief going.
+  if (getMaxSharp() <= getCurSharp()) {
+    ch->sendTo("It doesn't seem to be getting any sharper.\n\r");
+    act("$n stops sharpening $p.", false, ch, this, nullptr, TO_ROOM);
+    ch->stopTask();
+    return;
+  }
+
   int sharp_move = dice(2, 3);
 
   ch->addToMove(-sharp_move);
@@ -186,13 +203,6 @@ void TBaseWeapon::sharpenMe(TBeing* ch, TTool* tool) {
     delete tool;
     return;
   }
-  if (getMaxSharp() <= getCurSharp()) {
-    ch->sendTo("It doesn't seem to be getting any sharper.\n\r");
-    act("$n stops sharpening $p.", false, ch, this, nullptr, TO_ROOM);
-    ch->stopTask();
-    return;
-  }
-
   if (ch->bSuccess(SKILL_SHARPEN)) {
     addToCurSharp((itemType() == ITEM_ARROW) ? 2 : 1);
 

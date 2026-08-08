@@ -186,6 +186,19 @@ int task_serrate(TBeing* ch, cmdTypeT cmd, const char*, int pulse, TRoom*,
         return false;
       }
 
+      // The edge is the stock the teeth are cut from, so a blade that starts
+      // barely sharp can run out partway through.  Fail there rather than
+      // filing air for the remaining passes - the entry check refuses an
+      // edgeless weapon for the same reason, and the file is left unspent.
+      if (ch->task->timeLeft > 1 && weapon->getCurSharp() <= 0) {
+        act("There's no edge left on $p to cut the rest of the teeth from.",
+          false, ch, weapon, nullptr, TO_CHAR);
+        act("$n gives up on $p, its edge worked away to nothing.", true, ch,
+          weapon, nullptr, TO_ROOM);
+        ch->stopTask();
+        return false;
+      }
+
       if (--ch->task->timeLeft <= 0) {
         weapon->addObjStat(ITEM_SPIKED);
         act("You file a last row of teeth into $p - it will bite now.", false,

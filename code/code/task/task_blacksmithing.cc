@@ -414,8 +414,16 @@ namespace {
   // A master smith occasionally leaves a piece better than it started.
   // Gated on advanced blacksmithing being fully learned -- both a complete
   // practice allotment in DISC_BLACKSMITHING and the skill honed to its
-  // ceiling by use.
-  inline constexpr int kSmithMasteryRequired = 100;
+  // ceiling by use.  Both readings must be natural: getSkillValue() adds
+  // APPLY_SPELL bonuses, and the discipline cap it clamps against moves with
+  // APPLY_DISCIPLINE, so worn gear could otherwise buy the mastery outright.
+  bool hasSmithMastery(const TBeing* ch) {
+    const CDiscipline* disc = ch->getDiscipline(DISC_BLACKSMITHING);
+    return disc && disc->getNatLearnedness() >= MAX_DISC_LEARNEDNESS &&
+           ch->getNatSkillValue(SKILL_BLACKSMITHING_ADVANCED) >=
+             MAX_SKILL_LEARNEDNESS;
+  }
+
   inline constexpr int kSmithImproveChance = 10;  // 1 in N
   // One commodity unit is a tenth of a point of weight (numUnits() == 10x
   // weight), spent on top of what the repair itself consumes.
@@ -428,7 +436,7 @@ namespace {
 // task completion -- an undamaged item completes instantly (repairMetal in
 // repair.cc:1206 does not check for damage first) and must not earn a roll.
 void MetalRepair::OnRepairSuccess(TObj* o) {
-  if (m_ch->getSkillValue(SKILL_BLACKSMITHING_ADVANCED) < kSmithMasteryRequired)
+  if (!hasSmithMastery(m_ch))
     return;
   if (o->getMaxStructPoints() >= kMaxStructCeiling)
     return;
