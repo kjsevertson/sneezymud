@@ -66,6 +66,8 @@ class TBaseWeapon : public TObj {
 
     double weaponLevel() const;
     int sharpenPrice() const;
+    [[nodiscard]] int maxSharpCap() const;
+    [[nodiscard]] bool canHoneMaxSharp(const TBeing*) const;
     virtual double objLevel() const;
     double damageLevel() const;
     double structLevel() const;

@@ -44,8 +44,8 @@
 
 #include <boost/algorithm/string.hpp>
 
-std::tuple<spellNumT, sstring> TBeing::parseSpellNum(const sstring& base, const sstring& args) const {
-
+std::tuple<spellNumT, sstring> TBeing::parseSpellNum(const sstring& base,
+  const sstring& args) const {
   if (base.trim() == "")
     return std::make_tuple(TYPE_UNDEFINED, args);
 
@@ -823,7 +823,7 @@ int TBeing::doCast(const char* argument) {
   }
 
   if (discArray[spell]->typ != SPELL_MAGE &&
-          discArray[spell]->typ != SPELL_SHAMAN) {
+      discArray[spell]->typ != SPELL_SHAMAN) {
     sendTo("That's not a magic spell!\n\r");
     return FALSE;
   }
@@ -1556,6 +1556,7 @@ namespace {
     {SKILL_DISARM_THIEF, "SKILL_DISARM_THIEF"},
     {SKILL_COUNTER_STEAL, "SKILL_COUNTER_STEAL"},
     {SKILL_REPAIR_THIEF, "SKILL_REPAIR_THIEF"},
+    {SKILL_SERRATE, "SKILL_SERRATE"},
     {SKILL_PLANT, "SKILL_PLANT"},
     {SKILL_RESOURCEFULNESS, "SKILL_RESOURCEFULNESS"},
     {SKILL_SCRUTINY, "SKILL_SCRUTINY"},
@@ -1766,7 +1767,8 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
     return FALSE;
   }
 
-  // Don't log during boot, as it generates a ton of extra logs that aren't useful then.
+  // Don't log during boot, as it generates a ton of extra logs that aren't
+  // useful then.
   if (!bootTime) {
     vlogf(LOG_SILENT, format("doDiscipline: %s (%s): %s%s") % name % number %
                         spellNumToName[which] %

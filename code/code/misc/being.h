@@ -1366,6 +1366,7 @@ class TBeing : public TThing {
     void doDrive(sstring);
     void doSacrifice(const char*);
     void doWhittle(const char*);
+    void doSerrate(const char*);
     void doBload(const char*);
     std::vector<TBow*> getBows();
     TArrow* autoGetAmmoQuiver(TBow*, TQuiver*);

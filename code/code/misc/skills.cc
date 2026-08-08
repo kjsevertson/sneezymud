@@ -871,6 +871,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDThief*)cd)->skSneak;
     case SKILL_STABBING:  //                  484
       return &((CDThief*)cd)->skStabbing;
+    case SKILL_SERRATE:
+      return &((CDThief*)cd)->skSerrate;
     case SKILL_RETREAT_THIEF:  //             485
       return &((CDThief*)cd)->skRetreatThief;
     case SKILL_KICK:  //                486
@@ -1132,7 +1134,7 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
     case SKILL_FISHBURBLE:
       return &((CDAdvAdventuring*)cd)->skKalysian;
     case SKILL_COMMON:
-      return &((CDAdvAdventuring *) cd)->skCommon;
+      return &((CDAdvAdventuring*)cd)->skCommon;
 
       // adventuring
     case SKILL_ALCOHOLISM:  // 668
