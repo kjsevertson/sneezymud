@@ -578,8 +578,10 @@ int TBeing::doKeycut(const char* argument) {
     sendTo("There's no lock left there worth copying.\n\r");
     return false;
   }
-  if (exitp->key < 0) {
-    sendTo(format("The %s has no keyhole to take an impression from.\n\r") %
+  // < 0 is no keyhole at all; 0 is a lock builders left keyless, to be picked
+  // rather than opened. Neither has a key worth casting.
+  if (exitp->key <= 0) {
+    sendTo(format("There's no key fitting the %s for you to copy.\n\r") %
            exitp->getName());
     return false;
   }

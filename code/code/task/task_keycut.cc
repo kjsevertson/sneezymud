@@ -60,8 +60,8 @@ static roomDirData* keycut_recheck_exit(TBeing* ch) {
     ch->stopTask();
     return nullptr;
   }
-  if (exitp->key < 0) {
-    ch->sendTo("The keyhole is gone.\n\r");
+  if (exitp->key <= 0) {
+    ch->sendTo("There's no longer a key that fits this lock.\n\r");
     ch->stopTask();
     return nullptr;
   }
