@@ -2230,14 +2230,22 @@ int TBeing::doQuaff(sstring argument) {
 }
 
 // this function handles any special affect that drinking a liquid has
-int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
+int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt, bool ranged,
+  int levelBonus) {
   int rc = 0, i;
   int level = max(30, amt * 6), learn = max(100, amt * 20);
   // A poisoner trained in the skill delivers the liquid at their own level
   // when that beats the liquid's baseline, so a high-level thief's coating
-  // bites harder than a novice's.
-  if (ch && ch->doesKnowSkill(SKILL_POISON_WEAPON))
-    level = max(level, static_cast<int>(ch->GetMaxLevel()));
+  // bites harder than a novice's.  A delivery vehicle built for the job - a
+  // blowdart - lifts that level further, but stays under the same baseline,
+  // so it rewards the poisoner rather than papering over a novice.
+  //
+  // Only when someone else delivered it.  Most callers pass the same being as
+  // both caster and victim - drinking, and a coating with nobody holding it -
+  // and there the skill would scale the liquid against the person it is
+  // hurting, making training a liability.
+  if (ch && ch != vict && ch->doesKnowSkill(SKILL_POISON_WEAPON))
+    level = max(level, static_cast<int>(ch->GetMaxLevel()) + levelBonus);
   int duration = (level << 2) * Pulse::UPDATES_PER_MUDHOUR;
   affectedData aff, aff5[5];
   statTypeT whichStat;
@@ -2256,14 +2264,14 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
         vict->sendTo("Drinking the dead blood causes you great harm!\n\r");
         poison(ch, vict, level, learn, SPELL_POISON);
         slumber(ch, vict, level, learn);
-        rc = harm(ch, vict, level, learn, SPELL_HARM, 0);
+        rc = harm(ch, vict, level, learn, SPELL_HARM, 0, ranged);
       }
       break;
     case LIQ_HOLYWATER:
       if (vict->isUndead())
-        rc = harm(ch, vict, level, learn, SPELL_HARM, 0);
+        rc = harm(ch, vict, level, learn, SPELL_HARM, 0, ranged);
       else if (vict->isDiabolic())
-        rc = harmLight(ch, vict, level, learn, SPELL_HARM, 0);
+        rc = harmLight(ch, vict, level, learn, SPELL_HARM, 0, ranged);
       else
         bless(ch, vict, level / 10, learn / 10, SPELL_BLESS);
       break;
@@ -2446,7 +2454,9 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       poison(ch, vict, level, learn, SPELL_POISON);
       break;
     case LIQ_POT_BONE_BREAKER:
-      rc = boneBreaker(ch, vict, level, learn, SPELL_BONE_BREAKER);
+      // Fifth argument is adv_learn, not the spell - a liquid has no caster's
+      // advanced learning behind it, so 0, as the magic-item path passes.
+      rc = boneBreaker(ch, vict, level, learn, 0, ranged);
       break;
     case LIQ_POT_AQUALUNG:
       aqualung(ch, vict, level, learn);
@@ -2508,7 +2518,8 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       clarity(ch, vict, level, learn);
       break;
     case LIQ_POT_BOILING_BLOOD:
-      rc = bloodBoil(ch, vict, level, learn, SPELL_BLOOD_BOIL);
+      // adv_learn, as above - not the spell.
+      rc = bloodBoil(ch, vict, level, learn, 0, ranged);
       break;
     case LIQ_POT_STUPIDITY:
       stupidity(ch, vict, level, learn);
@@ -2523,7 +2534,7 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       cleanse(ch, vict, level, learn, SPELL_CLEANSE);
       break;
     case LIQ_POT_MULTI1:  // harm crit, infravision, armor
-      rc = harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
+      rc = harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0, ranged);
       // the harm can kill either party; don't cast on a corpse
       if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD))
         break;
@@ -2560,7 +2571,7 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       gillsOfFlesh(ch, vict, level, learn);
       break;
     case LIQ_POT_MULTI5:  // harm, stealth, invis
-      rc = harm(ch, vict, level, learn, SPELL_HARM, 0);
+      rc = harm(ch, vict, level, learn, SPELL_HARM, 0, ranged);
       // the harm can kill either party; don't cast on a corpse
       if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD))
         break;
@@ -2574,11 +2585,11 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       break;
     case LIQ_POT_MULTI7:  // sanc, harm crit
       sanctuary(ch, vict, level, learn);
-      rc = harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
+      rc = harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0, ranged);
       break;
     case LIQ_POT_MULTI8:  // sanc, harm ser
       sanctuary(ch, vict, level, learn);
-      rc = harmSerious(ch, vict, level, learn, SPELL_HARM_SERIOUS, 0);
+      rc = harmSerious(ch, vict, level, learn, SPELL_HARM_SERIOUS, 0, ranged);
       break;
     case LIQ_POT_MULTI9:  // sanc, armor, bless
       sanctuary(ch, vict, level, learn);

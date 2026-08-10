@@ -1,26 +1,49 @@
-Ranged weapons are those weapons that can be used to affect creatures in rooms
-other than the one you are presently in.  The most common forms of these are
-bow & arrows and certain thrown weapon types (daggers, axes).  Ranged weapons
-tend to do decent damage upon impact but the true worth of a ranged weapon
-is in its ability embed itself in an enemy.  The chance of embedding with
-a ranged weapon is roughly related to the weapon's sharpness and such an
-embedded weapon can do additional damage if it is extracted in the wrong way
-(ripped from the body) or if it left embedded for a long time (festering in
-the wound).
+Ammunition comes in four families, each in a long and a short version.  A bow
+accepts exactly one of the eight and refuses everything else, so what you can
+carry is decided by what you can shoot.
 
-Ranged weapons cannot be used in a peaceful room or against a target in a
-peaceful room.  Also, since some rooms are off-limits to mobs, ranged weapons
-can not pass through such rooms.
+     Long Stalk    : Hunting Arrows
+     Short Stalk   : Fighting Arrows
+     Long Quarrel  : Squabble Quarrels
+     Short Quarrel : Common Quarrels
+     Long Dart     : Sniper Blowdarts
+     Short Dart    : Common Blowdarts
+     Long Pellet   : Heavy Pellets
+     Short Pellet  : Common Pellets
 
-Thrown weapons typically have a short range and low damage, but require
-no or little training.  Bows tend to shoot further and do higher damage.
-Damage incurred is a function of the weapon's natural damage, the force
-with which it was launched and how close to the target it was fired from.
-The best damage would be from a powerful weapon, fired very close to the
-target using a weapon that could go very far total.
+EVALUATE will tell you which family a piece of ammunition belongs to, and will
+tell you the same of a bow, so the two can be matched before you buy.
 
-Specialization in ranged weapons will permit increased accuracy as well as
-the use of more complicated and bigger bows.
+Each family behaves differently once it reaches its target.
 
-See Also: BLOAD, SHOOT, THROW, RESTRING
+STALKS are ordinary arrows.  Short stalks are quick to nock, and a practised
+archer can loose several in the time it takes to draw a longer shaft - see
+FAST LOAD.  Long stalks cannot be hurried.  They are drawn by main strength,
+and a powerful bow needs a powerful archer even to bend it; the stronger you
+are and the greater the bow, the harder the shaft strikes.  A long stalk is
+the heaviest single shot available to an archer, paid for in rate of fire.
+
+QUARRELS are driven by the bow's mechanism rather than by your arm, so they
+neither reward strength nor permit haste.  What they do is bite.  A quarrel
+lodges in a wound far more readily than a loosed arrow.
+
+DARTS are the assassin's ammunition.  They are silent, they take poison
+readily, and in a thief's hands a quiet, unseen approach counts for as much as
+marksmanship - much as it does for a backstab.  Other classes can shoot them,
+but only a thief gets anything for the stalking.
+
+PELLETS have no point at all.  They batter rather than pierce, never lodge in
+a wound, and leave deep bruising instead.  A hard pellet against an unarmoured
+target is punishing; a soft one against armour is wasted effort.
+
+Ammunition wears out.  Every hit dulls a shaft a little, and a dulled shaft is
+far less likely to lodge in its target - which matters, because an embedded
+missile goes on causing harm long after it struck, and can turn a clean wound
+septic.  A dull arrow can be brought back with a whetstone; see SHARPEN.  Wear
+does not stop at the edge, and ammunition that has been used hard enough will
+eventually come apart.  What the head is made of decides how long it lasts: a
+steel head shot into unarmoured flesh will outlive its owner, while a wooden
+one splinters against anything solid.
+
+See Also: BLOAD, SHOOT, BOWS, SHARPEN, THROW
 Related Topics: COMBAT

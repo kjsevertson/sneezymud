@@ -1,26 +1,33 @@
-Ranged weapons are those weapons that can be used to affect creatures in rooms
-other than the one you are presently in.  The most common forms of these are
-bow & arrows and certain thrown weapon types (daggers, axes).  Ranged weapons
-tend to do decent damage upon impact but the true worth of a ranged weapon
-is in its ability embed itself in an enemy.  The chance of embedding with
-a ranged weapon is roughly related to the weapon's sharpness and such an
-embedded weapon can do additional damage if it is extracted in the wrong way
-(ripped from the body) or if it left embedded for a long time (festering in
-the wound).
+A bow is useless without ammunition that fits it.  Each bow accepts exactly one
+of the eight ammunition types and refuses all others, so a hunting bow will
+never fire a quarrel and a crossbow will never fire a hunting arrow.  EVALUATE
+a bow and it will tell you what it fires; EVALUATE the ammunition and it will
+tell you what it is.  See ARROWS for the eight types.
 
-Ranged weapons cannot be used in a peaceful room or against a target in a
-peaceful room.  Also, since some rooms are off-limits to mobs, ranged weapons
-can not pass through such rooms.
+Every bow has its own maximum range, measured in rooms, and this varies from
+bow to bow rather than by type - some short bows outrange some long ones.  You
+cannot shoot beyond that range no matter how skilled you are; the shot will be
+refused rather than the arrow wasted.  EVALUATE will estimate a bow's range if
+you know enough to judge it.
 
-Thrown weapons typically have a short range and low damage, but require
-no or little training.  Bows tend to shoot further and do higher damage.
-Damage incurred is a function of the weapon's natural damage, the force
-with which it was launched and how close to the target it was fired from.
-The best damage would be from a powerful weapon, fired very close to the
-target using a weapon that could go very far total.
+Long-stalk bows are drawn by strength alone.  A weak archer cannot bend a heavy
+one at all and will fail to load it, and the greater the bow's reach the more
+strength it demands.  An archer of ordinary build can manage the smaller long
+bows, while the finest need considerable power behind them.  Crossbows and
+blowpipes make no such demand - the mechanism or the breath does the work,
+not your back.
 
-Specialization in ranged weapons will permit increased accuracy as well as
-the use of more complicated and bigger bows.
+Bows are not indestructible.  Every shot risks the string, and a snapped string
+must be repaired before the bow will fire again.  Worse, a bow can shatter
+outright as you draw it.  Both grow likelier as the bow wears, so a bow in poor
+condition is a liability at exactly the moment you need it.
 
-See Also: BLOAD, SHOOT, THROW
+Ranged weapons cannot be used in a peaceful room, nor against a target in one.
+Some rooms are closed to mobs, and a shot cannot pass through such a room.
+
+Specialization in ranged weapons improves both your accuracy and the damage
+your shots deal, and it is the only way to loose more than one shot in a round
+with the heavier ammunition.
+
+See Also: BLOAD, SHOOT, ARROWS, THROW
 Related Topics: COMBAT

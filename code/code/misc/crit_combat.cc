@@ -18,6 +18,7 @@
 #include "combat.h"
 #include "statistics.h"
 #include "obj_corpse.h"
+#include "obj_arrow.h"
 #include "obj_gun.h"
 #include "obj_trash.h"
 #include "obj_drinkcon.h"
@@ -750,6 +751,13 @@ int TBeing::critSuccessChance(TBeing* victim, TThing* weapon,
   // boost the priority so that this sound will trump normal combat sounds
   playsound(pickRandSound(SOUND_CRIT_01, SOUND_CRIT_43), SOUND_TYPE_COMBAT, 100,
     45, 1);
+
+  // Ammunition gets its own table regardless of how its damage type happens to
+  // classify - otherwise pellets would pull the blunt table and bullets
+  // the pierce one, purely by accident of their TYPE_ codes.
+  if (dynamic_cast<TArrow*>(weapon))
+    return critRanged(victim, weapon, partHit, weaponDamageType, damage,
+      critSeverity);
 
   if (pierceType(weaponDamageType))
     return critPierce(victim, weapon, partHit, weaponDamageType, damage,
@@ -2784,6 +2792,99 @@ limb-specific effects.
 51-100: triple damage
 
 ------------------------------------------------------------ */
+namespace {
+  // Ammunition crits describe a shot arriving, not a swing landing.  One set
+  // per family, since a bolt, a dart and a pellet all read differently.
+  // Each string carries a single %s for the body part struck.
+  struct RangedCritLines {
+      const char* solidChar;
+      const char* solidVict;
+      const char* solidRoom;
+      const char* deepChar;
+      const char* deepVict;
+      const char* deepRoom;
+  };
+
+  constexpr std::array<RangedCritLines, 4> kRangedCritLines = {{
+    // ARROW_FAM_STALK
+    {"Your shaft punches deep into $N's %s!",
+      "$n's shaft punches deep into your %s!",
+      "$n's shaft punches deep into $N's %s!",
+      "Your shaft drives clean through $N's %s and stands quivering!",
+      "$n's shaft drives clean through your %s and stands quivering!",
+      "$n's shaft drives clean through $N's %s and stands quivering!"},
+    // ARROW_FAM_QUARREL
+    {"Your bolt slams into $N's %s hard enough to turn $M.",
+      "$n's bolt slams into your %s hard enough to turn you.",
+      "$n's bolt slams into $N's %s hard enough to turn $M.",
+      "Your bolt buries itself to the fletching in $N's %s!",
+      "$n's bolt buries itself to the fletching in your %s!",
+      "$n's bolt buries itself to the fletching in $N's %s!"},
+    // ARROW_FAM_DART
+    {"Your dart lodges in $N's %s before $E can react.",
+      "$n's dart lodges in your %s before you can react.",
+      "$n's dart lodges in $N's %s before $E can react.",
+      "Your dart finds the soft flesh of $N's %s - $E never saw it coming!",
+      "$n's dart finds the soft flesh of your %s - you never saw it coming!",
+      "$n's dart finds the soft flesh of $N's %s - $E never saw it coming!"},
+    // ARROW_FAM_PELLET
+    {"Your pellet cracks hard against $N's %s.",
+      "$n's pellet cracks hard against your %s.",
+      "$n's pellet cracks hard against $N's %s.",
+      "Your pellet strikes $N's %s with a sickening crunch!",
+      "$n's pellet strikes your %s with a sickening crunch!",
+      "$n's pellet strikes $N's %s with a sickening crunch!"},
+  }};
+
+  // Indexed by family, so adding one without a line here would read off the
+  // end.  setArrowType keeps the value in range; this keeps the table in step.
+  static_assert(kRangedCritLines.size() == ARROW_FAM_COUNT);
+}  // namespace
+
+// Crit table for anything shot rather than swung.  Deliberately damage-only:
+// the pierce/slash/blunt tables sever limbs and wreck equipment, which suits a
+// sustained melee exchange rather than a single arrival from several rooms
+// away.  Never indexes attack_hit_text, so the DAMAGE_* codes that ammunition
+// uses cannot run off the end of it.
+int TBeing::critRanged(TBeing* v, TThing* weapon, wearSlotT* part_hit,
+  spellNumT, int* dam, int crit_num) {
+  const TArrow* ammo = dynamic_cast<const TArrow*>(weapon);
+  const arrowFamilyT family =
+    ammo ? arrowFamily(ammo->getArrowType()) : ARROW_FAM_STALK;
+  const RangedCritLines& lines = kRangedCritLines[family];
+
+  const sstring part = v->describeBodySlot(*part_hit);
+
+  if (crit_num > 100) {
+    vlogf(LOG_BUG,
+      format("critRanged called with crit_num>100 (%i)") % crit_num);
+    crit_num = 0;
+  }
+
+  const bool deep = (crit_num > 50);
+  *dam *= deep ? 3 : 2;
+
+  act(format(deep ? lines.deepChar : lines.solidChar) % part, false, this, 0, v,
+    TO_CHAR, ANSI_ORANGE);
+  act(format(deep ? lines.deepVict : lines.solidVict) % part, false, this, 0, v,
+    TO_VICT, ANSI_RED);
+  act(format(deep ? lines.deepRoom : lines.solidRoom) % part, false, this, 0, v,
+    TO_NOTVICT, ANSI_BLUE);
+
+  // The line above is bound to the shooter, so act() lands it in the shooter's
+  // room.  On a shot from rooms away the victim's own bystanders are told the
+  // hit landed and nothing more.  Bind a line to the victim so it reaches their
+  // room instead, and leave the shooter out of it - nobody standing there can
+  // see who fired.
+  if (!sameRoom(*v))
+    act(format(deep ? "$n reels as the shot drives deep into $s %s!"
+                    : "$n is struck hard, the shot biting into $s %s.") %
+          part,
+      false, v, 0, nullptr, TO_ROOM, ANSI_BLUE);
+
+  return ONEHIT_MESS_CRIT_S;
+}
+
 int TBeing::critGeneric(TBeing* v, TThing* weapon, wearSlotT* part_hit,
   spellNumT wtype, int* dam, int crit_num) {
   int new_wtype = wtype - TYPE_HIT;

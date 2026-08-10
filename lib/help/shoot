@@ -14,9 +14,21 @@ do: SHOOT <dir> PEASANT 3
 You must have previously loaded (BLOAD) your bow with an arrow.  Different
 bows are capable of different maximum ranges.
 
+A bow will only accept the one type of ammunition it was made for, and the
+heavier bows must be drawn by main strength before they will load at all.  See
+ARROWS for the eight ammunition types and what each does, and BOWS for range,
+strength and upkeep.
+
+A single SHOOT may loose more than one missile.  Ranged specialization and
+FAST LOAD each contribute their current skill toward a further shot: at full
+mastery that is another missile every time, and short of it a proportional
+chance at one.  FAST LOAD contributes only with the lighter ammunition, since
+a quarrel must be cranked back and a long shaft drawn deliberately.  Each shot
+spends an arrow, so you must be carrying enough to feed the volley.
+
 The amount of learning will set what kind of weapon you can shoot.
 Players do not start with bow knowledge but must develop that
 through the learning system.
 
-See Also : BLOAD, RANGED WEAPONS, RESTRING
+See Also : BLOAD, ARROWS, BOWS, RESTRING
 Related Topics: COMBAT

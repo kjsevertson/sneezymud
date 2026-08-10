@@ -1344,7 +1344,7 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
           doGload(newarg);
           break;
         case CMD_THROW:
-          doThrow(newarg.c_str());
+          rc = doThrow(newarg.c_str());
           break;
         case CMD_SHOOT:
           rc = doShoot(newarg.c_str());

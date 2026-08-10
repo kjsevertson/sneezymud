@@ -1,26 +1,29 @@
-Ranged weapons are those weapons that can be used to affect creatures in rooms
-other than the one you are presently in.  The most common forms of these are
-bow & arrows and certain thrown weapon types (daggers, axes).  Ranged weapons
-tend to do decent damage upon impact but the true worth of a ranged weapon
-is in its ability embed itself in an enemy.  The chance of embedding with
-a ranged weapon is roughly related to the weapon's sharpness and such an
-embedded weapon can do additional damage if it is extracted in the wrong way
-(ripped from the body) or if it left embedded for a long time (festering in
-the wound).
+Ranged weapons are those that can be used against creatures in rooms other than
+the one you are presently in.  The common forms are bows with their ammunition,
+and certain thrown weapons such as daggers and axes.
 
-Ranged weapons cannot be used in a peaceful room or against a target in a
-peaceful room.  Also, since some rooms are off-limits to mobs, ranged weapons
-can not pass through such rooms.
+Ranged weapons do respectable damage on impact, but the real worth of a pointed
+one is that it embeds itself in its target.  An embedded missile goes on doing
+harm long after the shot - it can tear further when pulled out badly, and a
+wound left with something in it will fester.  How readily a missile lodges
+depends on how sharp it still is, so ammunition that has seen hard use bites
+less well than it did when new.
 
-Thrown weapons typically have a short range and low damage, but require
-no or little training.  Bows tend to shoot further and do higher damage.
-Damage incurred is a function of the weapon's natural damage, the force
-with which it was launched and how close to the target it was fired from.
-The best damage would be from a powerful weapon, fired very close to the
-target using a weapon that could go very far total.
+Not everything that flies has a point.  Blunt ammunition batters instead,
+leaving deep bruising rather than a puncture, and armour matters far more
+against it than sharpness ever could.
 
-Specialization in ranged weapons will permit increased accuracy as well as
-the use of more complicated and bigger bows.
+Ranged weapons cannot be used in a peaceful room, nor against a target in one.
+Some rooms are off-limits to mobs, and a shot cannot pass through such a room.
 
-See Also: BLOAD, SHOOT, THROW
+Thrown weapons have short range and modest damage but need little training.
+Bows shoot further and hit harder, at the cost of needing the right ammunition
+for the bow, and sometimes the strength to draw it.  A missile's damage comes
+from its own quality, the training of whoever loosed it, and - for the heavier
+bows - the strength behind the draw.
+
+Specialization in ranged weapons improves accuracy and damage alike, and allows
+more than one shot in a round.
+
+See Also: BLOAD, SHOOT, ARROWS, BOWS, THROW
 Related Topics: COMBAT

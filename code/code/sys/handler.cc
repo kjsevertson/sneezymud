@@ -1188,15 +1188,47 @@ TThing* TBeing::pulloutObj(wearSlotT numx, bool safe, int* res) {
       *res = -1;
       return o;
     } else {
-      if (dice(1, 100) < tbw->getCurSharp() && !isImmune(IMMUNE_BLEED, numx)) {
-        char buf[256];
-        sprintf(buf, "$n's %s starts bleeding as $p is taken out of it.",
-          describeBodySlot(numx).c_str());
-        act(buf, TRUE, this, tbw, NULL, TO_ROOM);
-        sprintf(buf, "Your %s starts bleeding as $p is taken out of it.",
-          describeBodySlot(numx).c_str());
-        act(buf, FALSE, this, tbw, NULL, TO_CHAR);
-        rawBleed(numx, 5 * tbw->getCurSharp(), SILENT_YES, CHECK_IMMUNITY_NO);
+      // A blunted spike still opens a wound, so the barbs contribute a fixed
+      // duration of their own rather than scaling off an edge they don't have.
+      static constexpr int BARBED_RIP_BLEED = 250;
+
+      if (!isImmune(IMMUNE_BLEED, numx)) {
+        const sstring slot = describeBodySlot(numx);
+
+        // One wounding incident: deepen the wound if the limb is already open,
+        // otherwise start one.  Called once for the rip and again for the
+        // barbs, so a spiked head can compound its own tear.
+        auto wound = [&](int duration, const char* freshRoom,
+                       const char* freshChar, const char* moreRoom,
+                       const char* moreChar) {
+          const bool open = isLimbFlags(numx, PART_BLEEDING);
+          act(format(open ? moreRoom : freshRoom) % slot, true, this, tbw,
+            nullptr, TO_ROOM);
+          act(format(open ? moreChar : freshChar) % slot, false, this, tbw,
+            nullptr, TO_CHAR);
+
+          if (open)
+            incrementBleedStack(numx, duration);
+          else
+            rawBleed(numx, duration, SILENT_YES, CHECK_IMMUNITY_NO);
+        };
+
+        // The rip itself, which needs an edge to catch on the way past.
+        if (dice(1, 100) < tbw->getCurSharp())
+          wound(5 * tbw->getCurSharp(),
+            "$n's %s starts bleeding as $p is taken out of it.",
+            "Your %s starts bleeding as $p is taken out of it.",
+            "$n's %s tears wider as $p is drawn out of it.",
+            "Your %s tears wider as $p is drawn out of it.");
+
+        // The barbs, a separate incident - they catch whether or not the edge
+        // did, so a spiked head either opens the wound the rip missed or
+        // deepens the one it made.
+        if (o->isSpiked())
+          wound(BARBED_RIP_BLEED, "The barbs on $p rake $n's %s open.",
+            "The barbs on $p rake your %s open.",
+            "The barbs on $p drag through $n's torn %s.",
+            "The barbs on $p drag through your torn %s.");
       }
     }
   }

@@ -552,8 +552,10 @@ class TObj : public TThing {
     void clearPoison() { poison = (liqTypeT)-1; }
     virtual int poisonWeaponWeapon(TBeing*, TThing*);
     // Delivers the coating and spends it.  Returns DELETE_VICT if the poison
-    // killed the victim, DELETE_THIS if it killed the wielder.
-    virtual int applyPoison(TBeing*);
+    // killed the victim, DELETE_THIS if it killed the striker.  Pass the
+    // striker explicitly when the object has already left their hands - a
+    // fired arrow or a thrown blade has no equippedBy by the time it lands.
+    virtual int applyPoison(TBeing* vict, TBeing* actor = nullptr);
 
     // VIRTUAL FUNCTIONS
     virtual sstring showModifier(showModeT, const TBeing*) const { return ""; }
@@ -649,7 +651,7 @@ class TObj : public TThing {
     int getItemIndex() const { return (number < 0 ? 0 : number); }
     virtual bool isPluralItem() const;
 
-    virtual void updateDesc(){};
+    virtual void updateDesc() {};
     virtual void weightCorrection() {}
     virtual bool monkRestrictedItem(const TBeing* ch) const;
     virtual bool shamanRestrictedItem(const TBeing* ch) const;
