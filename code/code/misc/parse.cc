@@ -1532,6 +1532,12 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
         case CMD_SKULK:
           rc = doSkulk(newarg.c_str());
           break;
+        case CMD_JAM:
+          rc = doJam(newarg.c_str());
+          break;
+        case CMD_KEYCUT:
+          rc = doKeycut(newarg.c_str());
+          break;
         case CMD_CRAWL:
           doCrawl();
           break;
@@ -1602,6 +1608,10 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
           break;
         case CMD_WHITTLE:
           doWhittle(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_SERRATE:
+          doSerrate(newarg.c_str());
           addToLifeforce(1);
           break;
         case CMD_MESSAGE:
@@ -2569,6 +2579,9 @@ void buildCommandArray(void) {
   commandArray[CMD_SNEAK] = new commandInfo("sneak", POSITION_CRAWLING, 0);
   commandArray[CMD_HIDE] = new commandInfo("hide", POSITION_STANDING, 0);
   commandArray[CMD_SKULK] = new commandInfo("skulk", POSITION_STANDING, 0);
+  commandArray[CMD_JAM] = new commandInfo("jam", POSITION_STANDING, 0);
+  commandArray[CMD_KEYCUT] =
+    new commandInfo("keycut", POSITION_STANDING, 0);
   commandArray[CMD_BACKSTAB] =
     new commandInfo("backstab", POSITION_FIGHTING, 0);
   commandArray[CMD_SLIT] = new commandInfo("slit", POSITION_STANDING, 0);
@@ -3018,6 +3031,7 @@ void buildCommandArray(void) {
   commandArray[CMD_POWERS] =
     new commandInfo("powers", POSITION_STANDING, GOD_LEVEL1);
   commandArray[CMD_WHITTLE] = new commandInfo("whittle", POSITION_STANDING, 0);
+  commandArray[CMD_SERRATE] = new commandInfo("serrate", POSITION_STANDING, 0);
   commandArray[CMD_MESSAGE] =
     new commandInfo("message", POSITION_DEAD, GOD_LEVEL1);
   commandArray[CMD_SMOKE] = new commandInfo("smoke", POSITION_RESTING, 0);

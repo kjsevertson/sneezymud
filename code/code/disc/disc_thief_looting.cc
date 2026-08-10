@@ -1,9 +1,14 @@
 #include <stdio.h>
 
+#include <algorithm>
+
 #include "handler.h"
 #include "extern.h"
 #include "room.h"
 #include "being.h"
+#include "obj_general_weapon.h"
+#include "obj_commodity.h"
+#include "materials.h"
 #include "disease.h"
 #include "combat.h"
 #include "disc_thief_looting.h"
@@ -379,4 +384,243 @@ int detectTrapDoor(TBeing* thief, int) {
     return TRUE;
   else
     return FALSE;
+}
+
+// The lock a successful jam leaves behind. Held below 100 because at 100 or
+// above task_picklock stops rolling and declares the lock "totally impossible
+// to pick" -- a far stronger effect than this skill is meant to have.
+short jamLockDifficulty(const TBeing* thief) {
+  int diff = (kJamBaseDifficulty + thief->getSkillLevel(SKILL_JAM)) *
+             thief->getSkillValue(SKILL_JAM) / 100;
+
+  return static_cast<short>(std::clamp(diff, 0, kJamMaxDifficulty));
+}
+
+// A blade wedged into a keyhole binds it from both sides, so mirror the
+// state onto the reverse exit the way doLock() does.
+void applyJam(TBeing* thief, dirTypeT door, short diff) {
+  roomDirData* exitp = thief->exitDir(door);
+  if (!exitp)
+    return;
+
+  SET_BIT(exitp->condition, EXIT_LOCKED);
+  exitp->lock_difficulty = diff;
+
+  TRoom* rp = real_roomp(exitp->to_room);
+  roomDirData* back = nullptr;
+  if (rp && (back = rp->dir_option[rev_dir(door)]) &&
+      back->to_room == thief->in_room) {
+    SET_BIT(back->condition, EXIT_LOCKED);
+    back->lock_difficulty = diff;
+  }
+}
+
+int TBeing::doJam(const char* argument) {
+  if (!doesKnowSkill(SKILL_JAM)) {
+    sendTo("You wouldn't know how to wedge a blade into anything.\n\r");
+    return false;
+  }
+
+  char objName[MAX_INPUT_LENGTH], dirName[MAX_INPUT_LENGTH];
+  argument_interpreter(argument, objName, cElements(objName), dirName,
+    cElements(dirName));
+
+  if (!*objName || !*dirName) {
+    sendTo("Syntax: jam <weapon> <direction>\n\r");
+    return false;
+  }
+
+  dirTypeT door = getDirFromChar(dirName);
+  if (door == DIR_NONE) {
+    sendTo("That's not a direction.\n\r");
+    return false;
+  }
+
+  roomDirData* exitp = exitDir(door);
+  if (!exitp || exitp->door_type == DOOR_NONE) {
+    sendTo("There's no door that way to jam.\n\r");
+    return false;
+  }
+  if (IS_SET(exitp->condition, EXIT_DESTROYED)) {
+    sendTo(
+      format("The %s has been destroyed; there's nothing left to jam.\n\r") %
+      exitp->getName());
+    return false;
+  }
+  if (IS_SET(exitp->condition, EXIT_CAVED_IN)) {
+    sendTo("It's caved in.  A blade isn't going to add much.\n\r");
+    return false;
+  }
+  if (!IS_SET(exitp->condition, EXIT_CLOSED)) {
+    sendTo(format("You have to close the %s first.\n\r") % exitp->getName());
+    return false;
+  }
+  // Deliberate: a jam only ever creates a lock, it never reinforces one. This
+  // also keeps the skill from overwriting a builder's lock_difficulty on a
+  // door that is legitimately locked.
+  if (IS_SET(exitp->condition, EXIT_LOCKED)) {
+    sendTo(format("The %s is already locked.\n\r") % exitp->getName());
+    return false;
+  }
+
+  TBeing* dummy = nullptr;
+  TObj* obj = nullptr;
+  if (!generic_find(objName, FIND_OBJ_INV, this, &dummy, &obj) || !obj) {
+    sendTo(format("You aren't carrying anything called '%s'.\n\r") % objName);
+    return false;
+  }
+
+  TGenWeapon* weapon = dynamic_cast<TGenWeapon*>(obj);
+  if (!weapon || !weapon->canBackstab()) {
+    act("$p is too clumsy a thing to wedge into a keyhole.", false, this, obj,
+      nullptr, TO_CHAR);
+    return false;
+  }
+  if (obj->isMonogrammed()) {
+    act("Leaving $p behind with your name on it rather defeats the point.",
+      false, this, obj, nullptr, TO_CHAR);
+    return false;
+  }
+
+  if (task)
+    stopTask();
+
+  act("You begin working $p into the keyhole of the $T.", false, this, obj,
+    reinterpret_cast<const TThing*>(exitp->getName().c_str()), TO_CHAR);
+  act("$n begins working $p into the keyhole of the $T.", true, this, obj,
+    reinterpret_cast<const TThing*>(exitp->getName().c_str()), TO_ROOM);
+
+  learnFromDoingUnusual(LEARN_UNUSUAL_NORM_LEARN, SKILL_JAM, 8);
+
+  // start_task's last argument is an absolute pulse, not an interval -- the
+  // task sweep fires when pulse >= nextUpdate. Zero means the first pulse of
+  // work lands on the next sweep; jam_pulse spaces the rest by MOBACT.
+  start_task(this, weapon, nullptr, TASK_JAM, "", kJamPulses, in_room, door, 0,
+    0);
+
+  return true;
+}
+
+// Commodities carry ten units per point of weight, so a key's prototype
+// weight converts directly. A clumsy caster spoils more of the pour.
+int keycutWaxUnits(const TBeing* thief, float keyWeight) {
+  int base = std::max(1, static_cast<int>(keyWeight * 10.0f));
+  int waste = kKeycutWasteFactor - thief->getSkillValue(SKILL_KEYCUT);
+
+  return std::max(1, base * waste / 100);
+}
+
+TCommodity* findWax(TBeing* thief) {
+  for (StuffIter it = thief->stuff.begin(); it != thief->stuff.end(); ++it) {
+    TCommodity* tc = dynamic_cast<TCommodity*>(*it);
+    if (tc && tc->getMaterial() == MAT_WAX)
+      return tc;
+  }
+
+  return nullptr;
+}
+
+// Returns false if the thief no longer has enough wax -- it can be dropped or
+// sold while the task is still running.
+bool consumeWax(TBeing* thief, int units) {
+  TCommodity* wax = findWax(thief);
+  if (!wax || wax->numUnits() < units)
+    return false;
+
+  wax->setWeight(wax->getWeight() - (units / 10.0));
+  if (wax->numUnits() <= 0)
+    delete wax;
+
+  return true;
+}
+
+// AFFECT_SKILL_ATTEMPT is the codebase's cooldown carrier: the skill it gates
+// rides in the modifier, and checkForSkillAttempt() matches on it.  Same shape
+// as smite and forage.
+void installKeycutCooldown(TBeing* thief) {
+  affectedData cd;
+  cd.type = AFFECT_SKILL_ATTEMPT;
+  cd.duration = kKeycutCooldownHours * Pulse::UPDATES_PER_MUDHOUR;
+  cd.location = APPLY_NONE;
+  cd.modifier = SKILL_KEYCUT;
+  cd.bitvector = 0;
+  thief->affectTo(&cd, -1);
+}
+
+int TBeing::doKeycut(const char* argument) {
+  if (!doesKnowSkill(SKILL_KEYCUT)) {
+    sendTo("You wouldn't know how to take an impression of a lock.\n\r");
+    return false;
+  }
+
+  if (checkForSkillAttempt(SKILL_KEYCUT)) {
+    sendTo("Your hands are still too unsteady to work a lock that finely.\n\r");
+    return false;
+  }
+
+  sstring dirName, ignored;
+  argument_interpreter(sstring(argument), dirName, ignored);
+  if (dirName.empty()) {
+    sendTo("Syntax: keycut <direction>\n\r");
+    return false;
+  }
+
+  dirTypeT door = getDirFromChar(dirName.c_str());
+  if (door == DIR_NONE) {
+    sendTo("That's not a direction.\n\r");
+    return false;
+  }
+
+  roomDirData* exitp = exitDir(door);
+  if (!exitp || exitp->door_type == DOOR_NONE) {
+    sendTo("There's no door that way to take an impression of.\n\r");
+    return false;
+  }
+  if (IS_SET(exitp->condition, EXIT_DESTROYED) ||
+      IS_SET(exitp->condition, EXIT_CAVED_IN)) {
+    sendTo("There's no lock left there worth copying.\n\r");
+    return false;
+  }
+  // < 0 is no keyhole at all; 0 is a lock builders left keyless, to be picked
+  // rather than opened. Neither has a key worth casting.
+  if (exitp->key <= 0) {
+    sendTo(format("There's no key fitting the %s for you to copy.\n\r") %
+           exitp->getName());
+    return false;
+  }
+
+  // A key vnum that resolves to nothing is builder data we can't work with.
+  int rnum = real_object(exitp->key);
+  if (rnum < 0) {
+    sendTo("You can't make any sense of that lock.\n\r");
+    vlogf(LOG_LOW, format("keycut: exit key vnum %d in room %d has no object") %
+                     exitp->key % in_room);
+    return false;
+  }
+
+  int units = keycutWaxUnits(this, obj_index[rnum].weight);
+  TCommodity* wax = findWax(this);
+  if (!wax || wax->numUnits() < units) {
+    sendTo(format("You need %d units of wax to cast that key, and you have "
+                  "%d.\n\r") %
+           units % (wax ? wax->numUnits() : 0));
+    return false;
+  }
+
+  if (task)
+    stopTask();
+
+  act("You begin working wax into the keyhole of the $T.", false, this, 0,
+    reinterpret_cast<const TThing*>(exitp->getName().c_str()), TO_CHAR);
+  act("$n crouches by the $T and begins working at the lock.", true, this, 0,
+    reinterpret_cast<const TThing*>(exitp->getName().c_str()), TO_ROOM);
+
+  learnFromDoingUnusual(LEARN_UNUSUAL_NORM_LEARN, SKILL_KEYCUT, 8);
+
+  // flags carries the wax cost so the pulse doesn't have to recompute it
+  // against a learnedness that may have risen mid-task.
+  start_task(this, nullptr, nullptr, TASK_KEYCUT, "", kKeycutPulses, in_room,
+    door, units, 0);
+
+  return true;
 }

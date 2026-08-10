@@ -1,0 +1,23 @@
+Syntax: jam <weapon> <direction>
+
+Jamming is a looter's answer to being followed.  By working a slim piercing
+weapon into the keyhole of a closed door and snapping it off flush, a thief can
+bind the door shut behind them.  Any blade light enough to backstab with will
+serve; heavier weapons will not seat properly in the gap.
+
+The door must be closed and unlocked before it can be jammed.  A door that is
+already locked offers nowhere for the blade to bite.
+
+A successful jam locks the door from both sides.  How stubborn the resulting
+lock is depends on the thief's level and their mastery of the skill.  The
+weapon is destroyed in the process and cannot be recovered, so a prudent
+looter carries something cheap for the purpose.  A failed attempt leaves the
+blade intact and may be tried again.
+
+A weapon bearing a monogram is no use here.  Leaving your own name wedged in
+a keyhole rather defeats the purpose.
+
+Nothing about a jam defeats a key.  Anyone carrying the door's key can unlock
+it as though the jam were an ordinary lock.
+
+See Also: PICKLOCK, DOORBASH

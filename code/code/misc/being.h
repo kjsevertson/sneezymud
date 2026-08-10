@@ -1336,6 +1336,8 @@ class TBeing : public TThing {
     int doBite(const sstring&);
     int doJump(const sstring&);
     int doPick(const char*);
+    int doJam(const char*);
+    int doKeycut(const char*);
     int doSearch(const char*);
     int doSpy();
     int doDodge();
@@ -1366,6 +1368,7 @@ class TBeing : public TThing {
     void doDrive(sstring);
     void doSacrifice(const char*);
     void doWhittle(const char*);
+    void doSerrate(const char*);
     void doBload(const char*);
     std::vector<TBow*> getBows();
     TArrow* autoGetAmmoQuiver(TBow*, TQuiver*);
