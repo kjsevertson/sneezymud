@@ -2239,7 +2239,12 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt, bool ranged,
   // bites harder than a novice's.  A delivery vehicle built for the job - a
   // blowdart - lifts that level further, but stays under the same baseline,
   // so it rewards the poisoner rather than papering over a novice.
-  if (ch && ch->doesKnowSkill(SKILL_POISON_WEAPON))
+  //
+  // Only when someone else delivered it.  Most callers pass the same being as
+  // both caster and victim - drinking, and a coating with nobody holding it -
+  // and there the skill would scale the liquid against the person it is
+  // hurting, making training a liability.
+  if (ch && ch != vict && ch->doesKnowSkill(SKILL_POISON_WEAPON))
     level = max(level, static_cast<int>(ch->GetMaxLevel()) + levelBonus);
   int duration = (level << 2) * Pulse::UPDATES_PER_MUDHOUR;
   affectedData aff, aff5[5];
@@ -2449,7 +2454,9 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt, bool ranged,
       poison(ch, vict, level, learn, SPELL_POISON);
       break;
     case LIQ_POT_BONE_BREAKER:
-      rc = boneBreaker(ch, vict, level, learn, SPELL_BONE_BREAKER, ranged);
+      // Fifth argument is adv_learn, not the spell - a liquid has no caster's
+      // advanced learning behind it, so 0, as the magic-item path passes.
+      rc = boneBreaker(ch, vict, level, learn, 0, ranged);
       break;
     case LIQ_POT_AQUALUNG:
       aqualung(ch, vict, level, learn);
@@ -2511,7 +2518,8 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt, bool ranged,
       clarity(ch, vict, level, learn);
       break;
     case LIQ_POT_BOILING_BLOOD:
-      rc = bloodBoil(ch, vict, level, learn, SPELL_BLOOD_BOIL, ranged);
+      // adv_learn, as above - not the spell.
+      rc = bloodBoil(ch, vict, level, learn, 0, ranged);
       break;
     case LIQ_POT_STUPIDITY:
       stupidity(ch, vict, level, learn);

@@ -28,7 +28,13 @@ enum arrowFamilyT {
   ARROW_FAM_QUARREL,
   ARROW_FAM_DART,
   ARROW_FAM_PELLET,
+  ARROW_FAM_COUNT,
 };
+
+// assignFourValues hands setArrowType four bits, so 0-15 can arrive, but only
+// two types per family are named.  Anything above this would send arrowFamily
+// past the end of the per-family tables.
+inline constexpr unsigned int MAX_ARROW_TYPE = 2 * ARROW_FAM_COUNT - 1;
 
 [[nodiscard]] constexpr arrowFamilyT arrowFamily(unsigned int arrowType) {
   return static_cast<arrowFamilyT>(arrowType >> 1);

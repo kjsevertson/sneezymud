@@ -2835,6 +2835,10 @@ namespace {
       "$n's pellet strikes your %s with a sickening crunch!",
       "$n's pellet strikes $N's %s with a sickening crunch!"},
   }};
+
+  // Indexed by family, so adding one without a line here would read off the
+  // end.  setArrowType keeps the value in range; this keeps the table in step.
+  static_assert(kRangedCritLines.size() == ARROW_FAM_COUNT);
 }  // namespace
 
 // Crit table for anything shot rather than swung.  Deliberately damage-only:

@@ -84,6 +84,15 @@ bool TArrow::isArrowFlag(unsigned short n) { return arrowFlags & n; }
 void TArrow::addArrowFlags(unsigned short n) { arrowFlags |= n; }
 
 void TArrow::setArrowType(unsigned int newArrowType) {
+  // Builder data reaches here through assignFourValues, which cannot express
+  // "no type" - four bits always produce a number.  Fold anything past the
+  // named types back to a long stalk rather than let arrowFamily index off the
+  // end of the family tables, and say so, because it means bad object data.
+  if (newArrowType > MAX_ARROW_TYPE) {
+    vlogf(LOG_LOW, format("Arrow %d has arrow type %u, out of range - using 0") %
+                     objVnum() % newArrowType);
+    newArrowType = 0;
+  }
   arrowType = newArrowType;
 }
 
