@@ -590,6 +590,8 @@ class TObj : public TThing {
     void setObjStat(unsigned int num);
     void remObjStat(unsigned int num);
     void addObjStat(unsigned int num);
+    bool isBulk() const;
+    float bulkQualityFraction() const;
     bool isPaired() const;
     bool usedAsPaired() const;
     int objVnum() const;
