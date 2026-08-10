@@ -496,7 +496,7 @@ int bloodBoil(TBeing* caster, TBeing* victim, TMagicItem* tObj) {
 }
 
 int bloodBoil(TBeing* caster, TBeing* victim, int level, short bKnown,
-  int adv_learn) {
+  int adv_learn, bool ranged) {
   if (victim->isImmortal()) {
     act("You can't boil $N's blood -- $E's a god! ", FALSE, caster, NULL,
       victim, TO_CHAR);
@@ -548,7 +548,15 @@ int bloodBoil(TBeing* caster, TBeing* victim, int level, short bKnown,
         }
         break;
     }
-    if (caster->reconcileDamage(victim, dam, SPELL_BLOOD_BOIL) == -1)
+    // Every line above went to the caster's room - act() scopes TO_NOTVICT to
+    // the actor.  When the caster is elsewhere, the people standing with the
+    // victim have seen nothing at all, so give them what they can actually
+    // perceive: no caster to name, only the effect.
+    if (ranged)
+      act("<R>$n's blood suddenly begins to boil!<z>", false, victim, nullptr,
+        nullptr, TO_ROOM);
+    if (caster->reconcileDamage(victim, dam, SPELL_BLOOD_BOIL, nullptr,
+          ranged) == -1)
       return SPELL_FAIL + VICTIM_DEAD;
     return SPELL_FAIL;
   } else {

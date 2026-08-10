@@ -1022,7 +1022,12 @@ class TBeing : public TThing {
     int reconcileLifeforce(spellNumT, bool, int = 0);
     int useLifeforce(spellNumT);
     double usePiety(spellNumT);
-    int reconcileDamage(TBeing*, int, spellNumT, int* damDealt = nullptr);
+    // ranged: the attacker is legitimately not standing with the victim (a
+    // shot, or a coating delivered by one).  Waives the same-room test in
+    // damDetailsOk, which exists to drop melee blows aimed at someone who
+    // has already fled.  Leave it false for melee.
+    int reconcileDamage(TBeing*, int, spellNumT, int* damDealt = nullptr,
+      bool ranged = false);
     virtual int doRent(const sstring&);
     void doRestring(const sstring&);
     void doRelease(const sstring&);
@@ -1551,7 +1556,7 @@ class TBeing : public TThing {
     int damageTrivia(TBeing* v, TThing* o, int dam, spellNumT type);
     void doDamage(int, spellNumT);
     int tellStatus(int, bool, bool);
-    int getActualDamage(TBeing*, TThing*, int, spellNumT);
+    int getActualDamage(TBeing*, TThing*, int, spellNumT, bool ranged = false);
     int damageEm(int, sstring, spellNumT);
     int skipImmortals(int) const;
     int applyDamage(TBeing*, int, spellNumT, int* damDealt = nullptr);
@@ -1907,7 +1912,7 @@ class TBeing : public TThing {
     int doDonate(const char*);
     int doSteal(const sstring&, TBeing*);
     void doRestore(const char*);
-    void doThrow(const sstring&);
+    int doThrow(const sstring&);
     void doWear(const char*);
     int stickIn(TThing* o, wearSlotT pos, silentTypeT silent = SILENT_NO);
     int doEmote(const sstring&);

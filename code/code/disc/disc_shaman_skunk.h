@@ -37,7 +37,7 @@ int cardiacStress(TBeing*, TBeing*, int, short, int);
 int bloodBoil(TBeing*, TBeing*);
 int castBloodBoil(TBeing*, TBeing*);
 int bloodBoil(TBeing*, TBeing*, TMagicItem*);
-int bloodBoil(TBeing*, TBeing*, int, short, int);
+int bloodBoil(TBeing*, TBeing*, int, short, int, bool ranged = false);
 
 int vampiricTouch(TBeing*, TBeing*);
 int castVampiricTouch(TBeing*, TBeing*);

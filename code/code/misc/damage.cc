@@ -260,7 +260,8 @@ namespace {
 }  // namespace
 
 // -1 = v is dead, needs to go bye-bye
-int TBeing::reconcileDamage(TBeing* v, int dam, spellNumT how, int* damDealt) {
+int TBeing::reconcileDamage(TBeing* v, int dam, spellNumT how, int* damDealt,
+  bool ranged) {
   int rc = 0;
   spellNumT how2;
 
@@ -282,7 +283,7 @@ int TBeing::reconcileDamage(TBeing* v, int dam, spellNumT how, int* damDealt) {
       SET_BIT(specials.affectedBy, AFF_ENGAGER);
   }
 
-  dam = getActualDamage(v, NULL, dam, how);
+  dam = getActualDamage(v, nullptr, dam, how, ranged);
 
   // make um fly if appropriate
   if (!v->isPc() && v->canFly() && !v->isFlying()) {
@@ -1478,7 +1479,7 @@ void TBeing::doDamage(int dam, spellNumT dmg_type) {
 }
 
 int TBeing::getActualDamage(TBeing* v, TThing* o, int dam,
-  spellNumT attacktype) {
+  spellNumT attacktype, bool ranged) {
   // checks for peaceful rooms, etc
   if (damCheckDeny(v, attacktype))
     return 0;
@@ -1487,10 +1488,10 @@ int TBeing::getActualDamage(TBeing* v, TThing* o, int dam,
   if (dam == -1)
     return 0;
 
-  // insures both in same room
-  bool rc = damDetailsOk(v, dam, FALSE);
+  // insures both in same room, unless the caller says the distance is meant
+  bool rc = damDetailsOk(v, dam, ranged);
   if (!rc)
-    return FALSE;
+    return false;
 
   dam = damageTrivia(v, o, dam, attacktype);
   return dam;

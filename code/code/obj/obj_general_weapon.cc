@@ -345,15 +345,16 @@ int spikesBreak(TBeing* victim, TBeing* ch, TObj* obj) {
     return 0;
 
   if ((obj->isObjStat(ITEM_SPIKED)) && percentChance(25) && victim->isTough()) {
-    static constexpr const char* catch_msg = "$n's $o catches on $N's $o!";
+    static constexpr const char* catch_msg = "%s $o catches on %s $o!";
     static constexpr const char* spikes_break_msg =
-      "Some spikes break off, damaging $n's $o!";
+      "Some spikes break off, damaging %s $o!";
 
     obj->addToStructPoints(-dam);
     obj->addToMaxStructPoints(-1);
-    act(format(catch_msg) % "Your" % "$N", FALSE, ch, obj, victim, TO_CHAR);
-    act(format(catch_msg) % "$n's" % "$N", FALSE, ch, obj, victim, TO_NOTVICT);
-    act(format(catch_msg) % "$n's" % "$N", FALSE, ch, obj, victim, TO_VICT);
+    act(format(catch_msg) % "Your" % "$N's", false, ch, obj, victim, TO_CHAR);
+    act(format(catch_msg) % "$n's" % "$N's", false, ch, obj, victim,
+      TO_NOTVICT);
+    act(format(catch_msg) % "$n's" % "your", false, ch, obj, victim, TO_VICT);
     act(format(spikes_break_msg) % "$n's", FALSE, ch, obj, nullptr, TO_ROOM,
       ANSI_GRAY);
     act(format(spikes_break_msg) % "your", FALSE, ch, obj, nullptr, TO_CHAR,

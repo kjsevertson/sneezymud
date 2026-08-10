@@ -70,7 +70,7 @@ static void addTorment(TBeing* victim, spellNumT spell) {
 }
 
 int harm(TBeing* caster, TBeing* victim, int level, short bKnown,
-  spellNumT spell, int adv_learn) {
+  spellNumT spell, int adv_learn, bool ranged) {
   caster->reconcileHurt(victim, discArray[spell]->alignMod);
 
   int dam = caster->getSkillDam(victim, spell, level, adv_learn);
@@ -91,7 +91,13 @@ int harm(TBeing* caster, TBeing* victim, int level, short bKnown,
     act("$N buckles from the pain!", FALSE, caster, NULL, victim, TO_CHAR);
     act("You buckle from the pain!  You could swear you're about to die!",
       FALSE, caster, NULL, victim, TO_VICT);
-    if (caster->reconcileDamage(victim, dam, spell) == -1)
+    // Unlike its siblings, harm addresses the room from the caster's side, so
+    // act() scopes it to the caster's room.  Give the victim's bystanders the
+    // same line bound to them instead.
+    if (ranged)
+      act("$n buckles from the pain!", false, victim, nullptr, nullptr,
+        TO_ROOM);
+    if (caster->reconcileDamage(victim, dam, spell, nullptr, ranged) == -1)
       return SPELL_SUCCESS + VICTIM_DEAD;
     return SPELL_SUCCESS;
   } else {
@@ -651,7 +657,7 @@ void blindness(TBeing* caster, TBeing* victim) {
 }
 
 int harmLight(TBeing* caster, TBeing* victim, int level, short bKnown,
-  spellNumT spell, int adv_learn) {
+  spellNumT spell, int adv_learn, bool ranged) {
   int dam = caster->getSkillDam(victim, spell, level, adv_learn);
 
   caster->reconcileHurt(victim, discArray[spell]->alignMod);
@@ -670,7 +676,13 @@ int harmLight(TBeing* caster, TBeing* victim, int level, short bKnown,
 
     act("$n is lightly hurt!", FALSE, victim, NULL, NULL, TO_ROOM);
     act("You are lightly hurt!", FALSE, victim, NULL, NULL, TO_CHAR);
-    if (caster->reconcileDamage(victim, dam, spell) == -1)
+    // Both lines above are bound to the victim, so at range they reach the
+    // victim's room and not the caster's.  Tell the caster their spell
+    // landed - in melee the TO_ROOM copy above did that for free.
+    if (ranged)
+      act("In the distance, $N is lightly hurt!", false, caster, nullptr,
+        victim, TO_CHAR);
+    if (caster->reconcileDamage(victim, dam, spell, nullptr, ranged) == -1)
       return SPELL_SUCCESS + VICTIM_DEAD;
     return SPELL_SUCCESS;
   } else {
@@ -755,7 +767,7 @@ int harmLight(TBeing* caster, TBeing* victim) {
 }
 
 int harmCritical(TBeing* caster, TBeing* victim, int level, short bKnown,
-  spellNumT spell, int adv_learn) {
+  spellNumT spell, int adv_learn, bool ranged) {
   caster->reconcileHurt(victim, discArray[spell]->alignMod);
   int dam = caster->getSkillDam(victim, spell, level, adv_learn);
 
@@ -767,7 +779,13 @@ int harmCritical(TBeing* caster, TBeing* victim, int level, short bKnown,
 
     act("$n is critically hurt!", FALSE, victim, NULL, NULL, TO_ROOM);
     act("You are critically hurt!", FALSE, victim, NULL, NULL, TO_CHAR);
-    if (caster->reconcileDamage(victim, dam, spell) == -1)
+    // Both lines above are bound to the victim, so at range they reach the
+    // victim's room and not the caster's.  Tell the caster their spell
+    // landed - in melee the TO_ROOM copy above did that for free.
+    if (ranged)
+      act("In the distance, $N is critically hurt!", false, caster, nullptr,
+        victim, TO_CHAR);
+    if (caster->reconcileDamage(victim, dam, spell, nullptr, ranged) == -1)
       return SPELL_SUCCESS + VICTIM_DEAD;
     return SPELL_SUCCESS;
   } else {
@@ -849,7 +867,7 @@ int harmCritical(TBeing* caster, TBeing* victim) {
 }
 
 int harmSerious(TBeing* caster, TBeing* victim, int level, short bKnown,
-  spellNumT spell, int adv_learn) {
+  spellNumT spell, int adv_learn, bool ranged) {
   int dam = caster->getSkillDam(victim, spell, level, adv_learn);
 
   caster->reconcileHurt(victim, discArray[spell]->alignMod);
@@ -862,7 +880,13 @@ int harmSerious(TBeing* caster, TBeing* victim, int level, short bKnown,
 
     act("$n is seriously hurt!", FALSE, victim, NULL, NULL, TO_ROOM);
     act("You are seriously hurt!", FALSE, victim, NULL, NULL, TO_CHAR);
-    if (caster->reconcileDamage(victim, dam, spell) == -1)
+    // Both lines above are bound to the victim, so at range they reach the
+    // victim's room and not the caster's.  Tell the caster their spell
+    // landed - in melee the TO_ROOM copy above did that for free.
+    if (ranged)
+      act("In the distance, $N is seriously hurt!", false, caster, nullptr,
+        victim, TO_CHAR);
+    if (caster->reconcileDamage(victim, dam, spell, nullptr, ranged) == -1)
       return SPELL_SUCCESS + VICTIM_DEAD;
     return SPELL_SUCCESS;
   } else {
@@ -1258,7 +1282,7 @@ bool TBeing::canBoneBreak(TBeing* victim, silentTypeT silent) {
 }
 
 int boneBreaker(TBeing* caster, TBeing* victim, int level, short bKnown,
-  int adv_learn) {
+  int adv_learn, bool ranged) {
   char buf[1024], limb[256];
   int ret;
   wearSlotT slot;
@@ -1325,6 +1349,14 @@ int boneBreaker(TBeing* caster, TBeing* victim, int level, short bKnown,
     else
       sprintf(buf, "You hear a muffled SNAP as $n's %s is shattered!", limb);
     act(buf, FALSE, victim, NULL, NULL, TO_ROOM);
+    // As above: the SNAP only carried to the victim's room.
+    if (ranged) {
+      sprintf(buf,
+        "In the distance, you hear a muffled SNAP as $N's %s "
+        "breaks!",
+        limb);
+      act(buf, false, caster, nullptr, victim, TO_CHAR);
+    }
 
     ret = SPELL_SUCCESS;
     switch (critSuccess(caster, SPELL_BONE_BREAKER)) {
@@ -1351,7 +1383,8 @@ int boneBreaker(TBeing* caster, TBeing* victim, int level, short bKnown,
     }
 
     victim->dropWeapon(slot);
-    if (caster->reconcileDamage(victim, dam, SPELL_BONE_BREAKER) == -1)
+    if (caster->reconcileDamage(victim, dam, SPELL_BONE_BREAKER, nullptr,
+          ranged) == -1)
       ret += VICTIM_DEAD;
     return ret;
   } else {

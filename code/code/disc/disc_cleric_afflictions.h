@@ -21,7 +21,7 @@ class CDAfflict : public CDiscipline {
 
 int harm(TBeing*, TBeing*);
 int harm(TBeing*, TBeing*, TMagicItem*, spellNumT);
-int harm(TBeing*, TBeing*, int, short, spellNumT, int);
+int harm(TBeing*, TBeing*, int, short, spellNumT, int, bool ranged = false);
 
 void poison(TBeing*, TObj*);
 int poison(TBeing*, TObj*, int, short, spellNumT);
@@ -36,15 +36,18 @@ int blindness(TBeing*, TBeing*, int, short);
 
 int harmLight(TBeing*, TBeing*);
 int harmLight(TBeing*, TBeing*, TMagicItem*, spellNumT);
-int harmLight(TBeing*, TBeing*, int, short, spellNumT, int);
+int harmLight(TBeing*, TBeing*, int, short, spellNumT, int,
+  bool ranged = false);
 
 int harmCritical(TBeing*, TBeing*);
 int harmCritical(TBeing*, TBeing*, TMagicItem*, spellNumT);
-int harmCritical(TBeing*, TBeing*, int, short, spellNumT, int);
+int harmCritical(TBeing*, TBeing*, int, short, spellNumT, int,
+  bool ranged = false);
 
 int harmSerious(TBeing*, TBeing*);
 int harmSerious(TBeing*, TBeing*, TMagicItem*, spellNumT);
-int harmSerious(TBeing*, TBeing*, int, short, spellNumT, int);
+int harmSerious(TBeing*, TBeing*, int, short, spellNumT, int,
+  bool ranged = false);
 
 void paralyze(TBeing*, TBeing*);
 void paralyze(TBeing*, TBeing*, TMagicItem*);
@@ -52,7 +55,7 @@ int paralyze(TBeing*, TBeing*, int, short);
 
 int boneBreaker(TBeing*, TBeing*);
 int boneBreaker(TBeing*, TBeing*, TMagicItem*);
-int boneBreaker(TBeing*, TBeing*, int, short, int);
+int boneBreaker(TBeing*, TBeing*, int, short, int, bool ranged = false);
 
 int bleed(TBeing*, TBeing*);
 int bleed(TBeing*, TBeing*, TMagicItem*);

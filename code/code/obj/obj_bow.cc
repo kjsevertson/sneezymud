@@ -379,6 +379,11 @@ int TBow::shootMeBow(TBeing* ch, TBeing* targ, unsigned int count, dirTypeT dir,
       delete targ;
       targ = NULL;
     }
+    // The shot killed ch - a poisoned shaft crit-failing back onto them.
+    // Nothing below may touch ch, so hand our caller the flag it reads as
+    // "the being you passed died" and stop the volley here.
+    if (IS_SET_DELETE(rc, DELETE_THIS))
+      return DELETE_VICT;
 
     rc = ch->doRemove("", this);
     if (IS_SET_DELETE(rc, DELETE_ITEM))
