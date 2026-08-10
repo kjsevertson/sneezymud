@@ -85,23 +85,38 @@ Where `baseVolume` is the 100% size for the slot (from the table above) and
 
 ## Hook Point
 
-The insertion point for bulk loot loading is at the end of `runResetCmdM()` in
-`code/code/sys/db.cc` (around line 3101), after the mob is placed in the room
-and registered on the born list, but before `last_cmd = mobload = true`.
+Bulk loot loads from two sites in `code/code/sys/db.cc`, both acting on a mob
+whose own zonefile commands have already finished:
+
+- `runResetCmdM()` generates on the *previous* mob before it starts a new one.
+- `zoneData::resetZone()` generates on the final mob after the command loop ends.
+
+Waiting until after the mob's own `E`/`G`/`Z`/`Y` commands is deliberate. By
+then the builder's equipment is worn, so `bulkLoadOut()` can skip any slot that
+is already filled and only add to what the builder left empty. Hooking at the
+end of the `M` command that creates the mob would run before that equipment
+exists, and bulk loot would compete with it instead of filling around it.
 
 At this point the mob is fully constructed with:
 - Race and class set
 - Placed in room
 - Wealth created
-- No builder equipment yet (E/G/Z commands execute after M returns)
+- Builder equipment already worn — occupied slots are skipped
+
+Neither site runs during a load-potential scan (`resetFlagFindLoadPotential`).
+That pass only tallies what a zone could produce; generating there would create
+real items and buy real commodities off real shops at boot.
 
 ### Zone Boot Flow (Reference)
 
 1. `bootZones()` → `bootOneZone()` → `zoneData::bootZone()` — parse zonefiles
 2. `zoneData::renumCmd()` — convert vnums to real indices
 3. `zoneData::resetZone()` — iterate `cmd_table`, dispatch commands
-4. `runResetCmdM()` — load mob into room ← **our hook goes here**
+4. `runResetCmdM()` — first generates bulk loot on the *previous* mob ← **our
+   hook**, then loads this mob into the room
 5. Conditional E/G/Z/Y commands — load builder-specified equipment onto mob
+6. Next `M` command, or the end of the loop for the last mob — bulk loot fills
+   whichever slots step 5 left empty
 
 Key files:
 - `code/code/sys/db.cc` — zone reset logic, all runResetCmd* functions
@@ -292,7 +307,7 @@ Format: `a [size] [quality] [material] [base name]`
 
 - Level 45 elf cleric wrist: `<blue>a slim honed platinum maniple</blue>` (+4 WIS, +5 HP)
 - Level 10 dwarf warrior body: `<red>a stout flimsy steel brigandine</red>` (+1 STR, +5% bash)
-- Level 55 human mage head: `<cyan>a superior feathered skullcap</cyan>` (+5 INT, +7 mana)
+- Level 55 human mage head: `<cyan>an excellent feathered skullcap</cyan>` (+5 INT, +7 mana)
 - Level 35 ogre thief leg: `<gray>a large silk legging</gray>` (+3 DEX, +3 CBS)
 
 Max visible name length: ~40 characters.

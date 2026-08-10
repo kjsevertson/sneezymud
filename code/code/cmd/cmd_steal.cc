@@ -216,6 +216,10 @@ TObj* generateStealLoot(TMonster* mob) {
 
     if (obj->getValue() / 4 <= mob->getLoadMoney())
       return obj;
+
+    // Too rich for this mob.  read_object hands the caller a live object, so
+    // a rejected roll has to go - otherwise ten tries can strand ten of them.
+    delete obj;
   }
 
   return NULL;

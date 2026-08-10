@@ -3318,7 +3318,10 @@ void runResetCmdM(zoneData& zone, resetCom& rs, resetFlag flags, bool& mobload,
   TMonster*& mob, bool& objload, TObj*& obj, bool& last_cmd) {
   // Generate bulk loot on the previous mob before starting a new one.
   // Always runs regardless of LoadOnDeath — bulk loot is worn, not dropped.
-  if (mob && mobload)
+  // Never during a load-potential scan: that pass only tallies what a zone
+  // could produce, and generating here would buy real commodities off real
+  // shops at boot.
+  if (mob && mobload && !IS_SET(flags, resetFlagFindLoadPotential))
     bulkLoadOut(mob);
 
   mob = NULL;
@@ -3977,8 +3980,9 @@ void zoneData::resetZone(bool bootTime, bool findLoadPotential) {
       break;
   }
 
-  // Generate bulk loot on the last mob in the zone.
-  if (mob && mobload)
+  // Generate bulk loot on the last mob in the zone.  Skipped during a
+  // load-potential scan, same as the per-mob site in runResetCmdM.
+  if (mob && mobload && !findLoadPotential)
     bulkLoadOut(mob);
 
   if (!findLoadPotential) {
