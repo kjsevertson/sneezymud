@@ -614,6 +614,9 @@ enum spellNumT {
   SKILL_SKULK,
   SKILL_RESOURCEFULNESS,
   SKILL_SCRUTINY,
+  SKILL_SERRATE,
+  SKILL_JAM,
+  SKILL_KEYCUT,
 
   // keep this as the last of the true skills
   MAX_SKILL,

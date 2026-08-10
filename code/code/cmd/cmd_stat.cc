@@ -1925,6 +1925,7 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_FAST_LOAD:
       case SKILL_SHARPEN:
       case SKILL_DULL:
+      case SKILL_SERRATE:
       case SKILL_ATTUNE:
       case SKILL_STAVECHARGE:
       case SKILL_SACRIFICE:
@@ -1965,6 +1966,8 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_COMMON:
       case SKILL_RESOURCEFULNESS:
       case SKILL_SCRUTINY:
+      case SKILL_JAM:
+      case SKILL_KEYCUT:
       case SPELL_EARTHMAW:
       case SPELL_CREEPING_DOOM:
       case SPELL_FERAL_WRATH:
