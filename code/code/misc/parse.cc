@@ -1532,6 +1532,12 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
         case CMD_SKULK:
           rc = doSkulk(newarg.c_str());
           break;
+        case CMD_JAM:
+          rc = doJam(newarg.c_str());
+          break;
+        case CMD_KEYCUT:
+          rc = doKeycut(newarg.c_str());
+          break;
         case CMD_CRAWL:
           doCrawl();
           break;
@@ -2573,6 +2579,9 @@ void buildCommandArray(void) {
   commandArray[CMD_SNEAK] = new commandInfo("sneak", POSITION_CRAWLING, 0);
   commandArray[CMD_HIDE] = new commandInfo("hide", POSITION_STANDING, 0);
   commandArray[CMD_SKULK] = new commandInfo("skulk", POSITION_STANDING, 0);
+  commandArray[CMD_JAM] = new commandInfo("jam", POSITION_STANDING, 0);
+  commandArray[CMD_KEYCUT] =
+    new commandInfo("keycut", POSITION_STANDING, 0);
   commandArray[CMD_BACKSTAB] =
     new commandInfo("backstab", POSITION_FIGHTING, 0);
   commandArray[CMD_SLIT] = new commandInfo("slit", POSITION_STANDING, 0);

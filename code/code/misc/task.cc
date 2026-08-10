@@ -265,6 +265,10 @@ TaskEntry tasks[NUM_TASKS] = {
     task_trap_portal},
   {"serrating a weapon", "You are too busy filing teeth into a weapon.\n\r",
     task_serrate},
+  {"jamming a door", "You are too busy wedging your blade into the door.\n\r",
+    task_jam},
+  {"casting a key", "You are too busy working wax into the lock.\n\r",
+    task_keycut},
 };
 
 bool TBeing::nobrainerTaskCommand(cmdTypeT cmd) {

@@ -1966,6 +1966,8 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_COMMON:
       case SKILL_RESOURCEFULNESS:
       case SKILL_SCRUTINY:
+      case SKILL_JAM:
+      case SKILL_KEYCUT:
       case SPELL_EARTHMAW:
       case SPELL_CREEPING_DOOM:
       case SPELL_FERAL_WRATH:

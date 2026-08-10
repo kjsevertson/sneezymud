@@ -604,6 +604,8 @@ enum cmdTypeT : int {
   CMD_INNATE,
   CMD_SKULK,
   CMD_SERRATE,
+  CMD_JAM,
+  CMD_KEYCUT,
   MAX_CMD_LIST,  // Keep this as last command in regular list
   CMD_RESP_TOGGLE,
   CMD_RESP_UNTOGGLE,

@@ -2239,6 +2239,8 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SKILL_IRON_WILL:
       case SKILL_RESOURCEFULNESS:
       case SKILL_SCRUTINY:
+      case SKILL_JAM:
+      case SKILL_KEYCUT:
       case SKILL_PLANT:
       case ABSOLUTE_MAX_SKILL:
         vlogf(LOG_BUG,

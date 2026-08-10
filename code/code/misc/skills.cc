@@ -99,16 +99,16 @@ static bool doesKnow(byte know) {
 }
 
 namespace {
-  // Innate cooldown tags use the spellNumT enum but have no discipline,
-  // CSkill, or discArray entry. Add new cooldown tags here AND to the
-  // matching fall-through case block in TBeing::getSkill().
-  bool isInnateCooldownTag(spellNumT skill) {
+  // Cooldown tags use the spellNumT enum but have no discipline, CSkill, or
+  // discArray entry. Add new cooldown tags here AND to the matching
+  // fall-through case block in TBeing::getSkill().
+  bool isCooldownTag(spellNumT skill) {
     return skill == SKILL_DROW_INVIS || skill == SKILL_DROW_DARKNESS;
   }
 }  // namespace
 
 CSkill* TBeing::getSkill(spellNumT skill) const {
-  if (isInnateCooldownTag(skill))
+  if (isCooldownTag(skill))
     return nullptr;
 
   discNumT which = getDisciplineNumber(skill, FALSE);
@@ -922,6 +922,10 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDLooting*)cd)->skResourcefulness;
     case SKILL_SCRUTINY:
       return &((CDLooting*)cd)->skScrutiny;
+    case SKILL_JAM:
+      return &((CDLooting*)cd)->skJam;
+    case SKILL_KEYCUT:
+      return &((CDLooting*)cd)->skKeycut;
 
       // disc_murder
 
@@ -1457,8 +1461,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
     case AFFECT_PREENED:
     case AFFECT_WET:
     case ABSOLUTE_MAX_SKILL:
-    // Innate cooldown tags — unreachable here (caught by isInnateCooldownTag
-    // at the top of the function); listed for -Wswitch coverage.
+    // Cooldown tags — unreachable here (caught by isCooldownTag at the top
+    // of the function); listed for -Wswitch coverage.
     case SKILL_DROW_INVIS:
     case SKILL_DROW_DARKNESS:
       break;
