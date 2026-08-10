@@ -109,9 +109,9 @@ inline constexpr double material_density[200] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 90-99
 
     // 100-109: gems/stones
-    3.5,   // MAT_JEWELED
-    0,     // 101
-    2.6,   // MAT_RUNITE
+    3.5,   // MAT_GEN_MINERAL
+    0,     // 101 (MAT_JEWELED is commented out in materials.h)
+    2.6,   // MAT_RUNESTONE
     2.6,   // MAT_CRYSTAL
     3.5,   // MAT_DIAMOND
     1.1,   // MAT_EBONY
@@ -149,17 +149,16 @@ inline constexpr double material_density[200] = {
     // 150-159: metals
     7.0,   // MAT_GEN_METAL
     8.96,  // MAT_COPPER
-    0,     // 152
-    0,     // 153
-    0,     // 154
-    0,     // 155
-    0,     // 156
+    0,     // MAT_SCALE_MAIL
+    0,     // MAT_BANDED_MAIL
+    0,     // MAT_CHAIN_MAIL
+    0,     // MAT_PLATE
     8.8,   // MAT_BRONZE
     8.5,   // MAT_BRASS
     7.87,  // MAT_IRON
+    7.8,   // MAT_STEEL
 
     // 160-169
-    7.8,   // MAT_STEEL
     3.5,   // MAT_MITHRIL
     8.0,   // MAT_ADAMANTITE
     10.49, // MAT_SILVER
@@ -167,24 +166,47 @@ inline constexpr double material_density[200] = {
     21.45, // MAT_PLATINUM
     4.5,   // MAT_TITANIUM
     2.7,   // MAT_ALUMINUM
-    0,     // 168
+    0,     // MAT_RINGMAIL
     8.9,   // MAT_GNICKEL
+    12.5,  // MAT_ELECTRUM
 
     // 170-179
-    12.5,  // MAT_ELECTRUM
     7.0,   // MAT_ATHANOR
     7.3,   // MAT_TIN
     19.25, // MAT_TUNGSTEN
     7.5,   // MAT_STARMETAL
     8.23,  // MAT_TERBIUM
-    0, 0,  // 176-177
+    0,     // MAT_ELVENMAIL
+    0,     // MAT_ELVENSTEEL
     9.0,   // MAT_ETERNIUM
+    0,     // 178
     0,     // 179
 
     // 180-199: empty slots
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 180-189
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // 190-199
 };
+
+// The table is positional, so one stray placeholder silently shifts every
+// entry after it - which is exactly what had happened to the metals above.
+// Pin the materials bulk loot can actually select (see statMaterials) plus the
+// block boundaries, so an edit that slips an index fails to compile instead of
+// quietly making mithril weigh as much as steel.
+static_assert(material_density[MAT_GEN_MINERAL] == 3.5);
+static_assert(material_density[MAT_COPPER] == 8.96);
+static_assert(material_density[MAT_BRONZE] == 8.8);
+static_assert(material_density[MAT_BRASS] == 8.5);
+static_assert(material_density[MAT_IRON] == 7.87);
+static_assert(material_density[MAT_STEEL] == 7.8);
+static_assert(material_density[MAT_MITHRIL] == 3.5);
+static_assert(material_density[MAT_SILVER] == 10.49);
+static_assert(material_density[MAT_GOLD] == 19.3);
+static_assert(material_density[MAT_PLATINUM] == 21.45);
+static_assert(material_density[MAT_TITANIUM] == 4.5);
+static_assert(material_density[MAT_ALUMINUM] == 2.7);
+static_assert(material_density[MAT_ELECTRUM] == 12.5);
+static_assert(material_density[MAT_TIN] == 7.3);
+static_assert(material_density[MAT_ETERNIUM] == 9.0);
 
 // -----------------------------------------------------------------------
 // Bulk loot equipment slots
@@ -1626,7 +1648,12 @@ void bulkLoadOut(TMonster* mob) {
 
   for (int i = 0; i < BULK_SLOT_COUNT; ++i) {
     auto bulkSlot = static_cast<BulkSlot>(i);
-    wearSlotT wearSlot = slot_from_bit(bulkSlots[i].wearFlag);
+    // A shield belongs in the off hand, leaving the weapon hand free below.
+    // slot_from_bit answers ITEM_WEAR_HOLD with a fixed side, so ask the mob
+    // which side that is rather than hardcoding one.
+    wearSlotT wearSlot = (bulkSlot == BulkSlot::Shield)
+                           ? mob->getSecondaryHold()
+                           : slot_from_bit(bulkSlots[i].wearFlag);
 
     // Don't generate if mob already has something in this slot
     if (mob->equipment[wearSlot])
@@ -1645,22 +1672,29 @@ void bulkLoadOut(TMonster* mob) {
   }
 
   // --- Weapon roll (independent of armor slots) ---
-  if (mob->equipment[HOLD_RIGHT])
+  // Mobs are left-handed: PLR_RT_HANDED is only ever set during character
+  // creation, so isRightHanded() is false for every one of them.  Go through
+  // the handedness helpers anyway - they are what decides which hold is the
+  // weapon hand, and hardcoding a side here would fight the shield above.
+  wearSlotT weaponHold = mob->getPrimaryHold();
+  wearSlotT offHold = mob->getSecondaryHold();
+
+  if (mob->equipment[weaponHold])
     return;
   // Two-handed weapons need both hands free
-  bool leftFree = !mob->equipment[HOLD_LEFT];
+  bool offHandFree = !mob->equipment[offHold];
 
   if (!percentChance(BULK_LOAD_CHANCE_PCT))
     return;
 
   if (auto* weapon = generateBulkWeapon(classInd, mob->GetMaxLevel())) {
-    if (weapon->isPaired() && !leftFree) {
+    if (weapon->isPaired() && !offHandFree) {
       delete weapon;
       return;
     }
     buyCommodityForItem(mob, weapon->getMaterial(),
         static_cast<float>(weapon->getWeight()));
-    mob->equipChar(weapon, HOLD_RIGHT, SILENT_YES);
+    mob->equipChar(weapon, weaponHold, SILENT_YES);
   }
 }
 

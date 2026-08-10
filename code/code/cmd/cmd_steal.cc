@@ -231,6 +231,10 @@ TObj* generateStealLoot(unsigned short classBits, double moneyCeiling) {
 
     if (obj->getValue() / 4 <= moneyCeiling)
       return obj;
+
+    // Too rich for this mob.  read_object hands the caller a live object, so
+    // a rejected roll has to go - otherwise ten tries can strand ten of them.
+    delete obj;
   }
 
   return NULL;
