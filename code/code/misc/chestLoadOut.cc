@@ -166,7 +166,11 @@ namespace {
   // d20: 1-9 mystery, 10-14 youth, 15-17 characteristics, 18-19 learning,
   // 20 yields two potions, each drawn evenly from all four (so a 20 can pay
   // out the same potion twice).
-  void maybeAddRarePotion(TOpenContainer* cont, int level) {
+  // `room` is how many items the container can still take; a 20 pays out two
+  // potions and must not spend a slot it does not have.
+  void maybeAddRarePotion(TOpenContainer* cont, int level, int room) {
+    if (room <= 0)
+      return;
     if (level < RARE_POTION_MIN_LEVEL)
       return;
     if (::number(1, RARE_POTION_ODDS) != 1)
@@ -182,7 +186,7 @@ namespace {
     else if (roll <= 19)
       addPotion(cont, Obj::LEARNING_POTION);
     else
-      for (int i = 0; i < 2; ++i)
+      for (int i = 0; i < std::min(2, room); ++i)
         addPotion(cont, uniformRarePotion());
   }
 
@@ -228,7 +232,11 @@ namespace {
     sysLootLoad(rs, nullptr, cont, false);
   }
 
-  void fillContainer(TOpenContainer* cont, int zoneLevel) {
+  // `cap` is the ceiling for this container's level. tryFillContainer checks it
+  // once to decide whether to fill at all, but a fill runs many rolls, so it has
+  // to be re-checked here or one reset can carry a nearly-full chest well past
+  // it.
+  void fillContainer(TOpenContainer* cont, int zoneLevel, int cap) {
     int level = zoneLevel;
     if (::number(1, 100) <= OVERLEVEL_CHANCE_PCT)
       level += ::number(1, OVERLEVEL_MAX);
@@ -247,11 +255,21 @@ namespace {
     // Cash accumulates and lands as a single pile. Separate piles in one
     // container is the problem runResetCmdP already guards against.
     double cash = 0.0;
+    bool cashPending = false;
 
-    for (int i = 0; i < rolls; ++i) {
+    // Read the container's live size rather than counting what we added:
+    // addLootTableItem and the potions land items without reporting whether
+    // they did. Cash is the one payload not yet in stuff, so it reserves the
+    // slot its pile will take.
+    auto atCapacity = [&]() {
+      return static_cast<int>(cont->stuff.size()) + (cashPending ? 1 : 0) >= cap;
+    };
+
+    for (int i = 0; i < rolls && !atCapacity(); ++i) {
       switch (rollLootKind()) {
         case LootKind::Cash:
           cash += money;
+          cashPending = true;
           break;
 
         case LootKind::StealSet:
@@ -278,10 +296,13 @@ namespace {
       else
         vlogf(LOG_BUG, "chestLoadOut: problem creating money");
     }
+    cashPending = false;
 
     // Independent of the roll table -- a bonus on top of whatever the chest
     // already produced, not a competing outcome that would crowd out the rest.
-    maybeAddRarePotion(cont, level);
+    // Still bounded by the ceiling: a bonus is not a licence to overflow.
+    maybeAddRarePotion(cont, level,
+      cap - static_cast<int>(cont->stuff.size()));
   }
 
   // Roll for one candidate container and fill it if the roll wins.
@@ -302,7 +323,7 @@ namespace {
     if (::number(1, 100) > fillChance(cont, carried) * room / cap)
       return;
 
-    fillContainer(cont, level);
+    fillContainer(cont, level, cap);
   }
 
 }  // anonymous namespace
