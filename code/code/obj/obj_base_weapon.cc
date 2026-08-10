@@ -1548,10 +1548,16 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
 
         d = get_range_actual_damage(ch, tb, this, d, damtype);
 
-        // An arrow in flight has no wielder, so applyPoison takes its
-        // victim-is-also-caster branch and can only report DELETE_VICT.
+        // Name the shooter: the arrow has no equippedBy in flight, and
+        // without them the coating would credit its damage to the victim.
+        // A crit-fail can now kill the shooter, several rooms away.
         if (isPoisoned()) {
-          if (IS_SET_DELETE(applyPoison(tb), DELETE_VICT)) {
+          int poisonRc = applyPoison(tb, ch);
+          if (IS_SET_DELETE(poisonRc, DELETE_THIS)) {
+            ADD_DELETE(resCode, DELETE_THIS);
+            return resCode;
+          }
+          if (IS_SET_DELETE(poisonRc, DELETE_VICT)) {
             if (true_targ) {
               ADD_DELETE(resCode, DELETE_VICT);
               return resCode;

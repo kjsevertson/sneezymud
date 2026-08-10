@@ -20,25 +20,45 @@ bool TObj::isPoisoned() const {
 // Returns DELETE_VICT if the poison killed the victim, DELETE_THIS if it
 // killed the wielder (spells crit-fail back onto their caster).  Callers must
 // check: the liquid can cast harm, bone breaker, or boiling blood.
-int TObj::applyPoison(TBeing* vict) {
+int TObj::applyPoison(TBeing* vict, TBeing* actor) {
   int rc = 0;
 
   if (!isPoisoned())
     return 0;
 
-  TBeing* ch = dynamic_cast<TBeing*>(equippedBy);
+  // equippedBy only finds a striker while the object is still in their hand.
+  // An object in flight has none, so callers that still know who loosed it
+  // name them - otherwise the coating would resolve with the victim standing
+  // in as their own attacker.
+  TBeing* ch = actor ? actor : dynamic_cast<TBeing*>(equippedBy);
 
   if (ch) {
+    // A coating delivered by a shot or a throw resolves with its striker
+    // rooms away.  Everything downstream needs to know: act() scopes TO_ROOM
+    // to the actor's room, and damDetailsOk zeroes cross-room damage.
+    bool ranged = !ch->sameRoom(*vict);
+
     act("There was something nasty on that $o!", false, ch, this, vict, TO_VICT,
       ANSI_RED);
     act("You inflict something nasty on $N!", false, ch, this, vict, TO_CHAR,
       ANSI_RED);
     act("There was something nasty on that $o!", false, ch, this, vict,
       TO_NOTVICT, ANSI_RED);
-    rc = doLiqSpell(ch, vict, poison, 1);
+    // The line above only reached the striker's room.  Replay it where the
+    // blow actually landed, with the victim standing in as the actor so act()
+    // picks their room - the same trick catchSmack uses to land "$n is
+    // smacked by $p!" at the far end of a shot.
+    if (ranged)
+      act("There was something nasty on that $o!", false, vict, this, nullptr,
+        TO_ROOM, ANSI_RED);
+
+    // Without this the guard that drops melee blows aimed at someone who has
+    // already fled would silently zero the coating's damage.
+    rc = doLiqSpell(ch, vict, poison, 1, ranged);
   } else {
-    // no wielder: the victim is both caster and target, so either death flag
-    // means the same person died
+    // Genuinely ownerless - a coating on something nobody threw or fired.  The
+    // victim stands in as their own caster, so either death flag means the
+    // same person died.
     rc = doLiqSpell(vict, vict, poison, 1);
     if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD))
       rc = VICTIM_DEAD;

@@ -198,6 +198,11 @@ int TThing::throwMe(TBeing* ch, dirTypeT tdir, const char* vict) {
     delete targ;
     targ = NULL;
   }
+  // A poisoned blade can crit-fail back onto the thrower.  DELETE_THIS is the
+  // thrown object here, so ch's death goes back as DELETE_VICT - doThrow's ch
+  // is its own `this`, and it translates again from there.
+  if (IS_SET_DELETE(rc, DELETE_THIS))
+    return DELETE_VICT;
   ch->addToWait(combatRound(2));
   ch->addToMove(-2);
   rc = checkSpec(NULL, CMD_OBJ_THROWN, NULL, NULL);
@@ -206,18 +211,18 @@ int TThing::throwMe(TBeing* ch, dirTypeT tdir, const char* vict) {
   return TRUE;
 }
 
-void TBeing::doThrow(const sstring& argument) {
+int TBeing::doThrow(const sstring& argument) {
   TThing* t;
   sstring object, dir, vict;
   int rc;
   dirTypeT tdir;
 
   if (checkPeaceful("You feel too peaceful to contemplate violence.\n\r"))
-    return;
+    return FALSE;
 
   if (getMove() <= 2) {
     sendTo("You are too tired to throw anything!\n\r");
-    return;
+    return FALSE;
   }
   vict = "";
   object = argument.word(0);
@@ -226,7 +231,7 @@ void TBeing::doThrow(const sstring& argument) {
 
   if (object.empty()) {
     sendTo("Syntax: throw <object> [direction] [character | distance]\n\r");
-    return;
+    return FALSE;
   }
 
   tdir = getDirFromChar(dir);
@@ -243,24 +248,24 @@ void TBeing::doThrow(const sstring& argument) {
   if (!(t = equipment[getPrimaryHold()])) {
     sendTo(
       "You can only throw objects you are holding in your primary hand.\n\r");
-    return;
+    return FALSE;
   }
   TObj* tobj = dynamic_cast<TObj*>(t);
   if (tobj) {
     if (tobj->isObjStat(ITEM_NEWBIE)) {
       sendTo(
         "That item might suck, but you can't just go throwing it around.\n\r");
-      return;
+      return FALSE;
     }
     if (tobj->isObjStat(ITEM_NODROP)) {
       sendTo("You can't throw a cursed item!\n\r");
-      return;
+      return FALSE;
     }
   }
   if (!isname(object, t->name)) {
     sendTo(
       "You can only throw objects you are holding in your primary hand.\n\r");
-    return;
+    return FALSE;
   }
 
   rc = t->throwMe(this, tdir, vict.c_str());
@@ -268,6 +273,12 @@ void TBeing::doThrow(const sstring& argument) {
     delete t;
     t = NULL;
   }
+  // throwMe reports our own death as DELETE_VICT (we are its ch).  We are the
+  // `this` our caller invoked, so translate before handing it up.
+  if (IS_SET_DELETE(rc, DELETE_VICT))
+    return DELETE_THIS;
+
+  return FALSE;
 }
 
 int get_range_actual_damage(TBeing* ch, TBeing* victim, TObj* o, int dam,
@@ -403,6 +414,8 @@ bool hitInnocent(const TBeing* ch, const TThing* thing, const TThing* vict) {
 
 // returns DELETE_ITEM if *thing should be nuked
 // returns DELETE_VICT if *targ should go poof   (|| able)
+// returns DELETE_THIS if ch died - a poisoned coating can crit-fail back onto
+//   whoever loosed it.  ch, not *thing: the flying object is DELETE_ITEM here.
 // return TRUE if it hits something (stops moving), otherwise false
 // cdist = current dist traveled
 // mdist =  max range item can go
@@ -705,6 +718,7 @@ static void barrier(TRoom* rp, dirTypeT dir, TThing* t) {
 // distance is actual amount flown
 // return DELETE_ITEM if t should go poof
 // returns DELETE_VICT if *targ should die   (|| able)
+// returns DELETE_THIS if ch died (poisoned coating crit-failing back onto them)
 int throwThing(TThing* t, dirTypeT dir, int from, TBeing** targ, int dist,
   int max_dist, TBeing* ch) {
   char capbuf[256];
@@ -732,7 +746,8 @@ int throwThing(TThing* t, dirTypeT dir, int from, TBeing** targ, int dist,
     // max_dist here is used to modify damage based on how far away they are.
     // use the absolute max it can go (max_dist) for this calculation
     rc = catch_or_smack(rp, targ, t, ch, iDist, max_dist);
-    if (IS_SET_DELETE(rc, DELETE_ITEM) || IS_SET_DELETE(rc, DELETE_VICT))
+    if (IS_SET_DELETE(rc, DELETE_ITEM) || IS_SET_DELETE(rc, DELETE_VICT) ||
+        IS_SET_DELETE(rc, DELETE_THIS))
       return rc;
     else if (rc)
       return FALSE;

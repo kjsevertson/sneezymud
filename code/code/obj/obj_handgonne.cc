@@ -159,6 +159,9 @@ int THandgonne::shootMeBow(TBeing* ch, TBeing* targ, unsigned int count,
     targ = NULL;
     return FALSE;
   }
+  // ch died on the shot; the addToWait below would touch them.
+  if (IS_SET_DELETE(rc, DELETE_THIS))
+    return DELETE_VICT;
 
   ch->addToWait(combatRound(1));
 

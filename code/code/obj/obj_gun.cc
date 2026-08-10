@@ -409,6 +409,9 @@ int TGun::shootMeBow(TBeing* ch, TBeing* targ, unsigned int count, dirTypeT dir,
       targ = NULL;
       return FALSE;
     }
+    // ch died on the shot; nothing below may touch them.
+    if (IS_SET_DELETE(rc, DELETE_THIS))
+      return DELETE_VICT;
   }
 
   return FALSE;
