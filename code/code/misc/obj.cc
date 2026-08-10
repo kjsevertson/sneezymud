@@ -5,6 +5,7 @@
 #include "corporation.h"
 #include "materials.h"
 #include "obj.h"
+#include "obj_arrow.h"
 #include "extern.h"
 #include "being.h"
 
@@ -52,9 +53,18 @@ int TObj::applyPoison(TBeing* vict, TBeing* actor) {
       act("There was something nasty on that $o!", false, vict, this, nullptr,
         TO_ROOM, ANSI_RED);
 
+    // A blowdart carries nothing but its coating, so a poisoner delivers
+    // through one at a higher effective level than off a smeared blade.
+    constexpr int DART_LEVEL_BONUS = 5;
+    auto* arrow = dynamic_cast<TArrow*>(this);
+    int levelBonus =
+      (arrow && arrowFamily(arrow->getArrowType()) == ARROW_FAM_DART)
+        ? DART_LEVEL_BONUS
+        : 0;
+
     // Without this the guard that drops melee blows aimed at someone who has
     // already fled would silently zero the coating's damage.
-    rc = doLiqSpell(ch, vict, poison, 1, ranged);
+    rc = doLiqSpell(ch, vict, poison, 1, ranged, levelBonus);
   } else {
     // Genuinely ownerless - a coating on something nobody threw or fired.  The
     // victim stands in as their own caster, so either death flag means the
