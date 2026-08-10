@@ -2871,6 +2871,17 @@ int TBeing::critRanged(TBeing* v, TThing* weapon, wearSlotT* part_hit,
   act(format(deep ? lines.deepRoom : lines.solidRoom) % part, false, this, 0, v,
     TO_NOTVICT, ANSI_BLUE);
 
+  // The line above is bound to the shooter, so act() lands it in the shooter's
+  // room.  On a shot from rooms away the victim's own bystanders are told the
+  // hit landed and nothing more.  Bind a line to the victim so it reaches their
+  // room instead, and leave the shooter out of it - nobody standing there can
+  // see who fired.
+  if (!sameRoom(*v))
+    act(format(deep ? "$n reels as the shot drives deep into $s %s!"
+                    : "$n is struck hard, the shot biting into $s %s.") %
+          part,
+      false, v, 0, nullptr, TO_ROOM, ANSI_BLUE);
+
   return ONEHIT_MESS_CRIT_S;
 }
 
