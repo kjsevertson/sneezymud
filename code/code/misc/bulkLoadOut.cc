@@ -1649,7 +1649,12 @@ void bulkLoadOut(TMonster* mob) {
 
   for (int i = 0; i < BULK_SLOT_COUNT; ++i) {
     auto bulkSlot = static_cast<BulkSlot>(i);
-    wearSlotT wearSlot = slot_from_bit(bulkSlots[i].wearFlag);
+    // A shield belongs in the off hand, leaving the weapon hand free below.
+    // slot_from_bit answers ITEM_WEAR_HOLD with a fixed side, so ask the mob
+    // which side that is rather than hardcoding one.
+    wearSlotT wearSlot = (bulkSlot == BulkSlot::Shield)
+                           ? mob->getSecondaryHold()
+                           : slot_from_bit(bulkSlots[i].wearFlag);
 
     // Don't generate if mob already has something in this slot
     if (mob->equipment[wearSlot])
@@ -1667,21 +1672,28 @@ void bulkLoadOut(TMonster* mob) {
   }
 
   // --- Weapon roll (independent of armor slots) ---
-  if (mob->equipment[HOLD_RIGHT])
+  // Mobs are left-handed: PLR_RT_HANDED is only ever set during character
+  // creation, so isRightHanded() is false for every one of them.  Go through
+  // the handedness helpers anyway - they are what decides which hold is the
+  // weapon hand, and hardcoding a side here would fight the shield above.
+  wearSlotT weaponHold = mob->getPrimaryHold();
+  wearSlotT offHold = mob->getSecondaryHold();
+
+  if (mob->equipment[weaponHold])
     return;
   // Two-handed weapons need both hands free
-  bool leftFree = !mob->equipment[HOLD_LEFT];
+  bool offHandFree = !mob->equipment[offHold];
 
   if (!percentChance(BULK_LOAD_CHANCE_PCT))
     return;
 
   if (auto* weapon = generateBulkWeapon(mob)) {
-    if (weapon->isPaired() && !leftFree) {
+    if (weapon->isPaired() && !offHandFree) {
       delete weapon;
       return;
     }
     buyCommodityForItem(mob, weapon->getMaterial(),
         static_cast<float>(weapon->getWeight()));
-    mob->equipChar(weapon, HOLD_RIGHT, SILENT_YES);
+    mob->equipChar(weapon, weaponHold, SILENT_YES);
   }
 }
