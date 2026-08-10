@@ -19,6 +19,11 @@ class CDLooting : public CDiscipline {
 
 int detectSecret(TBeing*);
 
+// Random potion/component/symbol/tool appropriate to the given class bits,
+// costing no more than moneyCeiling. Returns nullptr if nothing affordable
+// turned up. Caller owns the result.
+TObj* generateStealLoot(unsigned short classBits, double moneyCeiling);
+
 int disarmTrapObj(TBeing*, TObj*);
 int disarmTrapDoor(TBeing*, dirTypeT);
 

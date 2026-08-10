@@ -21,6 +21,8 @@
 #include "obj_component.h"
 #include "extern.h"
 #include "loadset.h"
+#include "bulkLoadOut.h"
+#include "chestLoadOut.h"
 #include "sys_loot.h"
 #include "shop.h"
 #include "process.h"
@@ -3315,6 +3317,16 @@ void runResetCmdE(zoneData& zd, resetCom& rs, resetFlag flags, bool&,
 
 void runResetCmdM(zoneData& zone, resetCom& rs, resetFlag flags, bool& mobload,
   TMonster*& mob, bool& objload, TObj*& obj, bool& last_cmd) {
+  // Generate bulk loot on the previous mob before starting a new one.
+  // Always runs regardless of LoadOnDeath — bulk loot is worn, not dropped.
+  // Never during a load-potential scan: that pass only tallies what a zone
+  // could produce, and generating here would buy real commodities off real
+  // shops at boot.
+  if (mob && mobload && !IS_SET(flags, resetFlagFindLoadPotential)) {
+    bulkLoadOut(mob);
+    mobBagLoadOut(mob);
+  }
+
   mob = NULL;
   last_cmd = mobload = false;
 
@@ -3971,9 +3983,21 @@ void zoneData::resetZone(bool bootTime, bool findLoadPotential) {
       break;
   }
 
+  // Generate bulk loot on the last mob in the zone.  Skipped during a
+  // load-potential scan, same as the per-mob site in runResetCmdM.
+  if (mob && mobload && !findLoadPotential) {
+    bulkLoadOut(mob);
+    mobBagLoadOut(mob);
+  }
+
   if (!findLoadPotential) {
     doGenericReset();  // sends CMD_GENERIC_RESET to all objects in zone
     trapDoors();       // randomly trap locked/secret doors based on zone level
+
+    // Runs on timed resets too, not just boot. Room containers persist, so
+    // chestLoadOut tapers a container's odds as it fills -- see
+    // tryFillContainer.
+    chestLoadOut(*this);
   }
 
   this->age = 0;
