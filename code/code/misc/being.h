@@ -57,6 +57,8 @@ typedef struct _app_typ {
 
 extern APP_type apply_types[MAX_APPLY_TYPES];
 
+[[nodiscard]] extern TObj* createSplinter(int material, int level, bool spiked);
+
 class playerData {
   public:
     sstring longDescr;
@@ -330,7 +332,8 @@ class equipmentData {
 
     // Finds the total sum for objAffect.modifier1 and objAffect.modifier2
     // amongst all worn equipment for the given applyTypeT
-    std::pair<int64_t, int64_t> sumAffectsByApplyType(applyTypeT affectType) {
+    std::pair<int64_t, int64_t> sumAffectsByApplyType(
+      applyTypeT affectType) const {
       int64_t mod1 = 0;
       int64_t mod2 = 0;
 
@@ -357,6 +360,15 @@ class equipmentData {
     equipmentData(const equipmentData& a);
     equipmentData& operator=(const equipmentData& a);
     ~equipmentData();
+};
+
+// Selects which point of a skill's damage spread getSkillDam returns. Random
+// (the default) rolls live; Min/Max return the deterministic endpoints so
+// skillDamageRange can bracket the spread without side effects.
+enum class SkillDamRoll {
+  Random,
+  Min,
+  Max
 };
 
 class TBeing : public TThing {
@@ -460,6 +472,7 @@ class TBeing : public TThing {
     virtual void setWimpy(int);
     virtual short int hitLimit() const;
     virtual int fallOffMount(TThing*, positionTypeT, bool death = FALSE);
+    int knockOffMount(int severity = 0);
     virtual bool hasQuestBit(int) const;
     virtual void setQuestBit(int);
     virtual void remQuestBit(int);
@@ -570,7 +583,8 @@ class TBeing : public TThing {
     int getAdvLearning(spellNumT) const;
     int getAdvDoLearning(spellNumT) const;
     spellNumT getSkillNum(spellNumT) const;
-    int getSkillDam(const TBeing*, spellNumT, int, int) const;
+    int getSkillDam(const TBeing*, spellNumT, int, int,
+      SkillDamRoll = SkillDamRoll::Random) const;
     void assignCorpsesToRooms();
     void initSkillsBasedOnDiscLearning(discNumT);
     void addAffects(const TObj*);
@@ -580,12 +594,39 @@ class TBeing : public TThing {
     bool canAttack(primaryTypeT);
     int attackRound(const TBeing* target) const;
     int defendRound(const TBeing* attacker) const;
+    // Per-swing melee hit chance vs target, as a percent (5-95).
+    int meleeHitChance(const TBeing* target) const;
     int specAttackMod(const TBeing* target) const;
     int specialAttack(TBeing* target, spellNumT);
     int specialAttack(TBeing* target, spellNumT, int);
     int specialAttack(TBeing* target, spellNumT, int, bool);
     int specialAttack(TBeing* target, spellNumT, int, statTypeT, statTypeT,
       statTypeT, statTypeT, bool);
+    // The offense/defense stat quartet a skill feeds to specialAttack. Defaults
+    // to FOC/KAR (offense) vs AGI/PER (defense); a few skills override. Single
+    // source so the live roll and the `consider` readout use the same stats.
+    struct SpecialAttackStats {
+        statTypeT off1, off2, def1, def2;
+    };
+    static SpecialAttackStats specialAttackStats(spellNumT skill);
+    // The circumstantial +/- level modifier a specific skill contributes to its
+    // specialAttack roll (on top of specAttackMod's baseline). 0 for most.
+    int skillSituationalModifier(TBeing* victim, spellNumT skill,
+      bool* spotted = nullptr);
+    int bashSituationalModifier(TBeing* victim);
+    // Stealth-strike detection predicates (backstab/throatslit): whether the
+    // victim hears this thief's noisy gear, and whether a suspicious mob spots
+    // the approach. Each drives both a -10 modifier and its own warning
+    // message.
+    bool canHearThief(TBeing* victim);
+    bool spottedBySuspiciousMob(TBeing* victim);
+    // Deterministic percent chance (0-100) that specialAttack lands this skill
+    // against victim -- mirrors the roll math without rolling. For `consider`.
+    int specialAttackChance(TBeing* victim, spellNumT skill);
+    // Skill-agnostic landing chance driven by level gap alone: the
+    // specialAttackChance math stripped to its level-diff term. A rough gauge
+    // for basic `consider`; the per-skill readout stays exact.
+    int genericSpecialAttackChance(TBeing* victim);
 
     void updateStatistics();
     bool checkForDiceHeld() const;
@@ -600,7 +641,6 @@ class TBeing : public TThing {
     void checkGuardiansLight();
     int checkAdvDefense();
     int doAdvDefense(TBeing*, TThing*, int*, int, wearSlotT);
-    
 
     // Postmaster
     void postmasterSendMail(const char*, TMonster*);
@@ -621,6 +661,7 @@ class TBeing : public TThing {
     void gainExpPerHit(TBeing*, double, int);
 
     int rideCheck(int);
+    int getRideMod();
     spellNumT mountSkillType() const;
     void calmMount(TBeing*);
     int advancedRidingBonus(TMonster*);
@@ -701,6 +742,8 @@ class TBeing : public TThing {
     classIndT bestClass() const;
     int getClassLevel(int) const;
     void loseSneak();
+    void loseSkulk();
+    void breakStealth();
     int checkEngagementStatus();
     virtual sstring parseTitle(Descriptor*);
     int onlyClass(int) const;
@@ -979,7 +1022,7 @@ class TBeing : public TThing {
     int reconcileLifeforce(spellNumT, bool, int = 0);
     int useLifeforce(spellNumT);
     double usePiety(spellNumT);
-    int reconcileDamage(TBeing*, int, spellNumT);
+    int reconcileDamage(TBeing*, int, spellNumT, int* damDealt = nullptr);
     virtual int doRent(const sstring&);
     void doRestring(const sstring&);
     void doRelease(const sstring&);
@@ -1009,7 +1052,8 @@ class TBeing : public TThing {
     int preCastCheck();
     int preDiscCheck(spellNumT);
     int doCast(const char*);
-    std::tuple<spellNumT, sstring> parseSpellNum(const sstring&, const sstring& = "") const;
+    std::tuple<spellNumT, sstring> parseSpellNum(const sstring&,
+      const sstring& = "") const;
     int parseTarget(spellNumT, char*, TThing** ret);
     int doTrigger(const char*);
     int doStore(const char*);
@@ -1049,6 +1093,7 @@ class TBeing : public TThing {
     void failSleep(TBeing*);
     void failPara(TBeing*);
     bool inGroup(const TBeing&) const;
+    bool hasGroupmateInRoom() const;
     int inCamp() const;
     int bumpHead(int*);
     virtual int bumpHeadDoor(roomDirData*, int*);
@@ -1057,6 +1102,7 @@ class TBeing : public TThing {
     bool willBumpHeadDoor(roomDirData*, int*) const;
     void sendTrapMessage(const char*, trap_targ_t, int);
     bool hasTrapComps(const char*, trap_targ_t, int, int* price = NULL);
+    TThing* findTrapComp(const sstring& name);
     int goofUpTrap(doorTrapT, trap_targ_t);
     int springTrap(TTrap*);
     int triggerTrap(TTrap*);
@@ -1068,28 +1114,12 @@ class TBeing : public TThing {
     int checkForInsideTrap(TThing*);
     int checkForGetTrap(TThing*);
     int checkForAnyTrap(TThing*);
-    int trapDoorSlashDamage(int, dirTypeT);
-    int trapDoorFireDamage(int, dirTypeT);
-    int trapDoorPierceDamage(int, dirTypeT);
-    int trapDoorTntDamage(int, dirTypeT);
-    int trapDoorAcidDamage(int, dirTypeT);
-    int trapDoorHammerDamage(int, dirTypeT);
-    int trapDoorEnergyDamage(int, dirTypeT);
-    int trapDoorFrostDamage(int, dirTypeT);
     virtual int grenadeHit(TTrap*);
     virtual bool addHated(TBeing*);
     virtual void setHunting(TBeing*) {}
     void throwGrenade(TTrap*, dirTypeT);
-    int getDoorTrapDam(doorTrapT);
-    int getContainerTrapDam(doorTrapT);
-    int getMineTrapDam(doorTrapT);
-    int getGrenadeTrapDam(doorTrapT);
-    int getArrowTrapDam(doorTrapT);
-    int getDoorTrapLearn(doorTrapT);
-    int getContainerTrapLearn(doorTrapT);
-    int getMineTrapLearn(doorTrapT);
-    int getGrenadeTrapLearn(doorTrapT);
-    int getArrowTrapLearn(doorTrapT);
+    int getTrapDam(trap_targ_t);
+    int getTrapLearn(trap_targ_t);
     bool canDoSummon() const;
     bool isSummonable() const;
     bool isTanking();
@@ -1159,6 +1189,20 @@ class TBeing : public TThing {
     virtual void trapPoison(int);
     virtual void trapDisease(int);
     virtual int trapTeleport(int);
+    virtual int trapSpike(int);
+    virtual int trapTnt(int, TThing*);
+    virtual void trapBlade(int);
+    virtual void trapFire(int);
+    virtual void trapAcid(int);
+    virtual void trapHammer(int);
+    virtual int trapFrost(int);
+    virtual void trapEnergy(int);
+    virtual int trapBolt(int);
+    virtual void trapDisk(int);
+    virtual void trapPebble(int);
+    int dealTrapDamage(spellNumT, int, TThing* = nullptr, TBeing* = nullptr);
+    int applyTrapEffect(doorTrapT, int, TThing* = nullptr, TBeing* = nullptr,
+      int = 1);
     void informMess();
     int objDam(spellNumT, int, TThing*);
     int objDamage(spellNumT, int, TThing*);
@@ -1185,6 +1229,7 @@ class TBeing : public TThing {
     int fallKill();
     int mostPowerstoneMana() const;
     bool affectedBySpell(spellNumT) const;
+    bool hasStandaloneSpell(spellNumT) const;
     int checkForSkillAttempt(spellNumT);
     void removeSkillAttempt(spellNumT);
 
@@ -1291,6 +1336,8 @@ class TBeing : public TThing {
     int doBite(const sstring&);
     int doJump(const sstring&);
     int doPick(const char*);
+    int doJam(const char*);
+    int doKeycut(const char*);
     int doSearch(const char*);
     int doSpy();
     int doDodge();
@@ -1299,6 +1346,9 @@ class TBeing : public TThing {
     int disarmTrap(const char*, TObj*);
     int detectTrap(const char*, int);
     int doSetTraps(const char*);
+    int makeDoorTrap(dirTypeT, const char*);
+    int makeMineTrap(const char*);
+    int makeGrenadeTrap(const char*);
     int doBerserk();
     int doShoot(const char*);
     void doSeekwater();
@@ -1318,6 +1368,7 @@ class TBeing : public TThing {
     void doDrive(sstring);
     void doSacrifice(const char*);
     void doWhittle(const char*);
+    void doSerrate(const char*);
     void doBload(const char*);
     std::vector<TBow*> getBows();
     TArrow* autoGetAmmoQuiver(TBow*, TQuiver*);
@@ -1328,8 +1379,8 @@ class TBeing : public TThing {
     void doScribe(const char*);
     void doFly();
     void doLand();
-    int crashLanding(positionTypeT, bool force = FALSE, bool dam = TRUE,
-      bool falling = false);
+    int crashLanding(int severity = 0, bool falling = false);
+    int stumble();
     int doTurn(const char*, TBeing*);
     virtual void doMedit(const char*);
     void doPreen(sstring& argument);
@@ -1441,6 +1492,25 @@ class TBeing : public TThing {
     int numValidSlots();
     int checkShield(TBeing*, TThing*, wearSlotT, spellNumT, int);
     int getWeaponDam(const TBeing*, const TThing*, primaryTypeT) const;
+    int weaponRollDam(primaryTypeT isprimary) const;
+    std::pair<int, int> monkBareHandDamRange() const;
+    int scaleWeaponDam(const TThing* wielded, primaryTypeT isprimary,
+      int wepDam, int rollDam, damRoundT round) const;
+    // Effective melee damage range (min-max) for one hand vs a vital part of v.
+    std::pair<int, int> meleeDamageRange(const TBeing* v, const TThing* wielded,
+      primaryTypeT isprimary) const;
+    // Estimated post-mitigation damage range for a special attack against v,
+    // mirroring reconcileDamage's reductions (resistance, magic-weapon
+    // immunity, protection). Deterministic; brackets the live spread.
+    std::pair<int, int> skillDamageRange(const TBeing* v,
+      spellNumT skill) const;
+    // Percent chance of landing this skill's execution roll (bSuccess),
+    // deterministic and side-effect free -- for consider's skill readout.
+    int skillExecuteChance(spellNumT skill) const;
+    // Accumulated crit chance (critSuccessChance units, 1000 == 1%).
+    double getCritChance() const;
+    // Per-hit chance to land a critical against v, as a percent.
+    double critChancePercent(const TBeing* v, const TThing* weapon) const;
     virtual float getStrDamModifier() const;
     virtual float getWisDamModifier() const;
     int getDexReaction() const;
@@ -1455,12 +1525,13 @@ class TBeing : public TThing {
     float getChaShopPenalty() const;
     float getSwindleBonus();
     void combatFatigue(TThing*);
-    int weaponCheck(TBeing* v, TThing* o, spellNumT type, int dam);
+    int weaponCheck(const TBeing* v, const TThing* o, spellNumT type,
+      int dam) const;
     virtual void reconcileHelp(TBeing*, double) { return; }
     virtual void reconcileHurt(TBeing*, double) { return; }
     int oneHit(TBeing*, primaryTypeT, TThing*, int, float*);
     bool isHitableAggr(TBeing*);
-    void normalHitMessage(TBeing*, TThing*, spellNumT, int, wearSlotT);
+    void normalHitMessage(TBeing*, TThing*, spellNumT, int, wearSlotT, int);
     int monkDodge(TBeing*, TThing*, int*, int, wearSlotT);
     int thiefDodge(TBeing*, TThing*, int*, int, wearSlotT);
     int parryWarrior(TBeing*, TThing*, int*, int, wearSlotT);
@@ -1485,11 +1556,11 @@ class TBeing : public TThing {
     int getActualDamage(TBeing*, TThing*, int, spellNumT);
     int damageEm(int, sstring, spellNumT);
     int skipImmortals(int) const;
-    int applyDamage(TBeing*, int, spellNumT);
+    int applyDamage(TBeing*, int, spellNumT, int* damDealt = nullptr);
     int preProcDam(spellNumT, int);
     int preProcDam(TBeing*, spellNumT, int);
     TBeing* findAnAttacker() const;
-    int damageEpilog(TBeing*, spellNumT);
+    int damageEpilog(TBeing*, int dam, spellNumT);
     void catchLostLink(TBeing*);
     void throwChar(TBeing* v, dirTypeT dir, bool throwerMove,
       silentTypeT silent, bool forceStand);
@@ -1511,13 +1582,12 @@ class TBeing : public TThing {
     int hit(TBeing*, int pulse = -1);
     bool canCounterMove(int);
     bool canFocusedAvoidance(int);
-    int trySpringleap(TBeing*);
-      bool maybeDestroyLimb(wearSlotT part_hit, TBeing* v,
+    bool maybeDestroyLimb(wearSlotT part_hit, TBeing* v,
       const TBaseWeapon* weapon, spellNumT attackType);
     int damageLimb(TBeing* v, wearSlotT part_hit, const TThing* maybeWeapon,
       int* dam);
     int damageLimb(TBeing* v, wearSlotT part_hit, const TThing* maybeWeapon,
-      int* dam, spellNumT attackType);
+      int* dam, spellNumT attackType, int* limbDamageDealt = nullptr);
     affectedData* isBleeding(wearSlotT limb);
     affectedData* isBruised(wearSlotT limb);
     affectedData* isInfected(wearSlotT limb);
@@ -1563,7 +1633,9 @@ class TBeing : public TThing {
     virtual bool canSee(const TThing*, infraTypeT = INFRA_NO) const;
 
     // functions for protected member manipulation
-    virtual bool isPc() const { return ((specials.act & ACT_POLYSELF) != 0); }
+    virtual bool isPc() const {
+      return IS_SET(specials.act, ACT_POLYSELF) && desc && desc->original;
+    }
     void setCurLimbHealth(wearSlotT, unsigned short);
     unsigned short getCurLimbHealth(wearSlotT) const;
     void addCurLimbHealth(wearSlotT, int);
@@ -1774,6 +1846,7 @@ class TBeing : public TThing {
     int doLeap(const sstring&);
     int doVote(const sstring&);
     int doLayHands(const char*);
+    int doInnate(const char*);
     int doSmoke(const char*);
     void doExtinguish(const sstring&);
     void doLight(const sstring&);
@@ -1857,7 +1930,8 @@ class TBeing : public TThing {
 
     // Monk Skills
     int doQuiveringPalm(const char*, TBeing*);
-    int doSpringleap(sstring, bool, TBeing*);
+    int doSpringleap();
+    int springleap();
     int doShoulderThrow(const char*, TBeing*);
     int doGrappleMonk(const char*, int, TBeing*);
     int doFeignDeath();
@@ -1980,11 +2054,13 @@ class TBeing : public TThing {
     void doCrawl();
     void doFollow(const char*);
     void doTestCode(const char*);
+    void mobGearList(TBeing*) const;
     int doGoto(const sstring&);
     int doMortalGoto(const sstring&);
     void doNewbieEqLoad(race_t, unsigned short, bool);
     virtual void doLoad(const char*);
     int doDisguise(const char*);
+    int doSkulk(const char*);
     int doPoisonWeapon(sstring);
     int doGarrotte(const char*, TBeing*);
     int doStab(const char*, TBeing*);

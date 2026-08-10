@@ -97,6 +97,8 @@ territoryT birdmanTerr[] = {HOME_TER_BIRDMAN_URBAN, HOME_TER_BIRDMAN_VILLAGER,
   HOME_TER_BIRDMAN_MOUNTAIN, HOME_TER_BIRDMAN_FOREST, HOME_TER_BIRDMAN_MARINER};
 territoryT trollTerr[] = {HOME_TER_TROLL_URBAN, HOME_TER_TROLL_VILLAGER,
   HOME_TER_TROLL_RECLUSE, HOME_TER_TROLL_HILL, HOME_TER_TROLL_MOUNTAIN};
+territoryT drowTerr[] = {HOME_TER_DROW_URBAN, HOME_TER_DROW_VILLAGER,
+  HOME_TER_DROW_RECLUSE, HOME_TER_DROW_HILL, HOME_TER_DROW_MOUNTAIN};
 
 // struct for holding race-specific data
 typedef struct _TPlayerRace {
@@ -145,6 +147,8 @@ TPlayerRace nannyRaces[] = {
     Room::AERIE_INN, "help/territory help aarakocra", 0},
   {RACE_TROLL, "Troll", 1, trollTerr, cElements(trollTerr), Room::TROLL_INN,
     "help/territory help troll", 0},
+  {RACE_DROW, "Drow", 1, drowTerr, cElements(drowTerr), Room::DROW_START,
+    "help/territory help drow", 0},
 };
 
 // a struct for holding data about customizable stats
@@ -754,10 +758,14 @@ connectStateT nannyLaunchpad_input(Descriptor* desc, sstring& output,
       format("%s [%s] new player.") % desc->character->getName() % desc->host);
     desc->character->saveChar(Room::AUTO_RENT);
     desc->character->loadMapData();
-    db.query("insert into player (name) values (lower('%s'))",
-      desc->character->getName().c_str());
-    db.query("select id from player where lower(name)=('%s')",
-      desc->character->getName().c_str());
+    if (!db.query("insert into player (name, account_id) values ('%s', %i)",
+          desc->character->getName().c_str(), desc->account->account_id)) {
+      vlogf(LOG_BUG, format("Failed to insert player row for %s") %
+                       desc->character->getName());
+      desc->writeToQ("A database error occurred creating your character.\n\r");
+      return CON_CREATION_ERROR;
+    }
+    db.query("select last_insert_id() as id");
     assert(db.fetchRow());
     desc->playerID = desc->character->player.player_id =
       convertTo<int>(db["id"]);

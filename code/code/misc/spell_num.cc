@@ -246,7 +246,7 @@ int mapSpellnumToFile(spellNumT stt) {
       return 67;
     case SPELL_FLY:
       return 68;
-    case SPELL_ANTIGRAVITY:
+    case SPELL_ANTIGRAVITY:  // removed spell, file slot kept for save stability
       return 69;
     case SPELL_DIVINATION:
       return 73;
@@ -288,7 +288,7 @@ int mapSpellnumToFile(spellNumT stt) {
       return 100;
     case SPELL_FUMBLE:
       return 102;
-    case SPELL_TRUE_SIGHT:
+    case SPELL_MAGE_SIGHT:
       return 103;
     case SPELL_CLOUD_OF_CONCEALMENT:
       return 104;
@@ -296,11 +296,16 @@ int mapSpellnumToFile(spellNumT stt) {
       return 105;
     case SPELL_SILENCE:
       return 106;
+    case SPELL_TRUE_SIGHT:
+      return 107;
+    case SPELL_BLIZZARD:
+      return 108;
     case SPELL_WATERY_GRAVE:
       return 110;
     case SPELL_TSUNAMI:
       return 111;
-    case SPELL_BREATH_OF_SARAHAGE:
+    case SPELL_BREATH_OF_SARAHAGE:  // removed spell, file slot kept for save
+                                    // stability
       return 112;
     case SPELL_PLASMA_MIRROR:
       return 113;
@@ -416,6 +421,10 @@ int mapSpellnumToFile(spellNumT stt) {
       return 204;
     case SPELL_CRUSADE:
       return 205;
+    case SPELL_CONSECRATE:
+      return 206;
+    case SPELL_CONSECRATE_AFFECT:
+      return 207;
     case SKILL_SLAM:
       return 217;
     case SKILL_BASH:
@@ -1029,6 +1038,16 @@ int mapSpellnumToFile(spellNumT stt) {
       return 718;
     case SKILL_COMMON:
       return 719;
+    case SKILL_RESOURCEFULNESS:
+      return 720;
+    case SKILL_SCRUTINY:
+      return 721;
+    case SKILL_SERRATE:
+      return 745;
+    case SKILL_DROW_INVIS:
+      return 751;
+    case SKILL_DROW_DARKNESS:
+      return 752;
     case SKILL_COOK:
       return 724;
     case SKILL_ADVANCED_OFFENSE:
@@ -1059,6 +1078,12 @@ int mapSpellnumToFile(spellNumT stt) {
       return 742;
     case SKILL_PIERCE_RESIST:
       return 743;
+    case SKILL_SKULK:
+      return 744;
+    case SKILL_JAM:
+      return 746;
+    case SKILL_KEYCUT:
+      return 747;
     case AFFECT_DISEASE:
       return 2500;
     case AFFECT_COMBAT:
@@ -1415,7 +1440,8 @@ spellNumT mapFileToSpellnum(int stt) {
     case 68:
       return SPELL_FLY;
     case 69:
-      return SPELL_ANTIGRAVITY;
+      return SPELL_ANTIGRAVITY;  // removed spell, file slot kept for save
+                                 // stability
     case 73:
       return SPELL_DIVINATION;
     case 74:
@@ -1457,19 +1483,24 @@ spellNumT mapFileToSpellnum(int stt) {
     case 102:
       return SPELL_FUMBLE;
     case 103:
-      return SPELL_TRUE_SIGHT;
+      return SPELL_MAGE_SIGHT;
     case 104:
       return SPELL_CLOUD_OF_CONCEALMENT;
     case 105:
       return SPELL_POLYMORPH;
     case 106:
       return SPELL_SILENCE;
+    case 107:
+      return SPELL_TRUE_SIGHT;
+    case 108:
+      return SPELL_BLIZZARD;
     case 110:
       return SPELL_WATERY_GRAVE;
     case 111:
       return SPELL_TSUNAMI;
     case 112:
-      return SPELL_BREATH_OF_SARAHAGE;
+      return SPELL_BREATH_OF_SARAHAGE;  // removed spell, file slot kept for
+                                        // save stability
     case 113:
       return SPELL_PLASMA_MIRROR;
     case 114:
@@ -1584,6 +1615,10 @@ spellNumT mapFileToSpellnum(int stt) {
       return SPELL_RELIVE;
     case 205:
       return SPELL_CRUSADE;
+    case 206:
+      return SPELL_CONSECRATE;
+    case 207:
+      return SPELL_CONSECRATE_AFFECT;
     case 217:
       return SKILL_SLAM;
     case 218:
@@ -2183,6 +2218,14 @@ spellNumT mapFileToSpellnum(int stt) {
       return SKILL_FISHBURBLE;
     case 719:
       return SKILL_COMMON;
+    case 720:
+      return SKILL_RESOURCEFULNESS;
+    case 721:
+      return SKILL_SCRUTINY;
+    case 751:
+      return SKILL_DROW_INVIS;
+    case 752:
+      return SKILL_DROW_DARKNESS;
     case 724:
       return SKILL_COOK;
     case 730:
@@ -2213,6 +2256,14 @@ spellNumT mapFileToSpellnum(int stt) {
       return SKILL_ORIENT;
     case 743:
       return SKILL_PIERCE_RESIST;
+    case 744:
+      return SKILL_SKULK;
+    case 745:
+      return SKILL_SERRATE;
+    case 746:
+      return SKILL_JAM;
+    case 747:
+      return SKILL_KEYCUT;
     case 2500:
       return AFFECT_DISEASE;
     case 2501:

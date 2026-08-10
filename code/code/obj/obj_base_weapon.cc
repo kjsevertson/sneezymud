@@ -32,16 +32,14 @@ TBaseWeapon::TBaseWeapon() :
   maxSharp(0),
   curSharp(0),
   damLevel(0),
-  damDev(0),
-  poison((liqTypeT)-1) {}
+  damDev(0) {}
 
 TBaseWeapon::TBaseWeapon(const TBaseWeapon& a) :
   TObj(a),
   maxSharp(a.maxSharp),
   curSharp(a.curSharp),
   damLevel(a.damLevel),
-  damDev(a.damDev),
-  poison(a.poison) {}
+  damDev(a.damDev) {}
 
 TBaseWeapon& TBaseWeapon::operator=(const TBaseWeapon& a) {
   if (this == &a)
@@ -51,7 +49,6 @@ TBaseWeapon& TBaseWeapon::operator=(const TBaseWeapon& a) {
   curSharp = a.curSharp;
   damLevel = a.damLevel;
   damDev = a.damDev;
-  poison = a.poison;
   return *this;
 }
 
@@ -152,7 +149,39 @@ double TBaseWeapon::baseDamage() const {
   return amt;
 }
 
+// A material can only hold so fine an edge.  Steel lands exactly on the 100 the
+// object editor enforces, so softer stock is capped below the old ceiling while
+// anything harder simply reaches it more readily.
+int TBaseWeapon::maxSharpCap() const {
+  return min(material_nums[getMaterial()].hardness + 30, 100);
+}
+
+// Honing a weapon past the edge its maker managed is thief work, and only for
+// those with nothing left to learn about sharpening.  Both halves of that read
+// natural progression: getSkillValue() folds in APPLY_SPELL bonuses, and the
+// discipline cap it clamps against moves with APPLY_DISCIPLINE, so worn gear
+// could otherwise stand in for the practice and the use.
+bool TBaseWeapon::canHoneMaxSharp(const TBeing* ch) const {
+  if (!ch || !ch->hasClass(CLASS_THIEF) || getMaxSharp() >= maxSharpCap())
+    return false;
+
+  const CDiscipline* disc = ch->getDiscipline(DISC_COMBAT);
+  return disc && disc->getNatLearnedness() >= MAX_DISC_LEARNEDNESS &&
+         ch->getNatSkillValue(SKILL_SHARPEN) >= MAX_SKILL_LEARNEDNESS;
+}
+
 void TBaseWeapon::sharpenMe(TBeing* ch, TTool* tool) {
+  // Checked before anything is spent: the pass that reaches the ceiling can't
+  // know it has finished until it lands, so the stop falls to the next pulse
+  // and must not charge move or a whetstone use for work it won't do.  Honing
+  // raises the ceiling below, which is what keeps a master thief going.
+  if (getMaxSharp() <= getCurSharp()) {
+    ch->sendTo("It doesn't seem to be getting any sharper.\n\r");
+    act("$n stops sharpening $p.", false, ch, this, nullptr, TO_ROOM);
+    ch->stopTask();
+    return;
+  }
+
   int sharp_move = dice(2, 3);
 
   ch->addToMove(-sharp_move);
@@ -174,15 +203,24 @@ void TBaseWeapon::sharpenMe(TBeing* ch, TTool* tool) {
     delete tool;
     return;
   }
-  if (getMaxSharp() <= getCurSharp()) {
-    ch->sendTo("It doesn't seem to be getting any sharper.\n\r");
-    act("$n stops sharpening $p.", FALSE, ch, this, 0, TO_ROOM);
-    ch->stopTask();
-    return;
-  }
-
-  if (ch->bSuccess(SKILL_SHARPEN))
+  if (ch->bSuccess(SKILL_SHARPEN)) {
     addToCurSharp((itemType() == ITEM_ARROW) ? 2 : 1);
+
+    // Only while there is still edge to restore.  A weapon already at its
+    // ceiling stops the task above, so honing follows genuine use and
+    // re-sharpening rather than idle grinding.  Headroom shrinks as the
+    // ceiling nears what the material can hold, and harder stock gives ground
+    // more readily, so the last points are the real work.
+    if (canHoneMaxSharp(ch) &&
+        percentChance((maxSharpCap() - getMaxSharp()) *
+                      material_nums[getMaterial()].hardness / 100)) {
+      addToMaxSharp(1);
+      act("You coax $p's edge past what its maker managed.", false, ch, this,
+        nullptr, TO_CHAR);
+      act("$n works $p with an unusual patience.", true, ch, this, nullptr,
+        TO_ROOM);
+    }
+  }
 
   // task can continue forever, so don't bother decrementing the timer
 }
@@ -222,9 +260,7 @@ void TBaseWeapon::dullMe(TBeing* ch, TTool* tool) {
 }
 
 int TBaseWeapon::sharpenPrice() const {
-  int cost = obj_flags.cost;
-  cost *= 5;
-  cost /= 100;
+  int cost = saturate_to_int((double)obj_flags.cost * 5 / 100);
 
   cost = max(cost, 1);
   if (!getMaxSharp())
@@ -396,7 +432,7 @@ void TBaseWeapon::changeObjValue3(TBeing* ch) {
   ch->sendTo(format(VT_CURSPOS) % 10 % 1);
   ch->sendTo("Enter new value.\n\r--> ");
 }
-  
+
 int getHardnessSpec(const TBeing* ch, wearSlotT limb) {
   if (!ch || limb == WEAR_NOWHERE) {
     return 0;
@@ -407,30 +443,34 @@ int getHardnessSpec(const TBeing* ch, wearSlotT limb) {
   }
 
   int hardness = material_nums[ch->getMaterial(limb)].hardness;
-  
+
   if (ch->affectedBySpell(SPELL_THORNFLESH)) {
     hardness = material_nums[MAT_WOOD].hardness;
   }
-  
+
   if (ch->affectedBySpell(SPELL_STONE_SKIN)) {
     hardness = material_nums[MAT_STONE].hardness;
   }
-  
+
   if (ch->doesKnowSkill(SKILL_IRON_FLESH)) {
     int skillValue = ch->getSkillValue(SKILL_IRON_FLESH);
-    int ironFleshHardness = (skillValue * material_nums[MAT_IRON].hardness) / 100;
+    int ironFleshHardness =
+      (skillValue * material_nums[MAT_IRON].hardness) / 100;
     if (ironFleshHardness > hardness) {
       hardness = ironFleshHardness;
     }
   }
-  
-  if ((limb == WEAR_HAND_R || limb == WEAR_HAND_L) && ch->doesKnowSkill(SKILL_IRON_FIST)) {
-    int ironFistHardness = (ch->getSkillValue(SKILL_IRON_FIST) * material_nums[MAT_IRON].hardness) / 100;
+
+  if ((limb == WEAR_HAND_R || limb == WEAR_HAND_L) &&
+      ch->doesKnowSkill(SKILL_IRON_FIST)) {
+    int ironFistHardness =
+      (ch->getSkillValue(SKILL_IRON_FIST) * material_nums[MAT_IRON].hardness) /
+      100;
     if (ironFistHardness > hardness) {
       hardness = ironFistHardness;
     }
   }
-  
+
   return hardness;
 }
 
@@ -678,6 +718,10 @@ bool TBaseWeapon::isPierceWeapon() const {
   // not a TGenWeapon
   return (pierceType(wtype));
 }
+
+// Pierce weapon currently wielded two-handed. ITEM_PAIRED is a per-instance
+// wear flag, not a type marker — small paired pierce weapons qualify too.
+bool TBaseWeapon::isPolearm() const { return isPierceWeapon() && isPaired(); }
 
 void TBaseWeapon::divinateMe(TBeing* caster) const {
 #if 1
@@ -1045,19 +1089,18 @@ int TGenWeapon::smiteWithMe(TBeing* ch, TBeing* v) {
 }
 
 int TBaseWeapon::poisonWeaponWeapon(TBeing* ch, TThing* poison) {
-  int rc;
-
-  if (isBluntWeapon()) {
-    ch->sendTo("Blunt weapons can't be poisoned effectively.\n\r");
-    return FALSE;
+  // A blunt weapon has no edge to hold a coating - unless it is spiked, in
+  // which case the spikes carry it the same way an armour's would.
+  if (isBluntWeapon() && !isSpiked()) {
+    act("$p has no edge to hold a coating.", false, ch, this, nullptr, TO_CHAR);
+    return false;
   }
   if (isPoisoned()) {
-    ch->sendTo("That is already poisoned!\n\r");
-    return FALSE;
+    act("$p is already poisoned!", false, ch, this, nullptr, TO_CHAR);
+    return false;
   }
 
-  rc = poison->poisonMePoison(ch, this);
-  return rc;
+  return poison->poisonMePoison(ch, this);
 }
 
 void TBaseWeapon::curseMe() {
@@ -1246,9 +1289,10 @@ int TBaseWeapon::suggestedPrice() const {
   }
   if (tohit) {
     // this formula is from balance notes
-    int amt = (int)(weapon_lev * max(weapon_lev, 20.0) * 450 / 4);
-    amt -=
-      (int)((weapon_lev - tohit) * max(weapon_lev - tohit, 20.0) * 450 / 4);
+    double amt_d =
+      weapon_lev * max(weapon_lev, 20.0) * 450.0 / 4.0 -
+      (weapon_lev - tohit) * max(weapon_lev - tohit, 20.0) * 450.0 / 4.0;
+    int amt = saturate_to_int(amt_d);
     price += amt;
   }
   switch (todam) {
@@ -1545,8 +1589,19 @@ int TBaseWeapon::catchSmack(TBeing* ch, TBeing** targ, TRoom* rp, int cdist,
 
         d = get_range_actual_damage(ch, tb, this, d, damtype);
 
-        if (isPoisoned())
-          applyPoison(tb);
+        // An arrow in flight has no wielder, so applyPoison takes its
+        // victim-is-also-caster branch and can only report DELETE_VICT.
+        if (isPoisoned()) {
+          if (IS_SET_DELETE(applyPoison(tb), DELETE_VICT)) {
+            if (true_targ) {
+              ADD_DELETE(resCode, DELETE_VICT);
+              return resCode;
+            }
+            delete tb;
+            tb = nullptr;
+            return resCode;
+          }
+        }
 
         TArrow* arrow;
         if ((arrow = dynamic_cast<TArrow*>(this)) &&
@@ -1608,8 +1663,8 @@ sstring TBaseWeapon::showModifier(showModeT mode, const TBeing* ch) const {
     }
   }
 
-  if (isPoisoned())
-    a += " (poisoned)";
+  // "(poisoned)" is appended generically for every object in show.cc, since
+  // poison is no longer weapon-only.
 
   return a;
 }
@@ -1684,37 +1739,4 @@ void TBaseWeapon::sellMeMoney(TBeing* ch, TMonster* keeper, int cost,
   int shop_nr) {
   TShopOwned tso(shop_nr, keeper, ch);
   tso.doSellTransaction(cost, getName(), TX_SELLING);
-}
-
-bool TBaseWeapon::isPoisoned() const {
-  if (poison >= LIQ_WATER)
-    return true;
-
-  return false;
-}
-
-void TBaseWeapon::applyPoison(TBeing* vict) {
-  TBeing* ch;
-
-  if (!isPoisoned())
-    return;
-
-  if ((ch = dynamic_cast<TBeing*>(equippedBy))) {
-    act("There was something nasty on that $o!", FALSE, ch, this, vict, TO_VICT,
-      ANSI_RED);
-    act("You inflict something nasty on $N!", FALSE, ch, this, vict, TO_CHAR,
-      ANSI_RED);
-    act("There was something nasty on that $o!", FALSE, ch, this, vict,
-      TO_NOTVICT, ANSI_RED);
-    doLiqSpell(ch, vict, poison, 1);
-  } else {
-    doLiqSpell(vict, vict, poison, 1);
-  }
-
-  poison = (liqTypeT)-1;
-}
-
-void TBaseWeapon::setPoison(liqTypeT liq) {
-  if (!isPoisoned())
-    poison = liq;
 }

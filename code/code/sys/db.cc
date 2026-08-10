@@ -58,6 +58,8 @@
 #include "obj_board.h"
 #include "obj_book.h"
 #include "obj_component.h"
+#include "obj_trap_component.h"
+#include "obj_trapcomp_bag.h"
 #include "obj_gemstone.h"
 #include "obj_key.h"
 #include "obj_note.h"
@@ -165,6 +167,7 @@ const char* const File::WIZNEWS_DIR =
 
 std::vector<TRoom*> roomspec_db(0);
 std::vector<TRoom*> roomsave_db(0);
+std::vector<TRoom*> affectedRooms_db;
 std::queue<sstring> queryqueue;
 
 struct cached_object {
@@ -218,6 +221,8 @@ class lag_data lag_info;
 
 // count of the number of mobs that can load an object
 std::map<int, int> obj_load_potential;
+std::vector<std::vector<CheckgearSourceInfo>> obj_load_sources_cache;
+std::vector<std::vector<CheckgearGearInfo>> mob_gear_cache;
 
 // local procedures
 static void bootZones(void);
@@ -230,6 +235,261 @@ struct reset_q_type {
     resetQElement* head;
     resetQElement* tail;
 } r_q;
+
+static sstring getCheckgearZoneNameOnly(const sstring& fullName) {
+  const char* dash = strchr(fullName.c_str(), '-');
+
+  if (dash) {
+    ++dash;
+    while (*dash == ' ')
+      ++dash;
+    return sstring(dash);
+  }
+
+  return fullName;
+}
+
+static wearSlotT getCheckgearSlotFromLSTPiece(loadSetTypeT piece,
+  bool isSecond) {
+  switch (piece) {
+    case LST_HELM: return WEAR_HEAD;
+    case LST_COLLAR: return WEAR_NECK;
+    case LST_JACKET: return WEAR_BODY;
+    case LST_SLEEVE: return isSecond ? WEAR_ARM_R : WEAR_ARM_L;
+    case LST_GLOVE: return isSecond ? WEAR_HAND_R : WEAR_HAND_L;
+    case LST_BELT: return WEAR_WAIST;
+    case LST_BRACELET: return isSecond ? WEAR_WRIST_R : WEAR_WRIST_L;
+    case LST_LEGGING: return isSecond ? WEAR_LEG_R : WEAR_LEG_L;
+    case LST_BOOT: return isSecond ? WEAR_FOOT_R : WEAR_FOOT_L;
+    case LST_RING: return isSecond ? WEAR_FINGER_R : WEAR_FINGER_L;
+    case LST_SHIELD: return HOLD_RIGHT;
+    case LST_CLOAK: return WEAR_BACK;
+    default: return WEAR_NOWHERE;
+  }
+}
+
+static sstring getCheckgearZoneNameForRoom(int roomVnum) {
+  for (unsigned int i = 0; i < zone_table.size(); ++i) {
+    if (roomVnum >= zone_table[i].bottom && roomVnum <= zone_table[i].top)
+      return getCheckgearZoneNameOnly(zone_table[i].name);
+  }
+
+  return "Unknown Zone";
+}
+
+static void addCheckgearSource(int objRnum, int mobRnum,
+  const sstring& zoneName) {
+  if (objRnum < 0 || objRnum >= (int)obj_load_sources_cache.size() ||
+      mobRnum < 0 || mobRnum >= (int)mob_index.size())
+    return;
+
+  CheckgearSourceInfo info;
+  info.mobVnum = mob_index[mobRnum].virt;
+  info.mobName = mob_index[mobRnum].short_desc;
+  info.zoneName = zoneName;
+
+  std::vector<CheckgearSourceInfo>& sources = obj_load_sources_cache[objRnum];
+  for (const auto& existing : sources) {
+    if (existing.mobVnum == info.mobVnum && existing.zoneName == info.zoneName)
+      return;
+  }
+
+  sources.push_back(info);
+}
+
+static void addCheckgearGear(int mobRnum, int objRnum, wearSlotT slot,
+  int chance) {
+  if (mobRnum < 0 || mobRnum >= (int)mob_gear_cache.size() ||
+      objRnum < 0 || objRnum >= (int)obj_index.size())
+    return;
+
+  CheckgearGearInfo info;
+  info.objVnum = obj_index[objRnum].virt;
+  info.objName = obj_index[objRnum].short_desc;
+  info.slot = slot;
+  info.chance = chance;
+
+  std::vector<CheckgearGearInfo>& gearList = mob_gear_cache[mobRnum];
+  for (const auto& existing : gearList) {
+    if (existing.objVnum == info.objVnum && existing.slot == info.slot &&
+        existing.chance == info.chance)
+      return;
+  }
+
+  gearList.push_back(info);
+}
+
+static int normalizeCheckgearChance(int chance) {
+  if (chance < 0)
+    return 0;
+  if (chance >= 99)
+    return 100;
+  if (chance > 100)
+    return 100;
+  return chance;
+}
+
+static int getCheckgearEffectiveSetChance(int setChance, int pendingChance,
+  bool hasPendingChance) {
+  if (setChance < 0)
+    setChance = 0;
+  else if (setChance > 100)
+    setChance = 100;
+
+  if (!hasPendingChance)
+    return setChance;
+
+  return (setChance * normalizeCheckgearChance(pendingChance)) / 100;
+}
+
+void rebuildCheckgearCaches() {
+  obj_load_sources_cache.clear();
+  obj_load_sources_cache.resize(obj_index.size());
+  mob_gear_cache.clear();
+  mob_gear_cache.resize(mob_index.size());
+
+  for (unsigned int zone_num = 0; zone_num < zone_table.size(); ++zone_num) {
+    zoneData& zone = zone_table[zone_num];
+    armorSetLoad localSets;
+
+    int currentMobRnum = -1;
+    sstring currentZoneName = "Unknown Zone";
+    int currentChance = 100;
+    bool hasPendingChance = false;
+
+    for (int cmd_no = 0; cmd_no < (int)zone.cmd_table.size(); ++cmd_no) {
+      resetCom& cmd = zone.cmd_table[cmd_no];
+
+      if (cmd.command == 'X') {
+        localSets.setArmor(cmd.arg3, cmd.arg1, cmd.arg2);
+        continue;
+      }
+
+      if (cmd.command == 'M' || cmd.command == 'C' || cmd.command == 'K' ||
+          cmd.command == 'R') {
+        currentMobRnum = cmd.arg1;
+        currentZoneName =
+          (cmd.arg3 == ZONE_ROOM_RANDOM) ? getCheckgearZoneNameOnly(zone.name)
+                                         : getCheckgearZoneNameForRoom(cmd.arg3);
+        currentChance = 100;
+        hasPendingChance = false;
+        continue;
+      }
+
+      if (currentMobRnum < 0 || currentMobRnum >= (int)mob_index.size())
+        continue;
+
+      if (cmd.command == '?') {
+        currentChance = cmd.arg1;
+        hasPendingChance = true;
+        continue;
+      }
+
+      if (cmd.command == 'E' || cmd.command == 'I') {
+        addCheckgearSource(cmd.arg1, currentMobRnum, currentZoneName);
+        addCheckgearGear(currentMobRnum, cmd.arg1, (wearSlotT)cmd.arg3,
+          hasPendingChance ? normalizeCheckgearChance(currentChance) : 100);
+        currentChance = 100;
+        hasPendingChance = false;
+        continue;
+      }
+
+      if (cmd.command == 'G') {
+        addCheckgearSource(cmd.arg1, currentMobRnum, currentZoneName);
+        currentChance = 100;
+        hasPendingChance = false;
+        continue;
+      }
+
+      if (cmd.command == 'L') {
+        if (cmd.arg4 == 0) {
+          for (TLootStructure* tTLoot = tLoot; tTLoot; tTLoot = tTLoot->tNext) {
+            if (!in_range(tTLoot->tLevel, cmd.arg1, cmd.arg2))
+              continue;
+            if (tTLoot->tRNum < 0 || tTLoot->tRNum >= (int)obj_index.size())
+              continue;
+
+            addCheckgearSource(tTLoot->tRNum, currentMobRnum, currentZoneName);
+          }
+        }
+
+        currentChance = 100;
+        hasPendingChance = false;
+        continue;
+      }
+
+      if (cmd.command == 'Y') {
+        const int effectiveChance =
+          getCheckgearEffectiveSetChance(cmd.arg2, currentChance,
+            hasPendingChance);
+        int sCount = cmd.arg1;
+
+        for (unsigned int suitIndex = 0; suitIndex < suitSets.suits.size();
+             ++suitIndex) {
+          if (sCount-- != 1)
+            continue;
+
+          const loadSetStruct& suit = suitSets.suits[suitIndex];
+
+          for (int pieceIndex = 0; pieceIndex < LST_MAX; ++pieceIndex) {
+            int vnum = suit.equipment[pieceIndex];
+            if (vnum <= 0)
+              continue;
+
+            int objRnum = real_object(vnum, true);
+            if (objRnum < 0)
+              continue;
+
+            addCheckgearSource(objRnum, currentMobRnum, currentZoneName);
+            addCheckgearGear(currentMobRnum, objRnum,
+              getCheckgearSlotFromLSTPiece((loadSetTypeT)pieceIndex, false),
+              effectiveChance);
+
+            if (pieceIndex == LST_SLEEVE || pieceIndex == LST_GLOVE ||
+                pieceIndex == LST_BRACELET || pieceIndex == LST_LEGGING ||
+                pieceIndex == LST_BOOT || pieceIndex == LST_RING) {
+              addCheckgearGear(currentMobRnum, objRnum,
+                getCheckgearSlotFromLSTPiece((loadSetTypeT)pieceIndex, true),
+                effectiveChance);
+            }
+          }
+
+          break;
+        }
+
+        currentChance = 100;
+        hasPendingChance = false;
+        continue;
+      }
+
+      if (cmd.command == 'Z' || cmd.command == 'J') {
+        const int effectiveChance =
+          getCheckgearEffectiveSetChance(cmd.arg2, currentChance,
+            hasPendingChance);
+        for (int slot = MIN_WEAR; slot < MAX_WEAR; ++slot) {
+          int vnum = localSets.getArmor(cmd.arg1, slot);
+          if (vnum <= 0)
+            continue;
+
+          int objRnum = real_object(vnum, true);
+          if (objRnum < 0)
+            continue;
+
+          addCheckgearSource(objRnum, currentMobRnum, currentZoneName);
+          addCheckgearGear(currentMobRnum, objRnum, (wearSlotT)slot,
+            effectiveChance);
+        }
+
+        currentChance = 100;
+        hasPendingChance = false;
+        continue;
+      }
+
+      currentChance = 100;
+      hasPendingChance = false;
+    }
+  }
+}
 
 void update_commod_index() {
   TDatabase db(DB_SNEEZY);
@@ -543,6 +803,9 @@ void bootDb(void) {
 
   bootPulse("Creating Loot List.");
   sysLootBoot();
+
+  bootPulse("Building checkgear caches.");
+  rebuildCheckgearCaches();
 
   bootPulse("Calculating object load potentials:", false);
   for (i = 0; i < zone_table.size(); i++) {
@@ -1487,6 +1750,8 @@ void TBeing::doBoot(const sstring& arg) {
   zone_table[z].bootZone(zone_table[z].bottom);
   sendTo("Renumbering loads (vnum->rnum).\n\r");
   zone_table[z].renumCmd();
+  sendTo("Rebuilding checkgear caches.\n\r");
+  rebuildCheckgearCaches();
 
   sendTo("Purging mobs and objects in zone.\n\r");
   while (found) {
@@ -1837,41 +2102,6 @@ cached_object* TMobileCache::operator[](int nr) {
     ret = NULL;
   }
   return ret;
-}
-
-void log_object(TObj* obj) {
-  // Don't log objects that are flagged as newbie
-  if (obj->isObjStat(ITEM_NEWBIE)) {
-    return;
-  }
-  // Don't log tools
-  if (dynamic_cast<TTool*>(obj)) {
-    return;
-  }
-  // Don't log commodities
-  if (dynamic_cast<TCommodity*>(obj)) {
-    return;
-  }
-  // Don't log treasures
-  if (dynamic_cast<TTreasure*>(obj)) {
-    return;
-  }
-  // Don't log food
-  if (dynamic_cast<TFood*>(obj)) {
-    return;
-  }
-  // Don't log other
-  if (dynamic_cast<TOtherObj*>(obj)) {
-    return;
-  }
-  // Don't log trash
-  if (dynamic_cast<TTrash*>(obj)) {
-    return;
-  }
-  TDatabase db(DB_SNEEZY);
-  db.query("insert into objlog (vnum, objcount) values (%i, %i)",
-    obj_index[obj->getItemIndex()].virt,
-    obj_index[obj->getItemIndex()].getNumber());
 }
 
 void TObjectCache::preload() {
@@ -2266,8 +2496,8 @@ int TMonster::readMobFromDB(int virt, bool should_alloc, TBeing* ch) {
   } else {
     TDatabase db(ch && should_alloc ? DB_IMMORTAL : DB_SNEEZY);
     if (ch && should_alloc) {
-      db.query("select * from mob where owner = '%s' and vnum = %i",
-        ch->name.c_str(), virt);
+      db.query("select * from mob where player_id=%i and vnum=%i",
+        ch->getPlayerID(), virt);
     } else {
       db.query("select * from mob where vnum = %i", virt);
     }
@@ -2416,13 +2646,21 @@ int TMonster::readMobFromDB(int virt, bool should_alloc, TBeing* ch) {
       if (db["adjacent_sound"].length() > 0)
         distantSnds = db["adjacent_sound"];
     }
-    db.query("select * from mob_imm where vnum=%i", virt);
+    if (ch && should_alloc)
+      db.query("select * from mob_imm where player_id=%i and vnum=%i",
+        ch->getPlayerID(), virt);
+    else
+      db.query("select * from mob_imm where vnum=%i", virt);
     while (db.fetchRow()) {
-      setImmunity((immuneTypeT)convertTo<int>(db["type"]),
+      setImmunity(static_cast<immuneTypeT>(convertTo<int>(db["type"])),
         convertTo<int>(db["amt"]));
     }
 
-    db.query("select * from mob_extra where vnum=%i", virt);
+    if (ch && should_alloc)
+      db.query("select * from mob_extra where player_id=%i and vnum=%i",
+        ch->getPlayerID(), virt);
+    else
+      db.query("select * from mob_extra where vnum=%i", virt);
     extraDescription* tExDescr;
     while (db.fetchRow()) {
       tExDescr = new extraDescription();
@@ -2615,6 +2853,61 @@ void zoneData::closeDoors() {
           (ep->door_type != DOOR_NONE) &&
           (!IS_SET(ep->condition, EXIT_DESTROYED)))
         SET_BIT(ep->condition, EXIT_CLOSED);
+    }
+  }
+}
+
+// Randomly trap closed locked and/or secret doors at zone reset.  Each locked
+// door has a 5% chance and each secret door a 5% chance (10% if both).  Damage
+// scales with the zone's average mob level; the trap type is fully random.
+// Already-trapped doors are skipped so builder- and player-set traps survive.
+void zoneData::trapDoors() {
+  const double avg = num_mobs ? mob_levels / num_mobs : 0.0;
+  const int maxDam = std::max(1, static_cast<int>(avg));
+  const int bottom = zone_nr ? (zone_table[zone_nr - 1].top + 1) : 0;
+
+  for (int rnum = bottom; rnum <= top; rnum++) {
+    TRoom* rp = real_roomp(rnum);
+    if (!rp)
+      continue;
+
+    for (dirTypeT dir = MIN_DIR; dir < MAX_DIR; dir++) {
+      roomDirData* exitp = rp->dir_option[dir];
+      if (!exitp || exitp->door_type == DOOR_NONE ||
+          !IS_SET(exitp->condition, EXIT_CLOSED) ||
+          IS_SET(exitp->condition,
+            EXIT_TRAPPED | EXIT_DESTROYED | EXIT_CAVED_IN))
+        continue;
+
+      int chance = 0;
+      if (IS_SET(exitp->condition, EXIT_LOCKED))
+        chance += 5;
+      if (IS_SET(exitp->condition, EXIT_SECRET))
+        chance += 5;
+      if (chance == 0 || number(1, 100) > chance)
+        continue;
+
+      const short trapInfo = randomTrapType(TRAP_TARG_DOOR, maxDam);
+      const short trapDam = number(1, maxDam);
+
+      SET_BIT(exitp->condition, EXIT_TRAPPED);
+      exitp->trap_info = trapInfo;
+      exitp->trap_dam = trapDam;
+      // Nobody set this one, so it must not inherit the name of whoever last
+      // trapped this exit -- otherwise they take the damage credit (and the
+      // resulting hatred) for a trap they had no part in.
+      exitp->trap_setter.clear();
+
+      // mirror onto the far side so the trap fires from either direction
+      if (TRoom* rp2 = real_roomp(exitp->to_room)) {
+        if (roomDirData* back = rp2->dir_option[rev_dir(dir)];
+            back && back->to_room == rnum) {
+          SET_BIT(back->condition, EXIT_TRAPPED);
+          back->trap_info = trapInfo;
+          back->trap_dam = trapDam;
+          back->trap_setter.clear();
+        }
+      }
     }
   }
 }
@@ -3002,7 +3295,6 @@ void runResetCmdE(zoneData& zd, resetCom& rs, resetFlag flags, bool&,
   // No need to log prop items
   if (!isPropLoad) {
     mob->logItem(obj, CMD_LOAD);
-    log_object(obj);
   }
 
   // run some sanity checks after load
@@ -3395,7 +3687,6 @@ void runResetCmdP(zoneData& zone, resetCom& rs, resetFlag flags, bool& mobload,
 
   newobj->onObjLoad();
   last_cmd = true;
-  log_object(newobj);
 }
 
 // Change ONE value of the four values upon reset- Russ
@@ -3690,8 +3981,10 @@ void zoneData::resetZone(bool bootTime, bool findLoadPotential) {
   if (mob && mobload)
     bulkLoadOut(mob);
 
-  if (!findLoadPotential)
+  if (!findLoadPotential) {
     doGenericReset();  // sends CMD_GENERIC_RESET to all objects in zone
+    trapDoors();       // randomly trap locked/secret doors based on zone level
+  }
 
   this->age = 0;
 }
@@ -3935,10 +4228,14 @@ TObj* makeNewObj(itemTypeT tmp) {
       return new TCorpse();
     case ITEM_SPELLBAG:
       return new TSpellBag();
+    case ITEM_TRAPCOMP_BAG:
+      return new TTrapCompBag();
     case ITEM_KEYRING:
       return new TKeyring();
     case ITEM_COMPONENT:
       return new TComponent();
+    case ITEM_TRAP_COMPONENT:
+      return new TTrapComponent();
     case ITEM_BOOK:
       return new TBook();
     case ITEM_PORTAL:

@@ -98,63 +98,6 @@ void TBeing::incorrectCommand() const {
          red() % norm());
 }
 
-bool willBreakHide(cmdTypeT tCmd, bool isPre) {
-  switch (tCmd) {
-    case CMD_BACKSTAB:
-      return (isPre ? false : true);
-    case CMD_SLIT:
-      return (isPre ? false : true);
-
-    case CMD_LOOK:
-    case CMD_SCORE:
-    case CMD_TROPHY:
-    case CMD_INVENTORY:
-    case CMD_HELP:
-    case CMD_WHO:
-    case CMD_NEWS:
-    case CMD_EQUIPMENT:
-    case CMD_WEATHER:
-    case CMD_SAVE:
-    case CMD_EXITS:
-    case CMD_TIME:
-    case CMD_HIDE:
-    case CMD_SNEAK:
-    case CMD_QUEST:
-    case CMD_LEVELS:
-    case CMD_WIZLIST:
-    case CMD_CONSIDER:
-    case CMD_CREDITS:
-    case CMD_TITLE:
-    case CMD_ATTRIBUTE:
-    case CMD_WORLD:
-    case CMD_SPY:
-    case CMD_CLS:
-    case CMD_PROMPT:
-    case CMD_ALIAS:
-    case CMD_CLEAR:
-    case CMD_MOTD:
-    case CMD_PRACTICE:
-    case CMD_HISTORY:
-    case CMD_EVALUATE:
-    case CMD_DISGUISE:
-    case CMD_EMAIL:
-    case CMD_AFK:
-    case CMD_SPELLS:
-    case CMD_COMPARE:
-    case CMD_ZONES:
-    case CMD_NEWBIE:
-    case CMD_REQUEST:
-    case CMD_IGNORE:
-    case MAX_CMD_LIST:
-      return false;
-
-    default:
-      return true;
-  }
-
-  return true;
-}
-
 extern int handleMobileResponse(TBeing*, cmdTypeT, const sstring&);
 
 // returns DELETE_THIS if this should be nuked
@@ -353,9 +296,6 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
       }
     }
 
-    if (IS_SET(specials.affectedBy, AFF_HIDE) && willBreakHide(cmd, true))
-      REMOVE_BIT(specials.affectedBy, AFF_HIDE);
-
     rc = triggerSpecial(NULL, cmd, newarg.c_str());
     if (IS_SET_DELETE(rc, DELETE_THIS))
       return DELETE_THIS;
@@ -373,7 +313,7 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
           doUnsaddle(newarg);
           break;
         case CMD_SPRINGLEAP:
-          doSpringleap(newarg, true, dynamic_cast<TBeing*>(vict));
+          doSpringleap();
           break;
         case CMD_HARNESS:
         case CMD_SADDLE:
@@ -1589,6 +1529,15 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
         case CMD_SNEAK:
           rc = doSneak(newarg.c_str());
           break;
+        case CMD_SKULK:
+          rc = doSkulk(newarg.c_str());
+          break;
+        case CMD_JAM:
+          rc = doJam(newarg.c_str());
+          break;
+        case CMD_KEYCUT:
+          rc = doKeycut(newarg.c_str());
+          break;
         case CMD_CRAWL:
           doCrawl();
           break;
@@ -1600,6 +1549,9 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
           break;
         case CMD_DISGUISE:
           rc = doDisguise(newarg.c_str());
+          break;
+        case CMD_INNATE:
+          rc = doInnate(newarg.c_str());
           break;
         case CMD_DESCRIPTION:
           addToLifeforce(1);
@@ -1656,6 +1608,10 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
           break;
         case CMD_WHITTLE:
           doWhittle(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_SERRATE:
+          doSerrate(newarg.c_str());
           addToLifeforce(1);
           break;
         case CMD_MESSAGE:
@@ -2063,10 +2019,10 @@ int TBeing::parseCommand(const sstring& orig_arg, bool typedIn, bool doAlias) {
     return FALSE;
   }
 
-  if (IS_SET(specials.affectedBy, AFF_HIDE) && cmd != CMD_BACKSTAB)
+  if (isAffected(AFF_HIDE) && willBreakHide(cmd)) {
+    sendTo("You move from your hiding spot.\n\r");
     REMOVE_BIT(specials.affectedBy, AFF_HIDE);
-  if (IS_SET(specials.affectedBy, AFF_HIDE) && cmd != CMD_SLIT)
-    REMOVE_BIT(specials.affectedBy, AFF_HIDE);
+  }
 
   if (getCaptiveOf()) {
     if (!sameRoom(*getCaptiveOf())) {
@@ -2622,8 +2578,12 @@ void buildCommandArray(void) {
   commandArray[CMD_FLIP] = new commandInfo("flip", POSITION_STANDING, 0);
   commandArray[CMD_SNEAK] = new commandInfo("sneak", POSITION_CRAWLING, 0);
   commandArray[CMD_HIDE] = new commandInfo("hide", POSITION_STANDING, 0);
+  commandArray[CMD_SKULK] = new commandInfo("skulk", POSITION_STANDING, 0);
+  commandArray[CMD_JAM] = new commandInfo("jam", POSITION_STANDING, 0);
+  commandArray[CMD_KEYCUT] =
+    new commandInfo("keycut", POSITION_STANDING, 0);
   commandArray[CMD_BACKSTAB] =
-    new commandInfo("backstab", POSITION_STANDING, 0);
+    new commandInfo("backstab", POSITION_FIGHTING, 0);
   commandArray[CMD_SLIT] = new commandInfo("slit", POSITION_STANDING, 0);
   commandArray[CMD_PICK] = new commandInfo("pick", POSITION_SITTING, 0);
   commandArray[CMD_STEAL] = new commandInfo("steal", POSITION_STANDING, 0);
@@ -2918,6 +2878,7 @@ void buildCommandArray(void) {
   commandArray[CMD_BOUNCE] = new commandInfo("bounce", POSITION_STANDING, 0);
   commandArray[CMD_DISGUISE] =
     new commandInfo("disguise", POSITION_STANDING, 0);
+  commandArray[CMD_INNATE] = new commandInfo("innate", POSITION_RESTING, 0);
   commandArray[CMD_RENAME] = new commandInfo("rename", POSITION_DEAD, 0);
   commandArray[CMD_DESCRIPTION] =
     new commandInfo("description", POSITION_DEAD, 0);
@@ -3070,6 +3031,7 @@ void buildCommandArray(void) {
   commandArray[CMD_POWERS] =
     new commandInfo("powers", POSITION_STANDING, GOD_LEVEL1);
   commandArray[CMD_WHITTLE] = new commandInfo("whittle", POSITION_STANDING, 0);
+  commandArray[CMD_SERRATE] = new commandInfo("serrate", POSITION_STANDING, 0);
   commandArray[CMD_MESSAGE] =
     new commandInfo("message", POSITION_DEAD, GOD_LEVEL1);
   commandArray[CMD_SMOKE] = new commandInfo("smoke", POSITION_RESTING, 0);

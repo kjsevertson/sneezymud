@@ -195,7 +195,7 @@ void TBeing::affectChange(uint64_t original, silentTypeT silent) {
       sendTo("You lose your ability to fly.\n\r");
       if (roomp && isFlying()) {
         // roomp is needed since this is sometimes called by dead critters
-        rc = crashLanding(POSITION_SITTING);
+        rc = crashLanding();
         if (IS_SET_DELETE(rc, DELETE_THIS))
           // I don't think this can happen, so won't bother to do work to pass
           // the return if it does
@@ -842,6 +842,18 @@ void TBeing::affectFrom(spellNumT skill) {
     if (hjp->type == skill)
       affectRemove(hjp);
   }
+
+  // Mage sight's passives are applied as separate affects but should be
+  // treated as one unit — removing the primary removes all passives too.
+  // Only remove passives tagged with modifier2 == SPELL_MAGE_SIGHT so we
+  // don't accidentally strip buffs from potions or other independent sources.
+  if (skill == SPELL_MAGE_SIGHT) {
+    for (hjp = affected; hjp; hjp = next_aff) {
+      next_aff = hjp->next;
+      if (hjp->modifier2 == SPELL_MAGE_SIGHT)
+        affectRemove(hjp);
+    }
+  }
 }
 
 void TBeing::removeSkillAttempt(spellNumT skill) {
@@ -902,6 +914,18 @@ bool TBeing::affectedBySpell(spellNumT skill) const {
       return TRUE;
   }
   return FALSE;
+}
+
+// Returns true if the victim has an instance of this spell that is NOT
+// a mage sight passive (i.e., not tagged with modifier2 == SPELL_MAGE_SIGHT).
+// Used by dispel/chase to avoid targeting passives that would be
+// cascade-removed when mage sight itself is removed.
+bool TBeing::hasStandaloneSpell(spellNumT skill) const {
+  for (auto* af = affected; af; af = af->next) {
+    if (af->type == skill && af->modifier2 != SPELL_MAGE_SIGHT)
+      return true;
+  }
+  return false;
 }
 
 // used with polymorph transfers of affects

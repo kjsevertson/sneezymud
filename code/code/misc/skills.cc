@@ -98,7 +98,19 @@ static bool doesKnow(byte know) {
     return TRUE;
 }
 
+namespace {
+  // Cooldown tags use the spellNumT enum but have no discipline, CSkill, or
+  // discArray entry. Add new cooldown tags here AND to the matching
+  // fall-through case block in TBeing::getSkill().
+  bool isCooldownTag(spellNumT skill) {
+    return skill == SKILL_DROW_INVIS || skill == SKILL_DROW_DARKNESS;
+  }
+}  // namespace
+
 CSkill* TBeing::getSkill(spellNumT skill) const {
+  if (isCooldownTag(skill))
+    return nullptr;
+
   discNumT which = getDisciplineNumber(skill, FALSE);
   if (which == DISC_NONE) {
     // silly core-generator, but helps to track down the item that is bad
@@ -161,7 +173,7 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
     case SPELL_ILLUMINATE:  // 8
       return &((CDMage*)cd)->skIlluminate;
     case SPELL_DETECT_MAGIC:  // 9
-      return &((CDMage*)cd)->skDetectMagic;
+      return &((CDAlchemy*)cd)->skDetectMagic;
     case SPELL_STUNNING_ARROW:  // 10
       return &((CDMage*)cd)->skStunningArrow;
     case SPELL_MATERIALIZE:  // 11
@@ -173,7 +185,7 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
     case SPELL_COLOR_SPRAY:  // 19
       return &((CDMage*)cd)->skColorSpray;
     case SPELL_INFRAVISION:  // 20
-      return &((CDMage*)cd)->skInfravision;
+      return &((CDFire*)cd)->skInfravision;
     case SPELL_IDENTIFY:  // 21
       return &((CDMage*)cd)->skIdentify;
     case SPELL_POWERSTONE:  // 22
@@ -223,7 +235,7 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
     case SPELL_GALVANIZE:
       return &((CDMage*)cd)->skGalvanize;
     case SPELL_DETECT_INVISIBLE:
-      return &((CDMage*)cd)->skDetectInvisible;
+      return &((CDSpirit*)cd)->skDetectInvisible;
     case SPELL_DISPEL_INVISIBLE:
       return &((CDMage*)cd)->skDispelInvisible;
     case SPELL_TORNADO:
@@ -252,6 +264,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDMage*)cd)->skCopy;
     case SPELL_HASTE:
       return &((CDMage*)cd)->skHaste;
+    case SPELL_MAGE_SIGHT:
+      return &((CDMage*)cd)->skMageSight;
     case SKILL_REPAIR_MAGE:
       return &((CDMage*)cd)->skRepairMage;
 
@@ -269,8 +283,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDAir*)cd)->skChainLightning;
     case SPELL_FLY:
       return &((CDAir*)cd)->skFly;
-    case SPELL_ANTIGRAVITY:
-      return &((CDAir*)cd)->skAntigravity;
+    case SPELL_ANTIGRAVITY:  // removed spell, enum kept for DB stability
+      return nullptr;
     case SKILL_PIERCE_RESIST:
       return &((CDAir*)cd)->skPierceResist;
 
@@ -351,8 +365,10 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDWater*)cd)->skWateryGrave;
     case SPELL_TSUNAMI:
       return &((CDWater*)cd)->skTsunami;
-    case SPELL_BREATH_OF_SARAHAGE:
-      return &((CDWater*)cd)->skBreathOfSarahage;
+    case SPELL_BLIZZARD:
+      return &((CDWater*)cd)->skBlizzard;
+    case SPELL_BREATH_OF_SARAHAGE:  // removed spell, enum kept for DB stability
+      return nullptr;
     case SPELL_PLASMA_MIRROR:
       return &((CDWater*)cd)->skPlasmaMirror;
     case SPELL_GARMULS_TAIL:
@@ -468,6 +484,9 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDAegis*)cd)->skRelive;
     case SPELL_CRUSADE:
       return &((CDAegis*)cd)->skCrusade;
+    case SPELL_CONSECRATE:
+    case SPELL_CONSECRATE_AFFECT:
+      return &((CDAegis*)cd)->skConsecrate;
 
       // disc_hand_of_god
 
@@ -852,6 +871,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDThief*)cd)->skSneak;
     case SKILL_STABBING:  //                  484
       return &((CDThief*)cd)->skStabbing;
+    case SKILL_SERRATE:
+      return &((CDThief*)cd)->skSerrate;
     case SKILL_RETREAT_THIEF:  //             485
       return &((CDThief*)cd)->skRetreatThief;
     case SKILL_KICK:  //                486
@@ -897,6 +918,14 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDLooting*)cd)->skCounterSteal;
     case SKILL_PLANT:
       return &((CDLooting*)cd)->skPlant;
+    case SKILL_RESOURCEFULNESS:
+      return &((CDLooting*)cd)->skResourcefulness;
+    case SKILL_SCRUTINY:
+      return &((CDLooting*)cd)->skScrutiny;
+    case SKILL_JAM:
+      return &((CDLooting*)cd)->skJam;
+    case SKILL_KEYCUT:
+      return &((CDLooting*)cd)->skKeycut;
 
       // disc_murder
 
@@ -916,6 +945,8 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDStealth*)cd)->skConcealment;
     case SKILL_DISGUISE:  //                  499
       return &((CDStealth*)cd)->skDisguise;
+    case SKILL_SKULK:
+      return &((CDStealth*)cd)->skSkulk;
 
       // disc_traps
     case SKILL_SET_TRAP_CONT:
@@ -1107,7 +1138,7 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
     case SKILL_FISHBURBLE:
       return &((CDAdvAdventuring*)cd)->skKalysian;
     case SKILL_COMMON:
-      return &((CDAdvAdventuring *) cd)->skCommon;
+      return &((CDAdvAdventuring*)cd)->skCommon;
 
       // adventuring
     case SKILL_ALCOHOLISM:  // 668
@@ -1430,6 +1461,10 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
     case AFFECT_PREENED:
     case AFFECT_WET:
     case ABSOLUTE_MAX_SKILL:
+    // Cooldown tags — unreachable here (caught by isCooldownTag at the top
+    // of the function); listed for -Wswitch coverage.
+    case SKILL_DROW_INVIS:
+    case SKILL_DROW_DARKNESS:
       break;
   }
 

@@ -260,6 +260,15 @@ TaskEntry tasks[NUM_TASKS] = {
   {"riding", "You are too busy riding.\n\r", task_ride},
   {"painting", "You are too busy painting.\n\r", task_painting},
   {"preening", "You are too busy cleaning your feathers.\n\r", task_preen},
+  {"skulking", "You are too busy skulking.\n\r", task_skulk},
+  {"setting a trap", "You are too busy setting your trap.\n\r",
+    task_trap_portal},
+  {"serrating a weapon", "You are too busy filing teeth into a weapon.\n\r",
+    task_serrate},
+  {"jamming a door", "You are too busy wedging your blade into the door.\n\r",
+    task_jam},
+  {"casting a key", "You are too busy working wax into the lock.\n\r",
+    task_keycut},
 };
 
 bool TBeing::nobrainerTaskCommand(cmdTypeT cmd) {

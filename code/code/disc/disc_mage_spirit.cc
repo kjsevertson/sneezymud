@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include <algorithm>
+
 #include "extern.h"
 #include "room.h"
 #include "client.h"
@@ -10,6 +12,7 @@
 #include "disease.h"
 #include "combat.h"
 #include "spelltask.h"
+#include "disc_mage_group.h"
 #include "disc_mage_spirit.h"
 #include "obj_magic_item.h"
 #include "combat.h"
@@ -1028,135 +1031,189 @@ int castPolymorph(TBeing* caster) {
   return TRUE;
 }
 
-int stealth(TBeing* caster, TBeing* victim, int level, short bKnown) {
-  affectedData aff;
+namespace {
 
-  caster->reconcileHelp(victim, discArray[SPELL_STEALTH]->alignMod);
-
-  if (caster->bSuccess(bKnown, SPELL_STEALTH)) {
+  // Returns false when affectJoin can't renew an existing non-expired affect.
+  // See applyFeatheryDescent (disc_mage_air.cc) for quiet/return semantics.
+  [[nodiscard]] bool applyStealth(TBeing* caster, TBeing* victim, int level,
+    int duration, silentTypeT silent = SILENT_NO) {
+    affectedData aff;
     aff.type = SPELL_STEALTH;
     aff.level = level;
-    aff.duration = caster->durationModify(SPELL_STEALTH,
-      (aff.level / 3) * Pulse::UPDATES_PER_MUDHOUR);
-    aff.modifier = -aff.level;
+    aff.duration = duration;
+    aff.modifier = -level;
     aff.location = APPLY_NOISE;
     aff.bitvector = 0;
+    if (!victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_YES,
+          silent == SILENT_NO))
+      return false;
 
+    act("$N seems more stealthy!", false, caster, nullptr, victim, TO_NOTVICT,
+      ANSI_GREEN);
+    act("You feel much more stealthy!", false, victim, nullptr, nullptr,
+      TO_CHAR, ANSI_GREEN);
+    if (caster != victim)
+      act("You have given $N the gift of stealth!", false, caster, nullptr,
+        victim, TO_CHAR, ANSI_GREEN);
+    return true;
+  }
+
+  bool rollStealthCrit(TBeing* caster) {
     switch (critSuccess(caster, SPELL_STEALTH)) {
       case CRIT_S_DOUBLE:
       case CRIT_S_TRIPLE:
       case CRIT_S_KILL:
         CS(SPELL_STEALTH);
-        aff.duration *= 2;
-        break;
+        return true;
       case CRIT_S_NONE:
         break;
     }
-    if (!victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_YES)) {
-      caster->nothingHappens();
-      return SPELL_FALSE;
-    }
-    return SPELL_SUCCESS;
-  } else {
+    return false;
+  }
+
+  int stealthDuration(TBeing* caster, int level, bool crit) {
+    int duration = caster->durationModify(SPELL_STEALTH,
+      (level / 3) * Pulse::UPDATES_PER_MUDHOUR);
+    if (crit)
+      duration *= 2;
+    return duration;
+  }
+
+}  // namespace
+
+int stealth(TBeing* caster, TBeing* victim, int level, short bKnown) {
+  if (!caster->bSuccess(bKnown, SPELL_STEALTH)) {
+    caster->nothingHappens();
     return SPELL_FAIL;
   }
+
+  bool crit = rollStealthCrit(caster);
+  int duration = stealthDuration(caster, level, crit);
+
+  if (!applyStealth(caster, victim, level, duration))
+    return SPELL_FAIL;
+
+  caster->reconcileHelp(victim, discArray[SPELL_STEALTH]->alignMod);
+  return SPELL_SUCCESS;
 }
 
 void stealth(TBeing* caster, TBeing* victim, TMagicItem* obj) {
-  int ret;
-
-  ret =
-    stealth(caster, victim, obj->getMagicLevel(), obj->getMagicLearnedness());
-
-  if (IS_SET(ret, SPELL_SUCCESS)) {
-    act("$n seems more stealthy!", FALSE, victim, NULL, 0, TO_ROOM);
-    act("You feel much more stealthy!", FALSE, victim, NULL, NULL, TO_CHAR);
-  } else {
-    caster->nothingHappens();
-  }
+  stealth(caster, victim, obj->getMagicLevel(), obj->getMagicLearnedness());
 }
 
 int stealth(TBeing* caster, TBeing* victim) {
-  taskDiffT diff;
-
   if (!bPassMageChecks(caster, SPELL_STEALTH, victim))
-    return FALSE;
+    return false;
 
   lag_t rounds = discArray[SPELL_STEALTH]->lag;
-  diff = discArray[SPELL_STEALTH]->task;
+  taskDiffT diff = discArray[SPELL_STEALTH]->task;
 
-  start_cast(caster, victim, NULL, caster->roomp, SPELL_STEALTH, diff, 1, "",
-    rounds, caster->in_room, 0, 0, TRUE, 0);
-  return TRUE;
+  start_cast(caster, victim, nullptr, caster->roomp, SPELL_STEALTH, diff, 1, "",
+    rounds, caster->in_room, 0, 0, true, 0);
+  return true;
 }
 
 int castStealth(TBeing* caster, TBeing* victim) {
-  int ret, level;
-
-  level = caster->getSkillLevel(SPELL_STEALTH);
+  int level = caster->getSkillLevel(SPELL_STEALTH);
   int bKnown = caster->getSkillValue(SPELL_STEALTH);
 
-  ret = stealth(caster, victim, level, bKnown);
-  if (IS_SET(ret, SPELL_SUCCESS)) {
-    act("$N seems more stealthy!", FALSE, caster, NULL, victim, TO_NOTVICT,
-      ANSI_GREEN);
-    act("You feel much more stealthy!", FALSE, victim, NULL, NULL, TO_CHAR,
-      ANSI_GREEN);
-    if (caster != victim)
-      act("You have given $N the gift of stealth!", FALSE, caster, NULL, victim,
-        TO_CHAR, ANSI_GREEN);
-  } else {
-    act("Your attempt to give $N the gift of stealth fails.", FALSE, caster,
-      NULL, victim, TO_CHAR, ANSI_GREEN);
-    caster->nothingHappens(SILENT_YES);
+  if (!caster->bSuccess(bKnown, SPELL_STEALTH)) {
+    if (victim) {
+      act("Your attempt to give $N the gift of stealth fails.", false, caster,
+        nullptr, victim, TO_CHAR, ANSI_GREEN);
+      caster->nothingHappens(SILENT_YES);
+    } else {
+      caster->nothingHappens();
+    }
+    return false;
   }
-  return TRUE;
+
+  bool crit = rollStealthCrit(caster);
+  int duration = stealthDuration(caster, level, crit);
+
+  if (victim) {
+    if (applyStealth(caster, victim, level, duration))
+      caster->reconcileHelp(victim, discArray[SPELL_STEALTH]->alignMod);
+  } else {
+    bool anyBuffed = forEachGroupBuffTarget(caster, [&](TBeing* target) {
+      if (!applyStealth(caster, target, level, duration, SILENT_YES))
+        return false;
+      caster->reconcileHelp(target, discArray[SPELL_STEALTH]->alignMod);
+      return true;
+    });
+    if (!anyBuffed)
+      caster->sendTo("Everyone in your group is already stealthy.\n\r");
+  }
+  return true;
 }
 
-int accelerate(TBeing* caster, TBeing* victim, int level, short bKnown) {
-  affectedData aff;
+namespace {
 
-  caster->reconcileHelp(victim, discArray[SPELL_ACCELERATE]->alignMod);
-
-  if (caster->bSuccess(bKnown, SPELL_ACCELERATE)) {
+  // See applyFeatheryDescent (disc_mage_air.cc) for quiet/return semantics.
+  // The caller plays the room sound once for the whole cast, not per target.
+  [[nodiscard]] bool applyAccelerate(TBeing* caster, TBeing* victim, int level,
+    int duration, silentTypeT silent = SILENT_NO) {
+    affectedData aff;
     aff.type = SPELL_ACCELERATE;
     aff.level = level;
-    aff.duration = caster->durationModify(SPELL_ACCELERATE,
-      (aff.level / 3) * Pulse::UPDATES_PER_MUDHOUR);
+    aff.duration = duration;
     aff.modifier = 0;
     aff.location = APPLY_NONE;
     aff.bitvector = 0;
+    if (!victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_YES,
+          silent == SILENT_NO))
+      return false;
+
+    act("$N seems more nimble on $S feet!", false, caster, nullptr, victim,
+      TO_NOTVICT, ANSI_WHITE_BOLD);
+    act("You seem to be able to move with more ease!", false, victim, nullptr,
+      nullptr, TO_CHAR, ANSI_WHITE_BOLD);
+    if (caster != victim)
+      act("You have given $N the gift of speed!", false, caster, nullptr,
+        victim, TO_CHAR, ANSI_WHITE_BOLD);
+    return true;
+  }
+
+  bool rollAccelerateCrit(TBeing* caster) {
     switch (critSuccess(caster, SPELL_ACCELERATE)) {
       case CRIT_S_DOUBLE:
       case CRIT_S_TRIPLE:
       case CRIT_S_KILL:
         CS(SPELL_ACCELERATE);
-        aff.duration *= 2;
-        break;
+        return true;
       case CRIT_S_NONE:
         break;
     }
+    return false;
+  }
 
-    if (!victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_YES)) {
-      caster->nothingHappens();
-      return SPELL_FALSE;
-    }
-    victim->roomp->playsound(SOUND_SPELL_ACCELERATE, SOUND_TYPE_MAGIC);
+  int accelerateDuration(TBeing* caster, int level, bool crit) {
+    int duration = caster->durationModify(SPELL_ACCELERATE,
+      (level / 3) * Pulse::UPDATES_PER_MUDHOUR);
+    if (crit)
+      duration *= 2;
+    return duration;
+  }
 
-    act("$N seems more nimble on $S feet!", FALSE, caster, NULL, victim,
-      TO_NOTVICT, ANSI_WHITE_BOLD);
-    act("You seem to be able to move with more ease!", FALSE, victim, NULL,
-      NULL, TO_CHAR, ANSI_WHITE_BOLD);
-    if (caster != victim)
-      act("You have given $N the gift of speed!", FALSE, caster, NULL, victim,
-        TO_CHAR, ANSI_WHITE_BOLD);
-    return SPELL_SUCCESS;
-  } else {
-    act("Your attempt to give $N the gift of speed fails!", FALSE, caster, NULL,
-      victim, TO_CHAR, ANSI_WHITE_BOLD);
+}  // namespace
+
+int accelerate(TBeing* caster, TBeing* victim, int level, short bKnown) {
+  if (!caster->bSuccess(bKnown, SPELL_ACCELERATE)) {
+    act("Your attempt to give $N the gift of speed fails!", false, caster,
+      nullptr, victim, TO_CHAR, ANSI_WHITE_BOLD);
     caster->nothingHappens(SILENT_YES);
     return SPELL_FAIL;
   }
+
+  bool crit = rollAccelerateCrit(caster);
+  int duration = accelerateDuration(caster, level, crit);
+
+  if (!applyAccelerate(caster, victim, level, duration))
+    return SPELL_FAIL;
+
+  victim->roomp->playsound(SOUND_SPELL_ACCELERATE, SOUND_TYPE_MAGIC);
+  caster->reconcileHelp(victim, discArray[SPELL_ACCELERATE]->alignMod);
+  return SPELL_SUCCESS;
 }
 
 void accelerate(TBeing* caster, TBeing* victim, TMagicItem* obj) {
@@ -1164,73 +1221,121 @@ void accelerate(TBeing* caster, TBeing* victim, TMagicItem* obj) {
 }
 
 int accelerate(TBeing* caster, TBeing* victim) {
-  taskDiffT diff;
-
   if (!bPassMageChecks(caster, SPELL_ACCELERATE, victim))
-    return FALSE;
+    return false;
 
   lag_t rounds = discArray[SPELL_ACCELERATE]->lag;
-  diff = discArray[SPELL_ACCELERATE]->task;
+  taskDiffT diff = discArray[SPELL_ACCELERATE]->task;
 
-  start_cast(caster, victim, NULL, caster->roomp, SPELL_ACCELERATE, diff, 1, "",
-    rounds, caster->in_room, 0, 0, TRUE, 0);
-  return TRUE;
+  start_cast(caster, victim, nullptr, caster->roomp, SPELL_ACCELERATE, diff, 1,
+    "", rounds, caster->in_room, 0, 0, true, 0);
+  return true;
 }
 
 int castAccelerate(TBeing* caster, TBeing* victim) {
-  int ret, level;
-
-  level = caster->getSkillLevel(SPELL_ACCELERATE);
+  int level = caster->getSkillLevel(SPELL_ACCELERATE);
   int bKnown = caster->getSkillValue(SPELL_ACCELERATE);
 
-  if ((ret = accelerate(caster, victim, level, bKnown)) == SPELL_SUCCESS) {
-  } else {
+  if (!caster->bSuccess(bKnown, SPELL_ACCELERATE)) {
+    if (victim) {
+      act("Your attempt to give $N the gift of speed fails!", false, caster,
+        nullptr, victim, TO_CHAR, ANSI_WHITE_BOLD);
+      caster->nothingHappens(SILENT_YES);
+    } else {
+      caster->nothingHappens();
+    }
+    return false;
   }
-  return TRUE;
+
+  bool crit = rollAccelerateCrit(caster);
+  int duration = accelerateDuration(caster, level, crit);
+
+  if (victim) {
+    if (applyAccelerate(caster, victim, level, duration)) {
+      caster->roomp->playsound(SOUND_SPELL_ACCELERATE, SOUND_TYPE_MAGIC);
+      caster->reconcileHelp(victim, discArray[SPELL_ACCELERATE]->alignMod);
+    }
+  } else {
+    bool anyBuffed = forEachGroupBuffTarget(caster, [&](TBeing* target) {
+      if (!applyAccelerate(caster, target, level, duration, SILENT_YES))
+        return false;
+      caster->reconcileHelp(target, discArray[SPELL_ACCELERATE]->alignMod);
+      return true;
+    });
+    if (!anyBuffed)
+      caster->sendTo("Everyone in your group is already accelerated.\n\r");
+    else
+      caster->roomp->playsound(SOUND_SPELL_ACCELERATE, SOUND_TYPE_MAGIC);
+  }
+  return true;
 }
 
-int haste(TBeing* caster, TBeing* victim, int level, short bKnown) {
-  affectedData aff;
+namespace {
 
-  caster->reconcileHelp(victim, discArray[SPELL_HASTE]->alignMod);
-
-  if (caster->bSuccess(bKnown, SPELL_HASTE)) {
+  // Returns false when affectJoin can't renew an existing non-expired affect.
+  // See applyFeatheryDescent (disc_mage_air.cc) for quiet/return semantics.
+  // The caller plays the room sound once for the whole cast, not per target.
+  [[nodiscard]] bool applyHaste(TBeing* caster, TBeing* victim, int level,
+    int duration, silentTypeT silent = SILENT_NO) {
+    affectedData aff;
     aff.type = SPELL_HASTE;
     aff.level = level;
-    aff.duration = caster->durationModify(SPELL_HASTE,
-      (aff.level / 3) * Pulse::UPDATES_PER_MUDHOUR);
+    aff.duration = duration;
     aff.modifier = 0;
     aff.location = APPLY_NONE;
     aff.bitvector = 0;
+    if (!victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_YES,
+          silent == SILENT_NO))
+      return false;
+
+    act("$N has gained a bounce in $S step!", false, caster, nullptr, victim,
+      TO_NOTVICT);
+    act("You seem to be able to move with the greatest of ease!", false, victim,
+      nullptr, nullptr, TO_CHAR);
+    if (caster != victim)
+      act("You have given $N the speed of the wind!", false, caster, nullptr,
+        victim, TO_CHAR);
+    return true;
+  }
+
+  bool rollHasteCrit(TBeing* caster) {
     switch (critSuccess(caster, SPELL_HASTE)) {
       case CRIT_S_KILL:
       case CRIT_S_TRIPLE:
       case CRIT_S_DOUBLE:
         CS(SPELL_HASTE);
-        aff.duration *= 2;
-        break;
+        return true;
       case CRIT_S_NONE:
         break;
     }
-    if (!victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_YES)) {
-      caster->nothingHappens();
-      return SPELL_FALSE;
-    }
+    return false;
+  }
 
-    victim->roomp->playsound(SOUND_SPELL_HASTE, SOUND_TYPE_MAGIC);
+  int hasteDuration(TBeing* caster, int level, bool crit) {
+    int duration = caster->durationModify(SPELL_HASTE,
+      (level / 3) * Pulse::UPDATES_PER_MUDHOUR);
+    if (crit)
+      duration *= 2;
+    return duration;
+  }
 
-    act("$N has gained a bounce in $S step!", FALSE, caster, NULL, victim,
-      TO_NOTVICT);
-    act("You seem to be able to move with the greatest of ease!", FALSE, victim,
-      NULL, NULL, TO_CHAR);
-    if (caster != victim)
-      act("You have given $N the speed of the wind!", FALSE, caster, NULL,
-        victim, TO_CHAR);
-    return SPELL_SUCCESS;
-  } else {
+}  // namespace
+
+int haste(TBeing* caster, TBeing* victim, int level, short bKnown) {
+  if (!caster->bSuccess(bKnown, SPELL_HASTE)) {
     caster->nothingHappens();
     return SPELL_FAIL;
   }
+
+  bool crit = rollHasteCrit(caster);
+  int duration = hasteDuration(caster, level, crit);
+
+  if (!applyHaste(caster, victim, level, duration))
+    return SPELL_FAIL;
+
+  victim->roomp->playsound(SOUND_SPELL_HASTE, SOUND_TYPE_MAGIC);
+  caster->reconcileHelp(victim, discArray[SPELL_HASTE]->alignMod);
+  return SPELL_SUCCESS;
 }
 
 void haste(TBeing* caster, TBeing* victim, TMagicItem* obj) {
@@ -1239,25 +1344,46 @@ void haste(TBeing* caster, TBeing* victim, TMagicItem* obj) {
 
 int haste(TBeing* caster, TBeing* victim) {
   if (!bPassMageChecks(caster, SPELL_HASTE, victim))
-    return FALSE;
+    return false;
 
   lag_t rounds = discArray[SPELL_HASTE]->lag;
   taskDiffT diff = discArray[SPELL_HASTE]->task;
 
-  start_cast(caster, victim, NULL, caster->roomp, SPELL_HASTE, diff, 1, "",
-    rounds, caster->in_room, 0, 0, TRUE, 0);
-  return TRUE;
+  start_cast(caster, victim, nullptr, caster->roomp, SPELL_HASTE, diff, 1, "",
+    rounds, caster->in_room, 0, 0, true, 0);
+  return true;
 }
 
 int castHaste(TBeing* caster, TBeing* victim) {
   int level = caster->getSkillLevel(SPELL_HASTE);
   int bKnown = caster->getSkillValue(SPELL_HASTE);
 
-  int ret = haste(caster, victim, level, bKnown);
-  if (ret == SPELL_SUCCESS) {
-  } else {
+  if (!caster->bSuccess(bKnown, SPELL_HASTE)) {
+    caster->nothingHappens();
+    return false;
   }
-  return TRUE;
+
+  bool crit = rollHasteCrit(caster);
+  int duration = hasteDuration(caster, level, crit);
+
+  if (victim) {
+    if (applyHaste(caster, victim, level, duration)) {
+      caster->roomp->playsound(SOUND_SPELL_HASTE, SOUND_TYPE_MAGIC);
+      caster->reconcileHelp(victim, discArray[SPELL_HASTE]->alignMod);
+    }
+  } else {
+    bool anyBuffed = forEachGroupBuffTarget(caster, [&](TBeing* target) {
+      if (!applyHaste(caster, target, level, duration, SILENT_YES))
+        return false;
+      caster->reconcileHelp(target, discArray[SPELL_HASTE]->alignMod);
+      return true;
+    });
+    if (!anyBuffed)
+      caster->sendTo("Everyone in your group is already hasted.\n\r");
+    else
+      caster->roomp->playsound(SOUND_SPELL_HASTE, SOUND_TYPE_MAGIC);
+  }
+  return true;
 }
 
 int calm(TBeing* caster, TBeing* victim, int, short bKnown) {
@@ -1581,37 +1707,6 @@ void senseLife(TBeing* caster, TBeing* victim, TMagicItem* obj) {
   }
 }
 
-int senseLife(TBeing* caster, TBeing* victim) {
-  taskDiffT diff;
-
-  if (!bPassMageChecks(caster, SPELL_SENSE_LIFE, victim))
-    return FALSE;
-
-  lag_t rounds = discArray[SPELL_SENSE_LIFE]->lag;
-  diff = discArray[SPELL_SENSE_LIFE]->task;
-
-  start_cast(caster, victim, NULL, caster->roomp, SPELL_SENSE_LIFE, diff, 1, "",
-    rounds, caster->in_room, 0, 0, TRUE, 0);
-  return TRUE;
-}
-
-int castSenseLife(TBeing* caster, TBeing* victim) {
-  int ret, level;
-
-  level = caster->getSkillLevel(SPELL_SENSE_LIFE);
-  int bKnown = caster->getSkillValue(SPELL_SENSE_LIFE);
-
-  ret = senseLife(caster, victim, level, bKnown);
-  if (ret == SPELL_SUCCESS) {
-    victim->sendTo("You feel more aware of the world about you.\n\r");
-    act("$n's eyes flicker a faint aqua blue.", FALSE, victim, NULL, NULL,
-      TO_ROOM, ANSI_CYAN);
-  } else
-    caster->nothingHappens();
-
-  return TRUE;
-}
-
 int detectInvisibility(TBeing* caster, TBeing* victim, int level,
   short bKnown) {
   affectedData aff;
@@ -1656,32 +1751,6 @@ void detectInvisibility(TBeing* caster, TBeing* victim, TMagicItem* obj) {
     obj->getMagicLearnedness());
 }
 
-int detectInvisibility(TBeing* caster, TBeing* victim) {
-  taskDiffT diff;
-
-  if (!bPassMageChecks(caster, SPELL_DETECT_INVISIBLE, victim))
-    return FALSE;
-
-  lag_t rounds = discArray[SPELL_DETECT_INVISIBLE]->lag;
-  diff = discArray[SPELL_DETECT_INVISIBLE]->task;
-
-  start_cast(caster, victim, NULL, caster->roomp, SPELL_DETECT_INVISIBLE, diff,
-    1, "", rounds, caster->in_room, 0, 0, TRUE, 0);
-  return TRUE;
-}
-
-int castDetectInvisibility(TBeing* caster, TBeing* victim) {
-  int ret, level;
-
-  level = caster->getSkillLevel(SPELL_DETECT_INVISIBLE);
-  int bKnown = caster->getSkillValue(SPELL_DETECT_INVISIBLE);
-
-  ret = detectInvisibility(caster, victim, level, bKnown);
-
-  if (ret == SPELL_SUCCESS) {}
-  return TRUE;
-}
-
 int trueSight(TBeing* caster, TBeing* victim, int level, short bKnown) {
   affectedData aff;
   caster->reconcileHelp(victim, discArray[SPELL_TRUE_SIGHT]->alignMod);
@@ -1724,28 +1793,159 @@ void trueSight(TBeing* caster, TBeing* victim, TMagicItem* obj) {
   trueSight(caster, victim, obj->getMagicLevel(), obj->getMagicLearnedness());
 }
 
-int trueSight(TBeing* caster, TBeing* victim) {
-  taskDiffT diff;
+namespace {
 
-  if (!bPassMageChecks(caster, SPELL_TRUE_SIGHT, victim))
-    return FALSE;
+  // Calculate the +vision modifier for mage sight based on caster level.
+  // Scales linearly from +5 at level 1 to +15 at level 50.
+  int mageSightVisionMod(int level) {
+    return std::clamp(5 + (level - 1) * 10 / 49, 5, 15);
+  }
 
-  lag_t rounds = discArray[SPELL_TRUE_SIGHT]->lag;
-  diff = discArray[SPELL_TRUE_SIGHT]->task;
+  // mageSightPassives is defined in disc_mage_spirit.h
 
-  start_cast(caster, victim, NULL, caster->roomp, SPELL_TRUE_SIGHT, diff, 1, "",
-    rounds, caster->in_room, 0, 0, TRUE, 0);
-  return TRUE;
+  // Apply mage sight buffs to a single target. Called once per target.
+  // passiveMask is a bitmask of which passives succeeded the group-wide roll.
+  void applyMageSight(TBeing* caster, TBeing* victim, int level, int duration,
+    unsigned int passiveMask) {
+    // Apply the primary +vision buff
+    affectedData aff;
+    aff.type = SPELL_MAGE_SIGHT;
+    aff.level = level;
+    aff.duration = duration;
+    aff.modifier = mageSightVisionMod(level);
+    aff.location = APPLY_VISION;
+    aff.bitvector = 0;
+    victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_YES, false);
+
+    // Apply each passive that passed the group-wide success check.
+    // Passives are tagged with APPLY_VISION (modifier +1) and modifier2 =
+    // SPELL_MAGE_SIGHT so the cascade in affectFrom can distinguish them from
+    // independently-sourced buffs (e.g. infravision potions use APPLY_NONE).
+    // Cap passive duration to the primary's remaining duration so passives
+    // never outlive the parent spell (e.g. when recasting adds a previously
+    // failed passive while the primary is not yet renewable).
+    int passiveDur = duration;
+    for (auto* af = victim->affected; af; af = af->next) {
+      if (af->type == SPELL_MAGE_SIGHT) {
+        passiveDur = std::min(duration, static_cast<int>(af->duration));
+        break;
+      }
+    }
+
+    for (size_t i = 0; i < mageSightPassives.size(); i++) {
+      if (!(passiveMask & (1u << i)))
+        continue;
+
+      const auto& passive = mageSightPassives[i];
+      affectedData pAff;
+      pAff.type = passive.spell;
+      pAff.level = level;
+      pAff.duration = passiveDur;
+      pAff.modifier = 1;
+      pAff.modifier2 = SPELL_MAGE_SIGHT;
+      pAff.location = APPLY_VISION;
+      pAff.bitvector = passive.bitvector;
+      victim->affectJoin(caster, &pAff, AVG_DUR_NO, AVG_EFF_YES, false);
+    }
+  }
+
+}  // namespace
+
+// Item-based mage sight (scrolls, potions, wands).
+void mageSight(TBeing* caster, TBeing* victim, TMagicItem* obj) {
+  int level = obj->getMagicLevel();
+  int bKnown = obj->getMagicLearnedness();
+  int duration = caster->durationModify(SPELL_MAGE_SIGHT,
+    level * Pulse::UPDATES_PER_MUDHOUR);
+
+  caster->reconcileHelp(victim, discArray[SPELL_MAGE_SIGHT]->alignMod);
+
+  if (!caster->bSuccess(bKnown, SPELL_MAGE_SIGHT)) {
+    caster->nothingHappens();
+    return;
+  }
+
+  // Roll passives using the item's learnedness
+  unsigned int passiveMask = 0;
+  for (size_t i = 0; i < mageSightPassives.size(); i++) {
+    if (caster->bSuccess(bKnown, mageSightPassives[i].spell))
+      passiveMask |= (1u << i);
+  }
+
+  applyMageSight(caster, victim, level, duration, passiveMask);
+  act("Your eyes take on a magical gleam.", false, victim, nullptr, nullptr,
+    TO_CHAR);
+  act("$n's eyes take on a magical gleam.", false, victim, nullptr, nullptr,
+    TO_ROOM);
 }
 
-int castTrueSight(TBeing* caster, TBeing* victim) {
-  int level;
+// Initiator for mage sight: called from spell parser when player casts.
+// If victim is non-null, single target. If null, group cast.
+int mageSight(TBeing* caster, TBeing* victim) {
+  if (!bPassMageChecks(caster, SPELL_MAGE_SIGHT, victim))
+    return false;
 
-  level = caster->getSkillLevel(SPELL_TRUE_SIGHT);
-  int bKnown = caster->getSkillValue(SPELL_TRUE_SIGHT);
+  lag_t rounds = discArray[SPELL_MAGE_SIGHT]->lag;
+  taskDiffT diff = discArray[SPELL_MAGE_SIGHT]->task;
 
-  trueSight(caster, victim, level, bKnown);
-  return TRUE;
+  start_cast(caster, victim, nullptr, caster->roomp, SPELL_MAGE_SIGHT, diff, 1,
+    "", rounds, caster->in_room, 0, 0, true, 0);
+  return true;
+}
+
+// Cast completion handler for mage sight.
+int castMageSight(TBeing* caster, TBeing* victim) {
+  int level = caster->getSkillLevel(SPELL_MAGE_SIGHT);
+  int bKnown = caster->getSkillValue(SPELL_MAGE_SIGHT);
+  int duration = caster->durationModify(SPELL_MAGE_SIGHT,
+    level * Pulse::UPDATES_PER_MUDHOUR);
+
+  if (!caster->bSuccess(bKnown, SPELL_MAGE_SIGHT)) {
+    caster->nothingHappens();
+    return false;
+  }
+
+  // Roll passives once for the entire cast (group-wide)
+  unsigned int passiveMask = 0;
+  for (size_t i = 0; i < mageSightPassives.size(); i++) {
+    int pKnown = caster->getSkillValue(mageSightPassives[i].spell);
+    if (pKnown > 0 && caster->bSuccess(pKnown, mageSightPassives[i].spell))
+      passiveMask |= (1u << i);
+  }
+
+  if (victim) {
+    // Single target mode
+    caster->reconcileHelp(victim, discArray[SPELL_MAGE_SIGHT]->alignMod);
+    applyMageSight(caster, victim, level, duration, passiveMask);
+    act("Your eyes take on a magical gleam.", false, victim, nullptr, nullptr,
+      TO_CHAR);
+    act("$n's eyes take on a magical gleam.", false, victim, nullptr, nullptr,
+      TO_ROOM);
+  } else {
+    // Group mode: buff all group members in the room
+    bool found = false;
+    for (StuffIter it = caster->roomp->stuff.begin();
+      it != caster->roomp->stuff.end();) {
+      TThing* t = *(it++);
+      auto* target = dynamic_cast<TBeing*>(t);
+      if (!target)
+        continue;
+      if (!caster->inGroup(*target))
+        continue;
+
+      caster->reconcileHelp(target, discArray[SPELL_MAGE_SIGHT]->alignMod);
+      applyMageSight(caster, target, level, duration, passiveMask);
+      act("Your eyes take on a magical gleam.", false, target, nullptr, nullptr,
+        TO_CHAR);
+      act("$n's eyes take on a magical gleam.", false, target, nullptr, nullptr,
+        TO_ROOM);
+      found = true;
+    }
+    if (!found) {
+      caster->sendTo("There's nobody in your group here.\n\r");
+    }
+  }
+  return true;
 }
 
 int telepathy(TBeing* caster, int, short bKnown) {

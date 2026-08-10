@@ -2233,6 +2233,11 @@ int TBeing::doQuaff(sstring argument) {
 int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
   int rc = 0, i;
   int level = max(30, amt * 6), learn = max(100, amt * 20);
+  // A poisoner trained in the skill delivers the liquid at their own level
+  // when that beats the liquid's baseline, so a high-level thief's coating
+  // bites harder than a novice's.
+  if (ch && ch->doesKnowSkill(SKILL_POISON_WEAPON))
+    level = max(level, static_cast<int>(ch->GetMaxLevel()));
   int duration = (level << 2) * Pulse::UPDATES_PER_MUDHOUR;
   affectedData aff, aff5[5];
   statTypeT whichStat;
@@ -2256,9 +2261,9 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       break;
     case LIQ_HOLYWATER:
       if (vict->isUndead())
-        harm(ch, vict, level, learn, SPELL_HARM, 0);
+        rc = harm(ch, vict, level, learn, SPELL_HARM, 0);
       else if (vict->isDiabolic())
-        harmLight(ch, vict, level, learn, SPELL_HARM, 0);
+        rc = harmLight(ch, vict, level, learn, SPELL_HARM, 0);
       else
         bless(ch, vict, level / 10, learn / 10, SPELL_BLESS);
       break;
@@ -2441,7 +2446,7 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       poison(ch, vict, level, learn, SPELL_POISON);
       break;
     case LIQ_POT_BONE_BREAKER:
-      boneBreaker(ch, vict, level, learn, SPELL_BONE_BREAKER);
+      rc = boneBreaker(ch, vict, level, learn, SPELL_BONE_BREAKER);
       break;
     case LIQ_POT_AQUALUNG:
       aqualung(ch, vict, level, learn);
@@ -2503,7 +2508,7 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       clarity(ch, vict, level, learn);
       break;
     case LIQ_POT_BOILING_BLOOD:
-      bloodBoil(ch, vict, level, learn, SPELL_BLOOD_BOIL);
+      rc = bloodBoil(ch, vict, level, learn, SPELL_BLOOD_BOIL);
       break;
     case LIQ_POT_STUPIDITY:
       stupidity(ch, vict, level, learn);
@@ -2518,7 +2523,10 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       cleanse(ch, vict, level, learn, SPELL_CLEANSE);
       break;
     case LIQ_POT_MULTI1:  // harm crit, infravision, armor
-      harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
+      rc = harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
+      // the harm can kill either party; don't cast on a corpse
+      if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD))
+        break;
       infravision(ch, vict, level, learn);
       armor(ch, vict, level, learn, SPELL_ARMOR);
       break;
@@ -2552,7 +2560,10 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       gillsOfFlesh(ch, vict, level, learn);
       break;
     case LIQ_POT_MULTI5:  // harm, stealth, invis
-      harm(ch, vict, level, learn, SPELL_HARM, 0);
+      rc = harm(ch, vict, level, learn, SPELL_HARM, 0);
+      // the harm can kill either party; don't cast on a corpse
+      if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD))
+        break;
       stealth(ch, vict, level, learn);
       invisibility(ch, vict, level, learn);
       break;
@@ -2563,11 +2574,11 @@ int doLiqSpell(TBeing* ch, TBeing* vict, liqTypeT liq, int amt) {
       break;
     case LIQ_POT_MULTI7:  // sanc, harm crit
       sanctuary(ch, vict, level, learn);
-      harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
+      rc = harmCritical(ch, vict, level, learn, SPELL_HARM_CRITICAL, 0);
       break;
     case LIQ_POT_MULTI8:  // sanc, harm ser
       sanctuary(ch, vict, level, learn);
-      harmSerious(ch, vict, level, learn, SPELL_HARM_SERIOUS, 0);
+      rc = harmSerious(ch, vict, level, learn, SPELL_HARM_SERIOUS, 0);
       break;
     case LIQ_POT_MULTI9:  // sanc, armor, bless
       sanctuary(ch, vict, level, learn);
@@ -3051,6 +3062,9 @@ int doObjSpell(TBeing* caster, TBeing* victim, TMagicItem* obj, TObj* target,
     case SPELL_TRUE_SIGHT:
       trueSight(caster, victim, obj);
       break;
+    case SPELL_MAGE_SIGHT:
+      mageSight(caster, victim, obj);
+      break;
     case SPELL_GARMULS_TAIL:
       garmulsTail(caster, victim, obj);
       break;
@@ -3080,9 +3094,6 @@ int doObjSpell(TBeing* caster, TBeing* victim, TMagicItem* obj, TObj* target,
       break;
     case SPELL_HEROES_FEAST:
       heroesFeast(caster);
-      break;
-    case SPELL_ANTIGRAVITY:
-      antigravity(caster);
       break;
     case SPELL_LEVITATE:
       levitate(caster, victim);
@@ -3902,13 +3913,15 @@ void TBeing::doHistory() {
   sendTo("\n\rYour tell history :\n\r\n\r");
 
   db.query(
-    "select tellfrom, tell from tellhistory where tellto='%s' order by "
-    "telltime desc limit 25",
-    getName().c_str());
+    "select coalesce(p.name, 'someone') as sender, th.tell "
+    "from tellhistory th "
+    "left join player p on th.from_id=p.id "
+    "where th.to_id=%i order by th.telltime desc limit 25",
+    getPlayerID());
 
   for (i = 0; i < 25 && db.fetchRow(); i++) {
     sendTo(COLOR_BASIC, format("[%d] <p>%s<1> told you, \"<c>%s<1>\"\n\r") % i %
-                          db["tellfrom"] % db["tell"]);
+                          db["sender"] % db["tell"]);
   }
 }
 

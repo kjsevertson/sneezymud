@@ -77,7 +77,6 @@ void TBeing::resetEffectsChar() { return; }
 
 void TPerson::resetChar() {
   char* tmstr;
-  sstring recipient;
   affectedData* af;
 
   roomp = NULL;
@@ -243,11 +242,7 @@ void TPerson::resetChar() {
 #endif
   classSpecificStuff();
 
-  parse_name_sstring(getName(), recipient);
-
-  recipient = recipient.lower();
-
-  if (!Config::NoMail() && has_mail(recipient))
+  if (!Config::NoMail() && has_mail(getPlayerID()))
     sendTo(format("\n\rYou have %sMAIL%s.\n\r") % bold() % norm());
 
   time_t ct = player.time->last_logon ? player.time->last_logon : time(0);
@@ -323,7 +318,7 @@ bool raw_save_char(const char* name, charFile* char_element) {
   TDatabase db(DB_SNEEZY);
   db.query(
     "update player p, account a set p.talens=%i, p.account_id=a.account_id "
-    "where lower(p.name)=lower('%s') and a.name='%s'",
+    "where p.name='%s' and a.name='%s'",
     char_element->money, name, char_element->aname);
 
   return TRUE;
@@ -347,13 +342,13 @@ bool load_char(const sstring& name, charFile* char_element,
     dbase ? std::move(dbase)
           : std::move(std::unique_ptr<IDatabase>(new TDatabase(DB_SNEEZY))));
   db->query(
-    "select talens from player where lower(name)=lower('%s') and talens is not "
+    "select talens from player where name='%s' and talens is not "
     "null",
     name.c_str());
   if (db->fetchRow()) {
     char_element->money = convertTo<int>((*db)["talens"]);
   } else {
-    db->query("update player set talens=%i where lower(name)=lower('%s')",
+    db->query("update player set talens=%i where name='%s'",
       char_element->money, name.c_str());
   }
 
@@ -588,8 +583,7 @@ void TPerson::loadFromDb(const std::string& name) {
   player.account_id = desc->account->account_id;
 
   TDatabase db(DB_SNEEZY);
-  db.query("select * from player where lower(name) = lower('%s')",
-    name.c_str());
+  db.query("select * from player where name='%s'", name.c_str());
   mud_assert(db.fetchRow(), "can't find player in DB");
   desc->playerID = player.player_id = convertTo<int>(db["id"]);
 }
@@ -964,7 +958,7 @@ void TBeing::saveChar(int load_room) {
       unsigned int shop_nr = 0;
       for (; (shop_nr < shop_index.size()) &&
              (shop_index[shop_nr].keeper != this->number);
-           shop_nr++)
+        shop_nr++)
         ;
 
       if (shop_nr >= shop_index.size()) {
@@ -1037,12 +1031,15 @@ void TBeing::saveChar(int load_room) {
 
   if (!isImmortal()) {
     db.query(
-      "update player set talens=%i, account_id=%i, load_room=%i, "
+      "update player set account_id=%i, talens=%i, load_room=%i, "
       "last_logon=%i, nutrition=%i where id=%i",
-      chFile.money, accountId, load_room, chFile.last_logon, nutrition,
+      accountId, chFile.money, load_room, chFile.last_logon, nutrition,
       getPlayerID());
 
     chFile.load_room = 0;
+  } else {
+    db.query("update player set account_id=%i where id=%i", accountId,
+      getPlayerID());
   }
 
   assert(getPlayerID());
@@ -1318,8 +1315,10 @@ void do_the_player_stuff(const char* name) {
       }
 
       TDatabase db(DB_SNEEZY);
-      db.query("insert into factionmembers values ('%s', '%s', %i)", st.name,
-        factname, max_level);
+      db.query(
+        "insert into factionmembers (player_id, faction, level) "
+        "select id, '%s', %i from player where name='%s'",
+        factname, max_level, st.name);
     }
 
     // count active
@@ -1345,6 +1344,12 @@ void do_the_player_stuff(const char* name) {
           vsystem(buf);
           wipeRentFile(name);
           wipeCorpseFile(sstring(name).lower().c_str());
+
+          // Delete the player DB row (FK CASCADE handles child tables)
+          {
+            TDatabase db(DB_SNEEZY);
+            db.query("delete from player where name='%s'", name);
+          }
           return;
         } else {
           sprintf(buf, "mutable/rent/%c/%s", LOWER(name[0]),
@@ -1669,7 +1674,7 @@ void TBeing::doReset(sstring arg) {
     }
     // reset the practices of this character
     for (classIndT resetClass = MIN_CLASS_IND; resetClass < MAX_CLASSES;
-         resetClass++) {
+      resetClass++) {
       int practices = 0;
       if (player->resetPractices(resetClass, practices, true)) {
         sendTo(format("You have reset %ss %s practices.  %d practices were "
@@ -2333,4 +2338,13 @@ int numFifties(race_t race, bool perma, sstring account_name) {
   closedir(dfd);
 
   return num_fifties;
+}
+
+int getPlayerIdByName(const char* name) {
+  TDatabase db(DB_SNEEZY);
+  db.query("select id from player where name='%s'", name);
+  if (db.fetchRow()) {
+    return convertTo<int>(db["id"]);
+  }
+  return 0;
 }

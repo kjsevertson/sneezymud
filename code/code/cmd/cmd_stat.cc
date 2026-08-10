@@ -13,6 +13,7 @@
 #include "low.h"
 #include "account.h"
 #include "materials.h"
+#include "liquids.h"
 #include "disease.h"
 #include "spec_rooms.h"
 #include "monster.h"
@@ -686,6 +687,9 @@ void TBeing::statObj(const TObj* j) {
          j->getCarriedWeight() % j->getCarriedVolume();
 
   str += j->statObjInfo();
+  if (j->isPoisoned())
+    str +=
+      format("Poisoned with:      %s\n\r") % liquidInfo[j->getPoison()]->name;
 
   str += format("\n\rSpecial procedure: %s   ") %
          (j->spec ? objSpecials[GET_OBJ_SPE_INDEX(j->spec)].name : "none");
@@ -796,6 +800,9 @@ void TBeing::statObjForDivman(const TObj* j) {
          j->getMaxStructPoints() % j->getVolume();
   str += format("Base value in talens: %d\n\r") % j->obj_flags.cost;
   str += j->statObjInfo();
+  if (j->isPoisoned())
+    str +=
+      format("Poisoned with:      %s\n\r") % liquidInfo[j->getPoison()]->name;
   if (j->spec) {
     str += format("It possesses the special trait known as %s.\n\r\n\r") %
            objSpecials[GET_OBJ_SPE_INDEX(j->spec)].name;
@@ -1514,6 +1521,7 @@ void TBeing::statBeing(TBeing* k) {
       case SPELL_FROST_BREATH:
       case SPELL_WATERY_GRAVE:
       case SPELL_TSUNAMI:
+      case SPELL_BLIZZARD:
       case SPELL_CHLORINE_BREATH:
       case SPELL_DUST_BREATH:
       case SPELL_POISON_DEIKHAN:
@@ -1674,6 +1682,7 @@ void TBeing::statBeing(TBeing* k) {
       case SPELL_BIND:
       case SPELL_ENLIVEN:
       case SPELL_TRUE_SIGHT:
+      case SPELL_MAGE_SIGHT:
       case SPELL_CLOUD_OF_CONCEALMENT:
       case SPELL_POLYMORPH:
       case SPELL_SILENCE:
@@ -1707,6 +1716,7 @@ void TBeing::statBeing(TBeing* k) {
       case SPELL_SANCTUARY:
       case SPELL_RELIVE:
       case SPELL_CRUSADE:
+      case SPELL_CONSECRATE:
       case SPELL_CURE_PARALYSIS:
       case SPELL_SECOND_WIND:
       case SPELL_HEROES_FEAST:
@@ -1854,6 +1864,7 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_HIDE:
       case SKILL_POISON_WEAPON:
       case SKILL_DISGUISE:
+      case SKILL_SKULK:
       case SKILL_DODGE_THIEF:
       case SKILL_SET_TRAP_CONT:
       case SKILL_SET_TRAP_DOOR:
@@ -1914,6 +1925,7 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_FAST_LOAD:
       case SKILL_SHARPEN:
       case SKILL_DULL:
+      case SKILL_SERRATE:
       case SKILL_ATTUNE:
       case SKILL_STAVECHARGE:
       case SKILL_SACRIFICE:
@@ -1952,6 +1964,10 @@ void TBeing::statBeing(TBeing* k) {
       case SKILL_AVIAN:
       case SKILL_FISHBURBLE:
       case SKILL_COMMON:
+      case SKILL_RESOURCEFULNESS:
+      case SKILL_SCRUTINY:
+      case SKILL_JAM:
+      case SKILL_KEYCUT:
       case SPELL_EARTHMAW:
       case SPELL_CREEPING_DOOM:
       case SPELL_FERAL_WRATH:
@@ -2284,8 +2300,8 @@ void TBeing::statBeing(TBeing* k) {
       case AFFECT_HOLY_BEAM:
         str += "Holy Beam.\n\r";
         str += format("     Modifies %s to %s by %ld points\n\r") %
-               apply_types[aff->location].name %
-               immunity_names[aff->modifier] % aff->modifier2;
+               apply_types[aff->location].name % immunity_names[aff->modifier] %
+               aff->modifier2;
         str += format("     Expires in %6d updates.\n\r") % aff->duration;
         break;
       case AFFECT_GUARDIANS_LIGHT:
@@ -2338,6 +2354,24 @@ void TBeing::statBeing(TBeing* k) {
         str += "Aura of Might.\n\r";
         str += format("     Modifies %s by %ld points\n\r") %
                apply_types[aff->location].name % aff->modifier;
+        str += format("     Expires in %6d updates.\n\r") % aff->duration;
+        break;
+
+      case SPELL_CONSECRATE_AFFECT:
+        str += "Consecration.\n\r";
+        str += format("     Modifies %s to %s by %ld points\n\r") %
+               apply_types[aff->location].name % immunity_names[aff->modifier] %
+               aff->modifier2;
+        str += format("     Expires in %6d updates.\n\r") % aff->duration;
+        break;
+
+      case SKILL_DROW_INVIS:
+        str += "Drow Invis (cooldown).\n\r";
+        str += format("     Expires in %6d updates.\n\r") % aff->duration;
+        break;
+
+      case SKILL_DROW_DARKNESS:
+        str += "Drow Darkness (cooldown).\n\r";
         str += format("     Expires in %6d updates.\n\r") % aff->duration;
         break;
 

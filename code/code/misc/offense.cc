@@ -1011,7 +1011,7 @@ int TBeing::doFlee(const char* arg) {
         TO_ROOM);
       act("You turn tail and attempt to run away.", true, this, nullptr,
         nullptr, TO_CHAR);
-      loseSneak();
+      breakStealth();
 
       // Handle troglodyte racial
       if (panic && !::number(0, 1) && getMyRace()->hasTalent(TALENT_MUSK) &&
@@ -2246,14 +2246,9 @@ void TBeing::blowCount(bool check, float& fx, float& fy) const {
     }
   }
 
-  // haste
-  if (affectedBySpell(SPELL_HASTE) && getPosition() >= POSITION_STANDING) {
-    if (fx > 0.0)
-      fx += 0.5;
-    if (fy > 0.0)
-      fy += 0.5;
-  }
-  if (affectedBySpell(SPELL_CELERITE) && getPosition() >= POSITION_STANDING) {
+  // haste/celerite — do not stack for extra attacks
+  if ((affectedBySpell(SPELL_HASTE) || affectedBySpell(SPELL_CELERITE)) &&
+      getPosition() >= POSITION_STANDING) {
     if (fx > 0.0)
       fx += 0.5;
     if (fy > 0.0)

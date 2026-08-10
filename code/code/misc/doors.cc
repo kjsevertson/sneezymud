@@ -174,9 +174,13 @@ void TBeing::rawOpenDoor(dirTypeT dir) {
     return;
   }
   REMOVE_BIT(exitp->condition, EXIT_CLOSED);
-  // traps have already been checked for before getting here.
-  if (IS_SET(exitp->condition, EXIT_TRAPPED))
+  // traps have already been checked for before getting here.  The setter is
+  // cleared with the flag so the next trap on this exit can't be credited to
+  // whoever set this one.
+  if (IS_SET(exitp->condition, EXIT_TRAPPED)) {
     REMOVE_BIT(exitp->condition, EXIT_TRAPPED);
+    exitp->trap_setter.clear();
+  }
 
   if (IS_SET(exitp->condition, EXIT_SECRET)) {
     act("$n reveals a hidden passage!", TRUE, this, 0, 0, TO_ROOM);
@@ -308,8 +312,10 @@ void TBeing::rawOpenDoor(dirTypeT dir) {
   if (exit_ok(exitp, &rp) && (back = rp->dir_option[rev_dir(dir)]) &&
       (back->to_room == in_room)) {
     REMOVE_BIT(back->condition, EXIT_CLOSED);
-    if (IS_SET(back->condition, EXIT_TRAPPED))
+    if (IS_SET(back->condition, EXIT_TRAPPED)) {
       REMOVE_BIT(back->condition, EXIT_TRAPPED);
+      back->trap_setter.clear();
+    }
     strcpy(buf, getName().c_str());
     rp2 = real_roomp(exitp->to_room);
     switch (back->door_type) {

@@ -10,6 +10,92 @@
 
 bool TObj::isPluralItem() const { return FALSE; }
 
+bool TObj::isPoisoned() const {
+  if (poison >= LIQ_WATER)
+    return true;
+
+  return false;
+}
+
+// Returns DELETE_VICT if the poison killed the victim, DELETE_THIS if it
+// killed the wielder (spells crit-fail back onto their caster).  Callers must
+// check: the liquid can cast harm, bone breaker, or boiling blood.
+int TObj::applyPoison(TBeing* vict) {
+  int rc = 0;
+
+  if (!isPoisoned())
+    return 0;
+
+  TBeing* ch = dynamic_cast<TBeing*>(equippedBy);
+
+  if (ch) {
+    act("There was something nasty on that $o!", false, ch, this, vict, TO_VICT,
+      ANSI_RED);
+    act("You inflict something nasty on $N!", false, ch, this, vict, TO_CHAR,
+      ANSI_RED);
+    act("There was something nasty on that $o!", false, ch, this, vict,
+      TO_NOTVICT, ANSI_RED);
+    rc = doLiqSpell(ch, vict, poison, 1);
+  } else {
+    // no wielder: the victim is both caster and target, so either death flag
+    // means the same person died
+    rc = doLiqSpell(vict, vict, poison, 1);
+    if (IS_SET(rc, VICTIM_DEAD | CASTER_DEAD))
+      rc = VICTIM_DEAD;
+  }
+
+  // A skilled poisoner makes a coating go further: on a successful roll it
+  // survives the strike instead of being spent.  An unwielded object - a
+  // fired arrow - has nobody to roll, so its coating always goes.  Don't
+  // consult the wielder if the spell just killed them.
+  //
+  // The flat chance below is what keeps a coating finite at all: poison
+  // weapons is an easy task, so a maxed thief passes the skill roll every
+  // time and would otherwise never use one up.  bSuccess is called first so
+  // the attempt still counts toward learning when the coating is lost anyway.
+  static const int COATING_LOSS_CHANCE = 20;
+  bool keepCoating =
+    ch && !IS_SET(rc, CASTER_DEAD) &&
+    ch->bSuccess(ch->getSkillValue(SKILL_POISON_WEAPON), SKILL_POISON_WEAPON) &&
+    !::percentChance(COATING_LOSS_CHANCE);
+  if (!keepCoating) {
+    // Tell the wielder the coating is gone - they can't see it wear off, and
+    // it now lasts an unpredictable number of strikes.
+    if (ch && !IS_SET(rc, CASTER_DEAD))
+      act("The last of the coating on $p is used up.", false, ch, this, nullptr,
+        TO_CHAR);
+    clearPoison();
+  }
+
+  // spell flags and delete flags are different bit positions - translate
+  if (IS_SET(rc, VICTIM_DEAD))
+    return DELETE_VICT;
+  if (IS_SET(rc, CASTER_DEAD))
+    return DELETE_THIS;
+  return 0;
+}
+
+// Anything spiked can be coated, weapon or not - the spikes are what break
+// skin and carry the poison in.  Plain objects still can't be.
+int TObj::poisonWeaponWeapon(TBeing* ch, TThing* poison) {
+  if (!isSpiked()) {
+    act("$p has nothing on it that would carry a poison.", false, ch, this,
+      nullptr, TO_CHAR);
+    return false;
+  }
+  if (isPoisoned()) {
+    act("$p is already poisoned!", false, ch, this, nullptr, TO_CHAR);
+    return false;
+  }
+
+  return poison->poisonMePoison(ch, this);
+}
+
+void TObj::setPoison(liqTypeT liq) {
+  if (!isPoisoned())
+    poison = liq;
+}
+
 bool TObj::engraveMe(TBeing*, TMonster*, bool) { return FALSE; }
 
 bool TObj::isUnique() const { return (!obj_index[getItemIndex()].getNumber()); }
@@ -274,6 +360,10 @@ itemTypeT mapFileToItemType(int num) {
       return ITEM_MONEYPOUCH;
     case 76:
       return ITEM_FRUIT;
+    case 77:
+      return ITEM_TRAP_COMPONENT;
+    case 78:
+      return ITEM_TRAPCOMP_BAG;
   }
   vlogf(LOG_BUG, format("Unknown type %d in map file") % num);
   return ITEM_UNDEFINED;
@@ -435,6 +525,10 @@ int mapItemTypeToFile(itemTypeT itt) {
       return 75;
     case ITEM_FRUIT:
       return 76;
+    case ITEM_TRAP_COMPONENT:
+      return 77;
+    case ITEM_TRAPCOMP_BAG:
+      return 78;
     case MAX_OBJ_TYPES:
       break;
   }

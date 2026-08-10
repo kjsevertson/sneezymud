@@ -234,19 +234,14 @@ void TPCorpse::dropMe(TBeing* ch, showMeT showme, showRoomT showroom) {
 }
 
 void TTrap::dropMe(TBeing* ch, showMeT, showRoomT showroom) {
-  extraDescription* ed;
-
   if (!isname("grenade", name)) {
     ch->sendTo(COLOR_OBJECTS,
       format("You drop %s, concealing and arming it.\n\r") %
         sstring(getName()).uncap());
 
-    swapToStrung();
-    ed = new extraDescription();
-    ed->next = ex_description;
-    ex_description = ed;
-    ed->keyword = TRAP_EX_DESC;
-    ed->description = getName();
+    // Record who set the trap (not the mine's own name) so the trigger can
+    // recognize the setter (group-spare + damage attribution).
+    recordTrapSetter(this, ch);
 
     // utilize baseclass so we are recursive
     // we already displayed appropriate text (room intentionally concealed)
@@ -979,12 +974,12 @@ int TBeing::doGive(const sstring& oarg, giveTypeT flags) {
     }
 
     if (vict) {
+      // int amount smuggled through the pointer slot. Cast to TThing* (the
+      // param's actual type) so no implicit derived->base upcast happens —
+      // UBSan's alignment check fires on the upcast even without a deref.
+      // Spec procs unpack with (long int)o.
       rc = vict->checkSpec(this, CMD_MOB_GIVEN_COINS, arg.c_str(),
-        reinterpret_cast<TObj*>(static_cast<intptr_t>(
-          amount)));  // casts: int amount is passed through what is normally a
-                      // pointer argument, so cast it to a wider type (should be
-                      // safe, unless the proc tries to cast it back to a
-                      // pointer. Right now they don't.)
+        reinterpret_cast<TThing*>(static_cast<intptr_t>(amount)));
 
       if (IS_SET_DELETE(rc, DELETE_THIS)) {
         delete vict;

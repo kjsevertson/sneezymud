@@ -16,17 +16,13 @@ class TBaseWeapon : public TObj {
     int curSharp;
     int damLevel;
     int damDev;
-    liqTypeT poison;
 
   public:
     virtual void assignFourValues(int, int, int, int);
     virtual void getFourValues(int*, int*, int*, int*) const;
     virtual sstring statObjInfo() const = 0;
 
-    virtual bool isPoisoned() const;
-    virtual void applyPoison(TBeing*);
-    virtual void setPoison(liqTypeT);
-    virtual liqTypeT getPoison() const { return poison; }
+    // poison state lives on TObj so spiked non-weapons can carry it too
     virtual int editAverageMe(TBeing*, const char*);
     virtual double baseDamage() const;
     virtual int swungObjectDamage(const TBeing*, const TBeing*) const;
@@ -49,6 +45,7 @@ class TBaseWeapon : public TObj {
     virtual bool isBluntWeapon() const;
     virtual bool isSlashWeapon() const;
     virtual bool isPierceWeapon() const;
+    virtual bool isPolearm() const;
     virtual void objMenu(const TBeing*) const;
     virtual void changeObjValue1(TBeing*);
     virtual void changeObjValue2(TBeing*);
@@ -69,6 +66,8 @@ class TBaseWeapon : public TObj {
 
     double weaponLevel() const;
     int sharpenPrice() const;
+    [[nodiscard]] int maxSharpCap() const;
+    [[nodiscard]] bool canHoneMaxSharp(const TBeing*) const;
     virtual double objLevel() const;
     double damageLevel() const;
     double structLevel() const;

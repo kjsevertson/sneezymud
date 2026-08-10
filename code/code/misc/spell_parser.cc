@@ -44,8 +44,8 @@
 
 #include <boost/algorithm/string.hpp>
 
-std::tuple<spellNumT, sstring> TBeing::parseSpellNum(const sstring& base, const sstring& args) const {
-
+std::tuple<spellNumT, sstring> TBeing::parseSpellNum(const sstring& base,
+  const sstring& args) const {
   if (base.trim() == "")
     return std::make_tuple(TYPE_UNDEFINED, args);
 
@@ -573,7 +573,7 @@ spellNumT searchForSpellNum(const sstring& arg, exactTypeT exact, bool unique) {
         if (!unique)
           return i;
         matches++;
-        ret = i;        
+        ret = i;
       }
     }
   }
@@ -623,6 +623,8 @@ static void badCastSyntax(const TBeing* ch, spellNumT which) {
 
   if (targets & (TAR_OBJ_INV | TAR_OBJ_ROOM | TAR_OBJ_WORLD | TAR_OBJ_EQUIP))
     tars += (tars.empty() ? "object" : " | object");
+  if (targets & TAR_GROUP)
+    tars += (tars.empty() ? "group" : " | group");
 
   if (tars.empty()) {
     vlogf(LOG_BUG, format("Unknown targets for spell %d") % which);
@@ -733,13 +735,23 @@ int TBeing::doPray(const char* argument) {
   };
 
   spellNumT which = findSpecialCaseByName(args);
-  if (which != TYPE_UNDEFINED)
+  if (which != TYPE_UNDEFINED) {
+    if (!doesKnowSkill(getSkillNum(which))) {
+      sendTo("You don't know that prayer!\n\r");
+      return FALSE;
+    }
     return doDiscipline(which, "");
+  }
 
   if (args.words().size() > 1) {
     which = findSpecialCaseByName(args.dropLastWord());
-    if (which != TYPE_UNDEFINED)
+    if (which != TYPE_UNDEFINED) {
+      if (!doesKnowSkill(getSkillNum(which))) {
+        sendTo("You don't know that prayer!\n\r");
+        return FALSE;
+      }
       return doDiscipline(which, args.lastWord());
+    }
   }
 
   which = findPrayerByName(args);
@@ -811,7 +823,7 @@ int TBeing::doCast(const char* argument) {
   }
 
   if (discArray[spell]->typ != SPELL_MAGE &&
-          discArray[spell]->typ != SPELL_SHAMAN) {
+      discArray[spell]->typ != SPELL_SHAMAN) {
     sendTo("That's not a magic spell!\n\r");
     return FALSE;
   }
@@ -819,6 +831,11 @@ int TBeing::doCast(const char* argument) {
   if (!doesKnowSkill(getSkillNum(spell))) {
     sendTo("You don't know that spell!\n\r");
     return FALSE;
+  }
+
+  if (discArray[spell]->targets & TAR_PASSIVE) {
+    sendTo("That ability is passive and cannot be cast directly.\n\r");
+    return false;
   }
 
   return doDiscipline(spell, target);
@@ -958,7 +975,15 @@ int TBeing::parseTarget(spellNumT which, char* n, TThing** ret) {
     if (!ok && (discArray[which]->targets & TAR_IGNORE))
       ok = TRUE;
   } else {
-    if ((discArray[which]->targets & TAR_FIGHT_SELF)) {
+    if ((discArray[which]->targets & TAR_GROUP)) {
+      // No target specified: signal group mode to the spell implementation.
+      // Both ch and *ret are explicitly set to nullptr; the spell iterates
+      // group members itself when it receives a null victim.
+      ch = nullptr;
+      *ret = nullptr;
+      ok = true;
+    }
+    if (!ok && (discArray[which]->targets & TAR_FIGHT_SELF)) {
       // if in a fight, cast this on caster
       // these are generally healing spells
       // just to be nice, if not in fight (and no args), also cast on caster
@@ -1108,7 +1133,7 @@ namespace {
     {DAMAGE_WHIRLPOOL, "DAMAGE_WHIRLPOOL"},
     {DAMAGE_ELECTRIC, "DAMAGE_ELECTRIC"},
     {DAMAGE_ACID, "DAMAGE_ACID"},
-    {DAMAGE_HOLY, "DAMAGE_HOLY" },
+    {DAMAGE_HOLY, "DAMAGE_HOLY"},
     {DAMAGE_GUST, "DAMAGE_GUST"},
     {DAMAGE_EATTEN, "DAMAGE_EATTEN"},
     {DAMAGE_KICK_HEAD, "DAMAGE_KICK_HEAD"},
@@ -1212,7 +1237,8 @@ namespace {
     {SPELL_LIGHTNING_BOLT, "SPELL_LIGHTNING_BOLT"},
     {SPELL_CHAIN_LIGHTNING, "SPELL_CHAIN_LIGHTNING"},
     {SPELL_FLY, "SPELL_FLY"},
-    {SPELL_ANTIGRAVITY, "SPELL_ANTIGRAVITY"},
+    {SPELL_ANTIGRAVITY,
+      "SPELL_ANTIGRAVITY"},  // removed spell, kept for enum stability
     {SPELL_DIVINATION, "SPELL_DIVINATION"},
     {SPELL_SHATTER, "SPELL_SHATTER"},
     {SPELL_SPONTANEOUS_GENERATION, "SPELL_SPONTANEOUS_GENERATION"},
@@ -1231,13 +1257,16 @@ namespace {
     {SPELL_ANIMATE, "SPELL_ANIMATE"},
     {SPELL_BIND, "SPELL_BIND"},
     {SPELL_FUMBLE, "SPELL_FUMBLE"},
+    {SPELL_MAGE_SIGHT, "SPELL_MAGE_SIGHT"},
     {SPELL_TRUE_SIGHT, "SPELL_TRUE_SIGHT"},
     {SPELL_CLOUD_OF_CONCEALMENT, "SPELL_CLOUD_OF_CONCEALMENT"},
     {SPELL_POLYMORPH, "SPELL_POLYMORPH"},
     {SPELL_SILENCE, "SPELL_SILENCE"},
     {SPELL_WATERY_GRAVE, "SPELL_WATERY_GRAVE"},
     {SPELL_TSUNAMI, "SPELL_TSUNAMI"},
-    {SPELL_BREATH_OF_SARAHAGE, "SPELL_BREATH_OF_SARAHAGE"},
+    {SPELL_BLIZZARD, "SPELL_BLIZZARD"},
+    {SPELL_BREATH_OF_SARAHAGE,
+      "SPELL_BREATH_OF_SARAHAGE"},  // removed spell, kept for enum stability
     {SPELL_PLASMA_MIRROR, "SPELL_PLASMA_MIRROR"},
     {SPELL_GARMULS_TAIL, "SPELL_GARMULS_TAIL"},
     {SPELL_ETHER_GATE, "SPELL_ETHER_GATE"},
@@ -1297,6 +1326,8 @@ namespace {
     {SPELL_KNIT_BONE, "SPELL_KNIT_BONE"},
     {SPELL_RELIVE, "SPELL_RELIVE"},
     {SPELL_CRUSADE, "SPELL_CRUSADE"},
+    {SPELL_CONSECRATE, "SPELL_CONSECRATE"},
+    {SPELL_CONSECRATE_AFFECT, "SPELL_CONSECRATE_AFFECT"},
     {SPELL_FLATULENCE, "SPELL_FLATULENCE"},
     {SPELL_ENLIVEN, "SPELL_ENLIVEN"},
     {SPELL_BLOOD_BOIL, "SPELL_BLOOD_BOIL"},
@@ -1513,6 +1544,7 @@ namespace {
     {SKILL_HIDE, "SKILL_HIDE"},
     {SKILL_POISON_WEAPON, "SKILL_POISON_WEAPON"},
     {SKILL_DISGUISE, "SKILL_DISGUISE"},
+    {SKILL_SKULK, "SKILL_SKULK"},
     {SKILL_DODGE_THIEF, "SKILL_DODGE_THIEF"},
     {SKILL_GARROTTE, "SKILL_GARROTTE"},
     {SKILL_SET_TRAP_CONT, "SKILL_SET_TRAP_CONT"},
@@ -1524,7 +1556,12 @@ namespace {
     {SKILL_DISARM_THIEF, "SKILL_DISARM_THIEF"},
     {SKILL_COUNTER_STEAL, "SKILL_COUNTER_STEAL"},
     {SKILL_REPAIR_THIEF, "SKILL_REPAIR_THIEF"},
+    {SKILL_SERRATE, "SKILL_SERRATE"},
     {SKILL_PLANT, "SKILL_PLANT"},
+    {SKILL_RESOURCEFULNESS, "SKILL_RESOURCEFULNESS"},
+    {SKILL_SCRUTINY, "SKILL_SCRUTINY"},
+    {SKILL_JAM, "SKILL_JAM"},
+    {SKILL_KEYCUT, "SKILL_KEYCUT"},
     {SKILL_CONCEALMENT, "SKILL_CONCEALMENT"},
     {SKILL_TRACK, "SKILL_TRACK"},
     {SKILL_RITUALISM, "SKILL_RITUALISM"},
@@ -1609,6 +1646,8 @@ namespace {
     {SKILL_ADVANCED_OFFENSE, "SKILL_ADVANCED_OFFENSE"},
     {SKILL_INEVITABILITY, "SKILL_INEVITABILITY"},
     {SKILL_COMMON, "SKILL_COMMON"},
+    {SKILL_DROW_INVIS, "SKILL_DROW_INVIS"},
+    {SKILL_DROW_DARKNESS, "SKILL_DROW_DARKNESS"},
     {MAX_SKILL, "MAX_SKILL"},
     {TYPE_HIT, "TYPE_HIT"},
     {TYPE_BLUDGEON, "TYPE_BLUDGEON"},
@@ -1730,12 +1769,13 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
     return FALSE;
   }
 
-  if (n1.empty())
-    vlogf(LOG_SILENT, format("doDiscipline: %s (%s): %s") % name % number %
-                        spellNumToName[which]);
-  else
-    vlogf(LOG_SILENT, format("doDiscipline: %s (%s): %s on %s") % name %
-                        number % spellNumToName[which] % n1);
+  // Don't log during boot, as it generates a ton of extra logs that aren't
+  // useful then.
+  if (!bootTime) {
+    vlogf(LOG_SILENT, format("doDiscipline: %s (%s): %s%s") % name % number %
+                        spellNumToName[which] %
+                        (n1.empty() ? n1 : format(" on %s") % n1));
+  }
 
   if (!discArray[which]) {
     vlogf(LOG_BUG,
@@ -1851,9 +1891,6 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
     case SPELL_FLY:
       rc = fly(this, ch);
       break;
-    case SPELL_ANTIGRAVITY:
-      rc = antigravity(this);
-      break;
     case SPELL_FALCON_WINGS:
       rc = falconWings(this, ch);
       break;
@@ -1895,9 +1932,6 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
       break;
     case SPELL_ILLUMINATE:
       rc = illuminate(this, o);
-      break;
-    case SPELL_DETECT_MAGIC:
-      rc = detectMagic(this, ch);
       break;
     case SPELL_DISPEL_MAGIC:
       if (!o) {
@@ -1992,9 +2026,6 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
     case SPELL_FLARE:
       rc = flare(this);
       break;
-    case SPELL_INFRAVISION:
-      infravision(this, ch);
-      break;
     case SPELL_PROTECTION_FROM_FIRE:
       protectionFromFire(this);
       break;
@@ -2055,9 +2086,6 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
     case SPELL_PROTECTION_FROM_ENERGY:
       protectionFromEnergy(this);
       break;
-    case SPELL_SENSE_LIFE:
-      senseLife(this, ch);
-      break;
     case SPELL_SENSE_LIFE_SHAMAN:
       senseLifeShaman(this, ch);
       break;
@@ -2091,9 +2119,6 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
     case SPELL_CLOUD_OF_CONCEALMENT:
       rc = cloudOfConcealment(this);
       break;
-    case SPELL_DETECT_INVISIBLE:
-      detectInvisibility(this, ch);
-      break;
     case SPELL_DETECT_SHADOW:
       detectShadow(this, ch);
       break;
@@ -2112,8 +2137,8 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
     case SPELL_RAZE:
       rc = raze(this, ch);
       break;
-    case SPELL_TRUE_SIGHT:
-      trueSight(this, ch);
+    case SPELL_MAGE_SIGHT:
+      mageSight(this, ch);
       break;
     case SPELL_POLYMORPH:
       polymorph(this, n);
@@ -2157,6 +2182,9 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
     case SPELL_TSUNAMI:
       rc = tsunami(this);
       break;
+    case SPELL_BLIZZARD:
+      rc = blizzard(this);
+      break;
     case SPELL_CONJURE_WATER:
       conjureElemWater(this);
       break;
@@ -2165,9 +2193,6 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
       break;
     case SPELL_AQUALUNG:
       aqualung(this, ch);
-      break;
-    case SPELL_BREATH_OF_SARAHAGE:
-      rc = breathOfSarahage(this);
       break;
     case SPELL_PROTECTION_FROM_WATER:
       protectionFromWater(this);
@@ -2442,6 +2467,9 @@ int TBeing::doDiscipline(spellNumT which, const sstring& n1) {
       break;
     case SPELL_CRUSADE:
       crusade(this);
+      break;
+    case SPELL_CONSECRATE:
+      consecrate(this);
       break;
     case SPELL_RELIVE:
       relive(this, ch);

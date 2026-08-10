@@ -2,11 +2,16 @@
 #include "being.h"
 #include "combat.h"
 #include "obj_base_weapon.h"
+#include "obj_general_weapon.h"
 
 static int whirlwind(TBeing* caster, TBeing* victim, int castLevel,
   spellNumT damageType) {
   int successfulHit = caster->specialAttack(victim, SKILL_WHIRLWIND);
   int dam = 0;
+  // impactSpec now applies its own damage, so it has to wait until after the
+  // skill's blow lands.  Remember whether we connected, and where.
+  bool landed = false;
+  wearSlotT damSource = WEAR_NOWHERE, targetLimb = WEAR_NOWHERE;
 
   // Success case
   if (!victim->awake() ||
@@ -19,6 +24,12 @@ static int whirlwind(TBeing* caster, TBeing* victim, int castLevel,
       TO_VICT);
     dam = caster->getSkillDam(victim, SKILL_WHIRLWIND, castLevel,
       caster->getAdvLearning(SKILL_WHIRLWIND));
+
+    // Weapon/gauntlet/bare-hand impact contribution per victim, applied below.
+    auto* weapon = dynamic_cast<TBaseWeapon*>(caster->heldInPrimHand());
+    damSource = weapon ? caster->getPrimaryHold() : caster->getPrimaryHand();
+    targetLimb = victim->getPartHit(caster, true);
+    landed = true;
   }
   // Failure case
   else {
@@ -30,6 +41,16 @@ static int whirlwind(TBeing* caster, TBeing* victim, int castLevel,
 
   if (caster->reconcileDamage(victim, dam, damageType) == -1)
     return DELETE_VICT;
+
+  if (landed) {
+    int impactRc = impactSpec(caster, victim, damSource, targetLimb);
+    // poisoned spikes can crit-fail back onto the caster, so both directions
+    // are possible here
+    if (IS_SET_DELETE(impactRc, DELETE_THIS))
+      return DELETE_THIS;
+    if (IS_SET_DELETE(impactRc, DELETE_VICT))
+      return DELETE_VICT;
+  }
 
   return TRUE;
 }
@@ -64,11 +85,12 @@ int TBeing::doWhirlwind() {
   }
 
   auto* weapon = dynamic_cast<TBaseWeapon*>(heldInPrimHand());
-  if (!weapon) {
-    sendTo(
-      "You need to hold a weapon in your primary attack to attempt this "
-      "maneuver.\n\r");
-    return FALSE;
+  // Empty hand is fine (unarmed whirlwind). Reject only when something
+  // non-weapon is held (light, scroll, instrument, etc.).
+  if (auto* held = heldInPrimHand(); held && !weapon) {
+    act("You can't perform a whirlwind attack with $p.", false, this, held,
+      nullptr, TO_CHAR);
+    return false;
   }
 
   if (!(isImmortal() || IS_SET(specials.act, ACT_IMMORTAL)))
@@ -106,14 +128,16 @@ int TBeing::whirlwindSuccess() {
   act("$n performs a sweeping attack, striking out at everyone nearby!", FALSE,
     this, NULL, NULL, TO_ROOM);
 
-  // Determine damage type
+  // Determine damage type: weapon class for armed, generic for unarmed.
   spellNumT damageType = DAMAGE_NORMAL;
-  if (weapon->isBluntWeapon())
-    damageType = DAMAGE_CAVED_SKULL;
-  else if (weapon->isPierceWeapon())
-    damageType = DAMAGE_IMPALE;
-  else if (weapon->isSlashWeapon())
-    damageType = DAMAGE_HACKED;
+  if (weapon) {
+    if (weapon->isBluntWeapon())
+      damageType = DAMAGE_CAVED_SKULL;
+    else if (weapon->isPierceWeapon())
+      damageType = DAMAGE_IMPALE;
+    else if (weapon->isSlashWeapon())
+      damageType = DAMAGE_HACKED;
+  }
 
   // Loop for each person in room and determine if they're a valid whirlwind
   // target. If so, add them to the vector for later.
@@ -141,6 +165,10 @@ int TBeing::whirlwindSuccess() {
 
     int castLevel = getSkillLevel(SKILL_WHIRLWIND);
     rc = whirlwind(this, being, castLevel, damageType);
+    // if the sweep killed us (poisoned spikes crit-failing), stop immediately -
+    // continuing the loop would keep using a deleted caster
+    if (IS_SET_DELETE(rc, DELETE_THIS))
+      return DELETE_THIS;
     if (!IS_SET_DELETE(rc, DELETE_VICT))
       continue;
 

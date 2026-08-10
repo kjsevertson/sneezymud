@@ -537,6 +537,15 @@ enum territoryT {
   HOME_TER_TROLL_FOREST,   // UNUSED
   HOME_TER_TROLL_MARINER,  // UNUSED
 
+  HOME_TER_DROW_URBAN,
+  HOME_TER_DROW_VILLAGER,
+  HOME_TER_DROW_PLAINS,  // UNUSED
+  HOME_TER_DROW_RECLUSE,
+  HOME_TER_DROW_HILL,
+  HOME_TER_DROW_MOUNTAIN,
+  HOME_TER_DROW_FOREST,   // UNUSED
+  HOME_TER_DROW_MARINER,  // UNUSED
+
   MAX_HOME_TERS
 };
 extern territoryT& operator++(territoryT& c, int);
@@ -665,6 +674,14 @@ enum castTypeT {
 enum primaryTypeT {
   HAND_SECONDARY = false,
   HAND_PRIMARY = true,
+};
+
+// Rounding mode for the fractional step in scaleWeaponDam(). Live combat rounds
+// stochastically; damage estimates force the round down/up to bracket a range.
+enum damRoundT {
+  DAM_ROUND_STOCHASTIC,
+  DAM_ROUND_DOWN,
+  DAM_ROUND_UP,
 };
 
 enum primLegT {

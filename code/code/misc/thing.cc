@@ -94,13 +94,17 @@ int TThing::swungObjectDamage(const TBeing*, const TBeing*) const {
 }
 
 int TThing::useMe(TBeing* ch, const char*) {
-  TObj* o = dynamic_cast<TObj*>(this);
-
-  if (o && o->spec && o->checkSpec(ch, CMD_OBJ_USED, "", NULL))
-    return TRUE;
+  if (auto* o = dynamic_cast<TObj*>(this)) {
+    if (o->spec) {
+      int rc = o->checkSpec(ch, CMD_OBJ_USED, "", nullptr);
+      if (rc) {
+        return rc;
+      }
+    }
+  }
 
   ch->sendTo("Use is normally only for wands and magic staves.\n\r");
-  return FALSE;
+  return false;
 }
 
 // Weight of all things that I am carrying, or that I contain
@@ -132,7 +136,8 @@ int TThing::getCarriedVolume() const {
   }
 
   for (StuffIter it = stuff.begin(); it != stuff.end() && (t = *it); ++it) {
-    if (t->getKind() == TThing::TThingKind::TComponent)
+    if (t->getKind() == TThing::TThingKind::TComponent ||
+        t->getKind() == TThing::TThingKind::TTrapComponent)
       total += (int)(t->getTotalVolume() * 0.10);
     else
       total += t->getTotalVolume();

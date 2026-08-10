@@ -177,6 +177,7 @@ class TMonster : public TBeing {
     void setDamLevel(float);
     unsigned short getDamPrecision() const;
     void setDamPrecision(unsigned short);
+    std::pair<int, int> getMobDamageRange() const;
     int getMobDamage() const;
 
     int aiSocialSwitch(TBeing*, TBeing*, cmdTypeT, aiTarg);
@@ -441,7 +442,7 @@ class TMonster : public TBeing {
     int getMobIndex() const { return (number < 0 ? 0 : number); }
     bool isUnique() { return (!mob_index[getMobIndex()].getNumber()); }
     virtual void purgeMe(TBeing*);
-    void loadResponses(int, const sstring& = "");
+    void loadResponses(int, int playerId = 0);
     bool checkResponsesPossible(cmdTypeT, const sstring&, TBeing*);
     int checkResponses(TBeing*, TThing*, const sstring&, cmdTypeT);
     int checkResponsesReal(TBeing*, TThing*, const sstring&, cmdTypeT);

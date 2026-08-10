@@ -12,6 +12,7 @@
 #include "configuration.h"
 #include "handler.h"
 #include "extern.h"
+#include "disc_mage_spirit.h"
 #include "being.h"
 #include "low.h"
 #include "colorstring.h"
@@ -1119,6 +1120,13 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
     af2 = aff->next;
 
     switch (aff->type) {
+      // Racial innate cooldowns are surfaced via the 'innate' command,
+      // not the 'affects' list. These are intentionally silent — do not
+      // fold into the BOGUS catch-all at the bottom of this switch.
+      case SKILL_DROW_INVIS:
+      case SKILL_DROW_DARKNESS:
+        break;
+
       case SKILL_TRACK:
       case SKILL_SEEKWATER:
         str += format("Tracking: %s\n\r") %
@@ -1142,6 +1150,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SPELL_FROST_BREATH:
       case SPELL_WATERY_GRAVE:
       case SPELL_TSUNAMI:
+      case SPELL_BLIZZARD:
       case SPELL_CHLORINE_BREATH:
       case SPELL_DUST_BREATH:
       case SPELL_POISON_DEIKHAN:
@@ -1237,7 +1246,6 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SPELL_FAERIE_FIRE:
       case SPELL_STUPIDITY:
       case SPELL_ILLUMINATE:
-      case SPELL_DETECT_MAGIC:
       case SPELL_MATERIALIZE:
       case SPELL_CHRISM:
       case SPELL_BLOOD_BOIL:
@@ -1248,13 +1256,11 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SPELL_PROTECTION_FROM_FIRE:
       case SPELL_PROTECTION_FROM_WATER:
       case SPELL_PROTECTION_FROM_ENERGY:
-      case SPELL_INFRAVISION:
       case SPELL_IDENTIFY:
       case SPELL_POWERSTONE:
       case SPELL_FAERIE_FOG:
       case SPELL_TELEPORT:
       case SPELL_KNOT:
-      case SPELL_SENSE_LIFE:
       case SPELL_SENSE_LIFE_SHAMAN:  // shaman
       case SPELL_CALM:
       case SPELL_ACCELERATE:
@@ -1287,7 +1293,6 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SPELL_CHASE_SPIRIT:  // shaman
       case SPELL_ENHANCE_WEAPON:
       case SPELL_GALVANIZE:
-      case SPELL_DETECT_INVISIBLE:
       case SPELL_DISPEL_INVISIBLE:
       case SPELL_FARLOOK:
       case SPELL_FALCON_WINGS:
@@ -1309,7 +1314,60 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SPELL_ATOMIZE:
       case SPELL_ANIMATE:
       case SPELL_BIND:
+      case SPELL_INFRAVISION:
+      case SPELL_DETECT_INVISIBLE:
+      case SPELL_DETECT_MAGIC:
+      case SPELL_SENSE_LIFE:
       case SPELL_TRUE_SIGHT:
+      case SPELL_MAGE_SIGHT: {
+        // When mage sight is active, consolidate all vision passives into one
+        // line: 'mage sight (IV/DI/TS/DM/SL)'. Passives are suppressed and
+        // shown as abbreviations. Without mage sight, fall through to normal.
+        // Passives applied by mage sight are tagged with modifier2 =
+        // SPELL_MAGE_SIGHT. Only suppress those — independently sourced
+        // buffs (potions, scrolls) should display normally.
+        if (aff->modifier2 == SPELL_MAGE_SIGHT) {
+          continue;
+        }
+        if (aff->type == SPELL_MAGE_SIGHT) {
+          if (!aff->shouldGenerateText())
+            continue;
+          if (!show)
+            break;
+
+          // Build abbreviation list for active passives
+          sstring label = "mage sight";
+          sstring passiveList;
+          for (const auto& [spell, bv, abbrev] : mageSightPassives) {
+            for (auto* af = ch->affected; af; af = af->next) {
+              if (af->type == spell && af->modifier2 == SPELL_MAGE_SIGHT) {
+                if (!passiveList.empty())
+                  passiveList += "/";
+                passiveList += abbrev;
+                break;
+              }
+            }
+          }
+          if (!passiveList.empty())
+            label += " (" + passiveList + ")";
+
+          if (aff->renew < 0) {
+            str += format("Affected : '%s' : Approx. Duration : %s\n\r") %
+                   label % describeDuration(this, aff->duration);
+          } else if (aff->canBeRenewed()) {
+            str += format("Affected : '%s' : Time Left : %s %s%s%s\n\r") %
+                   label % describeDuration(this, aff->duration) % red() %
+                   "(Renewable)" % norm();
+          } else {
+            str += format("Affected : '%s' : Time Left : %s %s%s%s\n\r") %
+                   label % describeDuration(this, aff->duration) % green() %
+                   "(Not Yet Renewable)" % norm();
+          }
+          break;
+        }
+        // No mage sight active — fall through to normal display
+        [[fallthrough]];
+      }
       case SPELL_CLOUD_OF_CONCEALMENT:
       case SPELL_POLYMORPH:
       case SPELL_SILENCE:
@@ -1344,6 +1402,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SPELL_SANCTUARY:
       case SPELL_RELIVE:
       case SPELL_CRUSADE:
+      case SPELL_CONSECRATE:
       case SPELL_CURE_PARALYSIS:
       case SPELL_SECOND_WIND:
       case SPELL_HEROES_FEAST:
@@ -1487,6 +1546,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SKILL_HIDE:
       case SKILL_POISON_WEAPON:
       case SKILL_DISGUISE:
+      case SKILL_SKULK:
       case SKILL_DODGE_THIEF:
       case SKILL_SET_TRAP_CONT:
       case SKILL_SET_TRAP_DOOR:
@@ -1545,6 +1605,7 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SKILL_FAST_LOAD:
       case SKILL_SHARPEN:
       case SKILL_DULL:
+      case SKILL_SERRATE:
       case SKILL_ATTUNE:
       case SKILL_STAVECHARGE:
       case SKILL_MANA:
@@ -1956,6 +2017,12 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
         }
         break;
       // Not in discarray since it's not a skill
+      case SPELL_CONSECRATE_AFFECT:
+        if (show && aff->shouldGenerateText()) {
+          str += format("Affected: Consecration.  Approx. duration : %s\n\r") %
+                 describeDuration(this, aff->duration);
+        }
+        break;
       case SPELL_AURA_MIGHT:
         if (show && aff->shouldGenerateText()) {
           str += format("Affected: Aura of Might.  Approx. duration : %s\n\r") %
@@ -2170,6 +2237,10 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SKILL_IRON_MUSCLES:
       case SKILL_IRON_LEGS:
       case SKILL_IRON_WILL:
+      case SKILL_RESOURCEFULNESS:
+      case SKILL_SCRUTINY:
+      case SKILL_JAM:
+      case SKILL_KEYCUT:
       case SKILL_PLANT:
       case ABSOLUTE_MAX_SKILL:
         vlogf(LOG_BUG,
@@ -2660,11 +2731,17 @@ void TBeing::doEquipment(const sstring& arg) {
     TDatabase db(DB_SNEEZY);
     sstring tattoos[MAX_WEAR];
 
-    db.query(
-      "select location, tattoo from tattoos where name='%s' order by location",
-      getName().c_str());
-    while (db.fetchRow()) {
-      tattoos[convertTo<int>(db["location"])] = db["tattoo"];
+    if (isPc()) {
+      db.query(
+        "select location, tattoo from tattoos where player_id=%i order by "
+        "location",
+        getPlayerID());
+      while (db.fetchRow()) {
+        int loc = convertTo<int>(db["location"]);
+        if (loc >= MIN_WEAR && loc < MAX_WEAR) {
+          tattoos[loc] = db["tattoo"];
+        }
+      }
     }
 
     sendTo(format("You are using %i pounds of equipment:\n\r") %
@@ -2708,12 +2785,17 @@ void TBeing::doEquipment(const sstring& arg) {
       victim = get_char_vis_world(this, argument, NULL, EXACT_NO);
 
     if (victim) {
-      db.query(
-        "select location, tattoo from tattoos where name='%s' order by "
-        "location",
-        victim->getName().c_str());
-      while (db.fetchRow()) {
-        tattoos[convertTo<int>(db["location"])] = db["tattoo"];
+      if (victim->isPc()) {
+        db.query(
+          "select location, tattoo from tattoos where player_id=%i order by "
+          "location",
+          victim->getPlayerID());
+        while (db.fetchRow()) {
+          int loc = convertTo<int>(db["location"]);
+          if (loc >= MIN_WEAR && loc < MAX_WEAR) {
+            tattoos[loc] = db["tattoo"];
+          }
+        }
       }
 
       act("$N is using.", FALSE, this, 0, victim, TO_CHAR);
@@ -3532,10 +3614,6 @@ void TBeing::doWorld() {
 
   int unkmobcount = 0;
 
-  // trophymob requires a periodic background task to fill it
-  // db.query("select count(*) as count from trophymob");
-
-  // just use the inefficient query for now
   db.query("select count(distinct mobvnum) as count from trophy");
   if (db.fetchRow())
     unkmobcount = convertTo<int>(db["count"]);
@@ -4058,6 +4136,14 @@ void TBeing::genericEvaluateItem(const TThing* obj) {
   }
 
   describeObject(obj);
+
+  // If evaluating an object and the character knows Resourcefulness, show
+  // where it loads.
+  const TObj* tobj = dynamic_cast<const TObj*>(obj);
+  if (tobj && doesKnowSkill(SKILL_RESOURCEFULNESS)) {
+    sendTo("\n\r");
+    tobj->objLoadSource(this);
+  }
 }
 
 void TThing::evaluateMe(TBeing* ch) const {}
@@ -4246,6 +4332,9 @@ void TBeing::doEvaluate(const char* argument) {
       sendTo("There is an out-of-control fire here.\n\r");
     if (roomp->isRoomFlag(ROOM_FLOODED))
       sendTo("The room is flooded with water.\n\r");
+
+    // room affect messages
+    sendRoomAffectDescs(this, roomp, true);
 
     int wetness = getRoomWetness(roomp);
     if (wetness != 0)  // show wetness
@@ -4570,6 +4659,17 @@ void TObj::describeMe(TBeing* ch) const {
         format("A monogram on it indicates it belongs to %s.\n\r") % name_buf);
   }
   describeObjectSpecifics(ch);
+
+  // Evaluating reveals a coating to anyone; only a trained poisoner can name
+  // what it actually is.
+  if (isPoisoned()) {
+    if (ch->doesKnowSkill(SKILL_POISON_WEAPON))
+      ch->sendTo(COLOR_OBJECTS, format("It has been coated with %s.\n\r") %
+                                  liquidInfo[getPoison()]->name);
+    else
+      ch->sendTo(COLOR_OBJECTS, "It has been coated with poison.\n\r");
+  }
+
   evaluateMe(ch);
 }
 
@@ -5310,10 +5410,9 @@ void TWand::descMagicSpells(TBeing* ch) const {
           sstring(capbuf).cap() % discNames[das].properName);
   }
 
-  ch->sendTo(COLOR_OBJECTS, format("%s has %d out of %d charge%s left.\n\r") %
-                              sstring(capbuf).cap() % getCurCharges() %
-                              getMaxCharges() %
-                              (getMaxCharges() == 1 ? "" : "s"));
+  ch->sendTo(COLOR_OBJECTS,
+    format("%s has %d out of %d charge%s left.\n\r") % sstring(capbuf).cap() %
+      getCurCharges() % getMaxCharges() % (getMaxCharges() == 1 ? "" : "s"));
 }
 
 void TStaff::descMagicSpells(TBeing* ch) const {
@@ -5334,10 +5433,9 @@ void TStaff::descMagicSpells(TBeing* ch) const {
           sstring(capbuf).cap() % discNames[das].properName);
   }
 
-  ch->sendTo(COLOR_OBJECTS, format("%s has %d out of %d charge%s left.\n\r") %
-                              sstring(capbuf).cap() % getCurCharges() %
-                              getMaxCharges() %
-                              (getMaxCharges() == 1 ? "" : "s"));
+  ch->sendTo(COLOR_OBJECTS,
+    format("%s has %d out of %d charge%s left.\n\r") % sstring(capbuf).cap() %
+      getCurCharges() % getMaxCharges() % (getMaxCharges() == 1 ? "" : "s"));
 }
 
 void TScroll::descMagicSpells(TBeing* ch) const {
@@ -5704,7 +5802,8 @@ namespace {
 
       if (!spell || sstring(spell->name).empty() ||
           !isValidSpellType(spell->typ) ||
-          (getDisciplineNumber(indexEnum, false) == DISC_NONE))
+          (getDisciplineNumber(indexEnum, false) == DISC_NONE) ||
+          (spell->targets & TAR_PASSIVE))
         continue;
 
       output.emplace_back(skillSorter(character, indexEnum));
@@ -5740,8 +5839,9 @@ namespace {
     const bool isViolent = spell->targets & TAR_VIOLENT;
     const bool isAOE = spell->targets & TAR_AREA;
     const bool isTargeted =
-      spell->targets & (TAR_CHAR_ROOM | TAR_CHAR_WORLD | TAR_SELF_ONLY |
-                         TAR_OBJ_INV | TAR_OBJ_EQUIP | TAR_CHAR_VIS_WORLD);
+      spell->targets &
+      (TAR_CHAR_ROOM | TAR_CHAR_WORLD | TAR_SELF_ONLY | TAR_OBJ_INV |
+        TAR_OBJ_EQUIP | TAR_CHAR_VIS_WORLD | TAR_GROUP);
 
     return isViolent ? (isAOE ? NONTARGETED_OFFENSIVE : TARGETED_OFFENSIVE)
                      : (isTargeted ? TARGETED_UTILITY : NONTARGETED_UTILITY);

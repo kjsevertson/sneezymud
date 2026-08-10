@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "extern.h"
 #include "room.h"
 #include "low.h"
@@ -5,6 +7,7 @@
 #include "disease.h"
 #include "combat.h"
 #include "spelltask.h"
+#include "disc_mage_group.h"
 #include "disc_mage_water.h"
 #include "obj_pool.h"
 #include "obj_magic_item.h"
@@ -939,70 +942,97 @@ int castConjureElemWater(TBeing* caster) {
   return TRUE;
 }
 
-static bool canBeGilled(TBeing* caster, TBeing* victim) {
+// Returns true if the victim already has natural waterbreath and should be
+// skipped.  Pass SILENT_YES to suppress the "already breathes water" message
+// (used during group iteration so per-target messages don't pile up).
+static bool canBeGilled(TBeing* caster, TBeing* victim,
+  silentTypeT silent = SILENT_NO) {
   // casting on natural waterbreathers causes natural ability to
   // be lost when spell decays
   // but do allow it to be multiply cast (increase duration)
   if (victim->isAffected(AFF_WATERBREATH) &&
-      !(victim->affectedBySpell(SPELL_GILLS_OF_FLESH) ||
-        victim->affectedBySpell(SPELL_BREATH_OF_SARAHAGE))) {
-    if (caster != victim)
-      act("$N already has the ability to breathe underwater.", FALSE, caster,
-        NULL, victim, TO_CHAR);
-    else
-      act("You already have the ability to breathe underwater.", FALSE, caster,
-        NULL, victim, TO_CHAR);
-    caster->nothingHappens(SILENT_YES);
+      !victim->affectedBySpell(SPELL_GILLS_OF_FLESH)) {
+    if (silent == SILENT_NO) {
+      if (caster != victim)
+        act("$N already has the ability to breathe underwater.", false, caster,
+          nullptr, victim, TO_CHAR);
+      else
+        act("You already have the ability to breathe underwater.", false,
+          caster, nullptr, victim, TO_CHAR);
+      caster->nothingHappens(SILENT_YES);
+    }
     return true;
   }
   return false;
 }
 
-int gillsOfFlesh(TBeing* caster, TBeing* victim, int level, short bKnown) {
-  affectedData aff;
+namespace {
 
-  if (canBeGilled(caster, victim))
-    return FALSE;
-
-  if (caster->bSuccess(bKnown, SPELL_GILLS_OF_FLESH)) {
-    caster->reconcileHelp(victim, discArray[SPELL_GILLS_OF_FLESH]->alignMod);
+  // See applyFeatheryDescent (disc_mage_air.cc) for quiet/return semantics.
+  [[nodiscard]] bool applyGillsOfFlesh(TBeing* caster, TBeing* victim,
+    int level, int duration, silentTypeT silent = SILENT_NO) {
+    affectedData aff;
     aff.type = SPELL_GILLS_OF_FLESH;
     aff.level = level;
-    aff.duration = caster->durationModify(SPELL_GILLS_OF_FLESH,
-      6 * Pulse::UPDATES_PER_MUDHOUR);
+    aff.duration = duration;
     aff.modifier = 0;
-    aff.renew = aff.duration;
+    aff.renew = duration;
     aff.location = APPLY_NONE;
     aff.bitvector = AFF_WATERBREATH;
+    if (!victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_NO,
+          silent == SILENT_NO))
+      return false;
 
+    act("You become one with the fishes!", true, victim, nullptr, nullptr,
+      TO_CHAR, ANSI_BLUE);
+    act("$N makes a face like a fish.", true, caster, nullptr, victim,
+      TO_NOTVICT, ANSI_BLUE);
+    if (victim != caster)
+      act("You bestow upon $N the ability to breathe water!", true, caster,
+        nullptr, victim, TO_CHAR, ANSI_BLUE);
+    return true;
+  }
+
+  bool rollGillsOfFleshCrit(TBeing* caster) {
     switch (critSuccess(caster, SPELL_GILLS_OF_FLESH)) {
       case CRIT_S_DOUBLE:
       case CRIT_S_TRIPLE:
       case CRIT_S_KILL:
         CS(SPELL_GILLS_OF_FLESH);
-        aff.duration >>= 1;
-        break;
+        return true;
       case CRIT_S_NONE:
         break;
     }
+    return false;
+  }
 
-    if (!victim->affectJoin(caster, &aff, AVG_DUR_NO, AVG_EFF_NO)) {
-      caster->nothingHappens();
-      return SPELL_FALSE;
-    }
+  int gillsOfFleshDuration(TBeing* caster, bool crit) {
+    int duration = caster->durationModify(SPELL_GILLS_OF_FLESH,
+      6 * Pulse::UPDATES_PER_MUDHOUR);
+    if (crit)
+      duration *= 2;
+    return duration;
+  }
 
-    act("You become one with the fishes!", TRUE, victim, NULL, NULL, TO_CHAR,
-      ANSI_BLUE);
-    act("$N makes a face like a fish.", TRUE, caster, NULL, victim, TO_NOTVICT,
-      ANSI_BLUE);
-    if (victim != caster)
-      act("You bestow upon $N the ability to breathe water!", TRUE, caster,
-        NULL, victim, TO_CHAR, ANSI_BLUE);
-    return SPELL_SUCCESS;
-  } else {
+}  // namespace
+
+int gillsOfFlesh(TBeing* caster, TBeing* victim, int level, short bKnown) {
+  if (canBeGilled(caster, victim))
+    return false;
+
+  if (!caster->bSuccess(bKnown, SPELL_GILLS_OF_FLESH)) {
     caster->nothingHappens();
     return SPELL_FAIL;
   }
+
+  bool crit = rollGillsOfFleshCrit(caster);
+  int duration = gillsOfFleshDuration(caster, crit);
+
+  if (!applyGillsOfFlesh(caster, victim, level, duration))
+    return SPELL_FAIL;
+
+  caster->reconcileHelp(victim, discArray[SPELL_GILLS_OF_FLESH]->alignMod);
+  return SPELL_SUCCESS;
 }
 
 void gillsOfFlesh(TBeing* caster, TBeing* victim, TMagicItem* obj) {
@@ -1011,102 +1041,50 @@ void gillsOfFlesh(TBeing* caster, TBeing* victim, TMagicItem* obj) {
 }
 
 int gillsOfFlesh(TBeing* caster, TBeing* victim) {
-  taskDiffT diff;
-
-  if (canBeGilled(caster, victim))
-    return FALSE;
+  if (victim && canBeGilled(caster, victim))
+    return false;
 
   if (!bPassMageChecks(caster, SPELL_GILLS_OF_FLESH, victim))
-    return FALSE;
+    return false;
 
   lag_t rounds = discArray[SPELL_GILLS_OF_FLESH]->lag;
-  diff = discArray[SPELL_GILLS_OF_FLESH]->task;
+  taskDiffT diff = discArray[SPELL_GILLS_OF_FLESH]->task;
 
-  start_cast(caster, victim, NULL, caster->roomp, SPELL_GILLS_OF_FLESH, diff, 1,
-    "", rounds, caster->in_room, 0, 0, TRUE, 0);
-  return TRUE;
+  start_cast(caster, victim, nullptr, caster->roomp, SPELL_GILLS_OF_FLESH, diff,
+    1, "", rounds, caster->in_room, 0, 0, true, 0);
+  return true;
 }
 
 int castGillsOfFlesh(TBeing* caster, TBeing* victim) {
-  int ret, level;
-
-  level = caster->getSkillLevel(SPELL_GILLS_OF_FLESH);
+  int level = caster->getSkillLevel(SPELL_GILLS_OF_FLESH);
   int bKnown = caster->getSkillValue(SPELL_GILLS_OF_FLESH);
 
-  if ((ret = gillsOfFlesh(caster, victim, level, bKnown)) == SPELL_SUCCESS) {
-  } else {
-  }
-  return TRUE;
-}
-
-int breathOfSarahage(TBeing* caster, int level, short bKnown) {
-  TBeing* tmp_victim = NULL;
-  affectedData aff;
-
-  if (caster->bSuccess(bKnown, SPELL_BREATH_OF_SARAHAGE)) {
-    aff.type = SPELL_GILLS_OF_FLESH;
-    aff.level = level;
-    aff.duration = 6 * Pulse::UPDATES_PER_MUDHOUR;
-    aff.modifier = 0;
-    aff.location = APPLY_NONE;
-    aff.bitvector = AFF_WATERBREATH;
-    TThing* t = NULL;
-    int found = FALSE;
-    for (StuffIter it = caster->roomp->stuff.begin();
-         it != caster->roomp->stuff.end() && (t = *it); ++it) {
-      tmp_victim = dynamic_cast<TBeing*>(t);
-      if (!tmp_victim)
-        continue;
-      if (caster->inGroup(*tmp_victim)) {
-        if (!tmp_victim->isAffected(AFF_WATERBREATH)) {
-          caster->reconcileHelp(tmp_victim,
-            discArray[SPELL_BREATH_OF_SARAHAGE]->alignMod);
-          act("$n makes a face like a fish.", TRUE, tmp_victim, NULL, NULL,
-            TO_ROOM, ANSI_BLUE_BOLD);
-          act("You make a face like a fish.", TRUE, tmp_victim, NULL, NULL,
-            TO_CHAR, ANSI_BLUE_BOLD);
-
-          tmp_victim->affectTo(&aff);
-          found = TRUE;
-        }
-      }
-    }
-    if (!found)
-      caster->sendTo("But, there's nobody in your group.\n\r");
-    return SPELL_SUCCESS;
-  } else {
-    return SPELL_FAIL;
-  }
-}
-
-int breathOfSarahage(TBeing* caster) {
-  taskDiffT diff;
-
-  if (!bPassMageChecks(caster, SPELL_BREATH_OF_SARAHAGE, NULL))
-    return FALSE;
-
-  lag_t rounds = discArray[SPELL_BREATH_OF_SARAHAGE]->lag;
-  diff = discArray[SPELL_BREATH_OF_SARAHAGE]->task;
-
-  start_cast(caster, NULL, NULL, caster->roomp, SPELL_BREATH_OF_SARAHAGE, diff,
-    1, "", rounds, caster->in_room, 0, 0, TRUE, 0);
-
-  return TRUE;
-}
-
-int castBreathOfSarahage(TBeing* caster) {
-  int ret, level;
-
-  level = caster->getSkillLevel(SPELL_BREATH_OF_SARAHAGE);
-  int bKnown = caster->getSkillValue(SPELL_BREATH_OF_SARAHAGE);
-
-  if ((ret = breathOfSarahage(caster, level, bKnown)) == SPELL_SUCCESS) {
-    caster->sendTo("You exhale a blue-green vapor around your group.\n\r");
-    act("$n breaths forth a blue-green mist that surrounds $s group.", TRUE,
-      caster, 0, 0, TO_ROOM, ANSI_GREEN);
-  } else
+  if (!caster->bSuccess(bKnown, SPELL_GILLS_OF_FLESH)) {
     caster->nothingHappens();
-  return TRUE;
+    return false;
+  }
+
+  bool crit = rollGillsOfFleshCrit(caster);
+  int duration = gillsOfFleshDuration(caster, crit);
+
+  if (victim) {
+    if (applyGillsOfFlesh(caster, victim, level, duration))
+      caster->reconcileHelp(victim, discArray[SPELL_GILLS_OF_FLESH]->alignMod);
+  } else {
+    bool anyBuffed = forEachGroupBuffTarget(
+      caster,
+      [&](TBeing* target) {
+        if (!applyGillsOfFlesh(caster, target, level, duration, SILENT_YES))
+          return false;
+        caster->reconcileHelp(target,
+          discArray[SPELL_GILLS_OF_FLESH]->alignMod);
+        return true;
+      },
+      [&](TBeing* target) { return canBeGilled(caster, target, SILENT_YES); });
+    if (!anyBuffed)
+      caster->sendTo("Everyone in your group can already breathe water.\n\r");
+  }
+  return true;
 }
 
 int protectionFromWater(TBeing* caster, int level, short bKnown) {
@@ -1457,3 +1435,258 @@ int garmulsTail(TBeing* caster, TBeing* victim, int level, short bKnown) {
     return SPELL_FAIL;
   }
 }
+
+// ---- BLIZZARD ----
+
+int blizzard(TBeing* caster, int level, short bKnown, int adv_learn) {
+  TRoom* room = caster->roomp;
+  int orig_damage =
+    caster->getSkillDam(nullptr, SPELL_BLIZZARD, level, adv_learn);
+
+  if (caster->bSuccess(bKnown, SPELL_BLIZZARD)) {
+    act(
+      "$n raises $s arms and calls forth a <W>howling blizzard<z> of ice and "
+      "snow!",
+      false, caster, nullptr, nullptr, TO_ROOM, ANSI_CYAN);
+    act(
+      "You raise your arms and call forth a <W>howling blizzard<z> of ice and "
+      "snow!",
+      false, caster, nullptr, nullptr, TO_CHAR, ANSI_CYAN);
+
+    // Initial burst — lighter than a typical AoE at this level
+    int burst_damage = orig_damage / 2;
+
+    // Build target list first, then iterate (safety invariant)
+    std::vector<TBeing*> targets;
+    for (StuffIter it = room->stuff.begin(); it != room->stuff.end(); ++it) {
+      if (auto* victim = dynamic_cast<TBeing*>(*it))
+        targets.push_back(victim);
+    }
+
+    for (auto* victim : targets) {
+      if (!victim)
+        continue;
+      // Re-validate: an earlier victim's death cascade can free or move
+      // other beings in the room before we get to them.
+      if (std::find(room->stuff.begin(), room->stuff.end(), victim) ==
+          room->stuff.end())
+        continue;
+      if (victim->getPosition() == POSITION_DEAD)
+        continue;
+      if (victim == caster)
+        continue;
+      if (victim->isImmortal())
+        continue;
+      if (caster->inGroup(*victim))
+        continue;
+
+      caster->reconcileHurt(victim, discArray[SPELL_BLIZZARD]->alignMod);
+      int damage = burst_damage;
+
+      if (victim->isLucky(caster->spellLuckModifier(SPELL_BLIZZARD))) {
+        act("$N finds shelter from the worst of the blast!", false, caster,
+          nullptr, victim, TO_NOTVICT, ANSI_CYAN);
+        act("$N finds shelter from the worst of the blast!", false, caster,
+          nullptr, victim, TO_CHAR, ANSI_CYAN);
+        act("You find shelter from the worst of the blast!", false, caster,
+          nullptr, victim, TO_VICT, ANSI_CYAN);
+        damage /= 2;
+      } else {
+        act("$N is battered by the onslaught of ice and snow!", false, caster,
+          nullptr, victim, TO_NOTVICT, ANSI_CYAN);
+        act("$N is battered by the onslaught of ice and snow!", false, caster,
+          nullptr, victim, TO_CHAR, ANSI_CYAN);
+        act("You are battered by the onslaught of ice and snow!", false, caster,
+          nullptr, victim, TO_VICT, ANSI_CYAN);
+      }
+
+      if (caster->reconcileDamage(victim, damage, SPELL_BLIZZARD) == -1) {
+        delete victim;
+        victim = nullptr;
+      }
+    }
+
+    // Apply room affect for ongoing damage. duration is the number of damage
+    // ticks; tickRoomAffects fires that many onTick callbacks followed by one
+    // onExpire.
+    int per_tick_damage = max(1, orig_damage / 4);
+    int duration = 3 + min(4, level / 25);
+
+    if (auto* existing = room->getRoomAffect(SPELL_BLIZZARD)) {
+      // Refresh: update duration, damage, and caster
+      existing->duration = duration;
+      existing->modifier = per_tick_damage;
+      existing->casterID = caster->getPlayerID();
+      existing->level = level;
+    } else {
+      RoomAffectData affect;
+      affect.type = SPELL_BLIZZARD;
+      affect.duration = duration;
+      affect.level = level;
+      affect.modifier = per_tick_damage;
+      affect.casterID = caster->getPlayerID();
+      room->addRoomAffect(affect);
+    }
+
+    return SPELL_SUCCESS;
+  } else {
+    switch (critFail(caster, SPELL_BLIZZARD)) {
+      case CRIT_F_HITSELF:
+      case CRIT_F_HITOTHER:
+        CF(SPELL_BLIZZARD);
+        act("The spell backfires, engulfing $n in a blast of freezing air!",
+          false, caster, nullptr, nullptr, TO_ROOM, ANSI_CYAN);
+        act("The spell backfires, engulfing you in a blast of freezing air!",
+          false, caster, nullptr, nullptr, TO_CHAR, ANSI_CYAN);
+        if (caster->reconcileDamage(caster, orig_damage / 3, SPELL_BLIZZARD) ==
+            -1)
+          return SPELL_CRIT_FAIL + CASTER_DEAD;
+        return SPELL_CRIT_FAIL;
+      default:
+        act("Your spell fizzles and fails to conjure a blizzard.", true, caster,
+          nullptr, nullptr, TO_CHAR);
+        caster->nothingHappens(SILENT_YES);
+        return SPELL_FAIL;
+    }
+  }
+}
+
+int blizzard(TBeing* caster) {
+  if (!bPassMageChecks(caster, SPELL_BLIZZARD, nullptr))
+    return false;
+
+  if (caster->checkPeaceful(
+        "Such a destructive spell is not needed in this peaceful place.\n\r"))
+    return false;
+
+  lag_t rounds = discArray[SPELL_BLIZZARD]->lag;
+  taskDiffT diff = discArray[SPELL_BLIZZARD]->task;
+
+  start_cast(caster, nullptr, nullptr, caster->roomp, SPELL_BLIZZARD, diff, 1,
+    "", rounds, caster->in_room, 0, 0, true, 0);
+  return true;
+}
+
+int castBlizzard(TBeing* caster) {
+  int level = caster->getSkillLevel(SPELL_BLIZZARD);
+  int bKnown = caster->getSkillValue(SPELL_BLIZZARD);
+  int rc = 0;
+
+  int ret =
+    blizzard(caster, level, bKnown, caster->getAdvLearning(SPELL_BLIZZARD));
+  if (IS_SET(ret, CASTER_DEAD))
+    ADD_DELETE(rc, DELETE_THIS);
+  return rc;
+}
+
+namespace {
+  void blizzardRoomTick(TRoom* room, RoomAffectData& affect);
+  void blizzardRoomExpire(TRoom* room, const RoomAffectData&);
+
+  sstring blizzardLookDesc(bool here) {
+    return (
+      format("<c>A howling blizzard rages %s, pelting everything with ice "
+             "and snow.<z>\n\r") %
+      (here ? "here" : "there"))
+      .str();
+  }
+
+  const RoomAffectVTable kBlizzardRoomAffect = {
+    .onTick = &blizzardRoomTick,
+    .onExpire = &blizzardRoomExpire,
+    .lookDesc = &blizzardLookDesc,
+  };
+}  // namespace
+
+void registerBlizzardRoomAffect() {
+  registerRoomAffect(SPELL_BLIZZARD, &kBlizzardRoomAffect);
+}
+
+namespace {
+  void blizzardRoomTick(TRoom* room, RoomAffectData& affect) {
+    // Look up caster by player ID for the group exemption check. casterID == 0
+    // means the original caster wasn't a real player (TBeing::getPlayerID()
+    // returns 0 for normal mobs), so skip the lookup entirely — otherwise we'd
+    // match the first mob in character_list and exempt its followers.
+    TBeing* caster = nullptr;
+    if (affect.casterID > 0) {
+      for (TBeing* ch = character_list; ch; ch = ch->next) {
+        if (ch->getPlayerID() == affect.casterID) {
+          caster = ch;
+          break;
+        }
+      }
+    }
+
+    // Group exemption only applies while the caster is still in the room —
+    // if they walked out (or died), the blizzard damages everyone
+    // indiscriminately
+    const bool caster_in_room = caster && caster->roomp == room;
+
+    MakeNoise(room->in_room,
+      "<c>The blizzard rages, pelting everything with ice and snow!<z>\n\r",
+      "<c>You hear howling winds nearby.<z>\n\r");
+
+    // Build target list first (safety invariant: don't modify during iteration)
+    std::vector<TBeing*> targets;
+    for (StuffIter it = room->stuff.begin(); it != room->stuff.end(); ++it) {
+      if (auto* victim = dynamic_cast<TBeing*>(*it))
+        targets.push_back(victim);
+    }
+
+    for (auto* victim : targets) {
+      if (!victim)
+        continue;
+      // Re-validate: an earlier tick victim's death cascade (scripts, mount
+      // riders, charm chains) can free or move other beings in the room.
+      if (std::find(room->stuff.begin(), room->stuff.end(), victim) ==
+          room->stuff.end())
+        continue;
+      if (victim->getPosition() == POSITION_DEAD)
+        continue;
+      if (victim->isImmortal())
+        continue;
+
+      // Skip caster and their group only while the caster remains in the room
+      if (caster_in_room) {
+        if (victim == caster)
+          continue;
+        if (caster->inGroup(*victim))
+          continue;
+      }
+
+      // Honor cold immunity / type-specific resistances. applyDamage doesn't
+      // run the preProcDam pipeline that reconcileDamage does, so we have to
+      // call getActualDamage explicitly or cold-immune mobs would take full
+      // damage.
+      int damage = victim->getActualDamage(victim, nullptr, affect.modifier,
+        SPELL_BLIZZARD);
+      if (damage <= 0)
+        continue;
+
+      // Compute save using the caster's class level at cast time, stored on the
+      // affect. This matches spellLuckModifier()'s formula (class_level * 20)
+      // without needing the caster to still exist.
+      if (victim->isLucky(affect.level * 20))
+        damage /= 2;
+
+      // Environmental damage: the initial burst already built hatred against
+      // the caster. Ticks deal damage without re-attribution, so the behavior
+      // is identical whether the caster is present, gone, or logged out. This
+      // also avoids AFF_AGGRESSOR pollution from reconcileDamage's self-flag
+      // path.
+      int rc = victim->applyDamage(victim, damage, SPELL_BLIZZARD);
+      if (IS_SET_DELETE(rc, DELETE_VICT)) {
+        delete victim;
+        victim = nullptr;
+      }
+    }
+  }
+
+  void blizzardRoomExpire(TRoom* room, const RoomAffectData&) {
+    MakeNoise(room->in_room,
+      "<c>The blizzard subsides, leaving only a bitter chill in the "
+      "air.<z>\n\r",
+      "<c>The howling winds nearby fade to silence.<z>\n\r");
+  }
+}  // namespace

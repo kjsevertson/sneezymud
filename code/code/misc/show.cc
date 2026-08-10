@@ -108,6 +108,9 @@ void TObj::show_me_to_char(TBeing* ch, showModeT mode) const {
   // this is an item-type-specific modifier
   buffer += showModifier(mode, ch);
 
+  // Only a trained poisoner recognises a coating at a glance.
+  if (isPoisoned() && ch && ch->doesKnowSkill(SKILL_POISON_WEAPON))
+    buffer += " (poisoned)";
   if (isObjStat(ITEM_INVISIBLE))
     buffer += " (invisible)";
   if (isObjStat(ITEM_MAGIC) && ch->isAffected(AFF_DETECT_MAGIC)) {
@@ -191,6 +194,9 @@ void TObj::show_me_mult_to_char(TBeing* ch, showModeT mode,
       mode == SHOW_MODE_PLUS) {
     buffer += showModifier(mode, ch);
 
+    // Only a trained poisoner recognises a coating at a glance.
+    if (isPoisoned() && ch && ch->doesKnowSkill(SKILL_POISON_WEAPON))
+      buffer += " (poisoned)";
     if (isObjStat(ITEM_INVISIBLE))
       buffer += " (invisible)";
     if (isObjStat(ITEM_MAGIC) && ch->isAffected(AFF_DETECT_MAGIC)) {
@@ -1184,12 +1190,18 @@ void TBeing::show_me_to_char(TBeing* ch, showModeT mode) const {
     TDatabase db(DB_SNEEZY);
     sstring tattoos[MAX_WEAR];
 
-    db.query(
-      "select location, tattoo from tattoos where name='%s' order by location",
-      getName().c_str());
-    while (db.fetchRow()) {
-      tattoos[convertTo<int>(db["location"])] = db["tattoo"];
-      found = true;
+    if (isPc()) {
+      db.query(
+        "select location, tattoo from tattoos where player_id=%i order by "
+        "location",
+        getPlayerID());
+      while (db.fetchRow()) {
+        int loc = convertTo<int>(db["location"]);
+        if (loc >= MIN_WEAR && loc < MAX_WEAR) {
+          tattoos[loc] = db["tattoo"];
+          found = true;
+        }
+      }
     }
 
     if (found && ch->GetMaxLevel() != GOD_LEVEL1) {
@@ -1256,6 +1268,16 @@ void TBeing::show_me_to_char(TBeing* ch, showModeT mode) const {
       else
         ch->sendTo(
           "Nothing.\n\r");  // this should be identical text as list_in_heap
+
+      // If spying on a mob and the observer knows Scrutiny, show possible gear.
+      if (success) {
+        const TMonster* mob = dynamic_cast<const TMonster*>(this);
+        if (mob && ch->doesKnowSkill(SKILL_SCRUTINY) &&
+            real_mobile(mob->mobVnum()) >= 0) {
+          ch->sendTo("\n\r");
+          mobGearList(ch);
+        }
+      }
     } else if (ch->isImmortal()) {
       ch->sendTo("Inventory:\n\r");
 

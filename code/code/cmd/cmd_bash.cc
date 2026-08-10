@@ -198,59 +198,12 @@ static int bash(TBeing* attacker, TBeing* victim, spellNumT skill) {
   }
 
   /*
-    Calculate modifier for specialAttack
-
-    Per combat.cc balance notes, 16.667 points of mod is equivalent to one
-    level's worth of advantage/disadvantage.
+    The circumstantial modifier for specialAttack (advanced-disc mastery plus
+    weight differential) lives in TBeing::bashSituationalModifier so the live
+    attack and the `consider` readout share one source. Other situational
+    factors (stats, environment, group effects) could be folded in there too.
   */
-  const float ONE_LEVEL = 16.667;
-  float modifier = 0.0;
-
-  /*
-     Maxed advanced disc lets one bash as if they were 10 levels higher. Bonus
-     increases linearly with advanced disc learnedness.
-   */
-  modifier += ONE_LEVEL * ((float)advLearnedness / 10.0);
-
-  /*
-    Attacker with advanced disc using shield to bash can get another bonus of
-    up to +5 levels to distinguish shield bashing from weapon/shoulder bashing
-    and also makes bash more of a tank-centric ability.
-  */
-  modifier += ONE_LEVEL * ((float)advLearnedness / 20.0);
-
-  float attackerWeight = attacker->getWeight();
-  float victimWeight = victim->getWeight();
-
-  // Include attacker's shield or two-handed weapon in weight calculation
-  if (isHoldingShield)
-    attackerWeight += itemInSecondaryHand->getWeight();
-  else if (isWielding2Hander)
-    attackerWeight += weaponInPrimaryHand->getWeight();
-
-  // Each 20% weight difference between attacker and victim modifies
-  // chance by one level's worth, up to max of +/- 10 levels.
-  if (attackerWeight > victimWeight)
-    modifier +=
-      ONE_LEVEL * min(10.0, ((attackerWeight - victimWeight) / victimWeight) *
-                              100.0 / 20.0);
-  else if (victimWeight > attackerWeight)
-    modifier -=
-      ONE_LEVEL * min(10.0, ((victimWeight - attackerWeight) / attackerWeight) *
-                              100.0 / 20.0);
-
-  /*
-    Other possible modifiers that could be applied here: stat-based
-    (bonus/penalty based on low/high attacker/victim str/bra/agi/spd?),
-    environmental factors such as weather/lighting, group-related situations (#
-    of attackers, certain spell effects on victim?)
-
-    Basically, anything that would situationally affect the success of *this
-    specific attempt* can be converted into a +/- level modifier passed to the
-    specialAttack overload, in effect using the circumstances at the time of the
-    attack to make it more or less likely to land against this specific victim
-    based on their level/AC/other defense.
-  */
+  int modifier = attacker->skillSituationalModifier(victim, skill);
 
   int bKnown = attacker->getSkillValue(skill);
   bool wasSkillExecutionSuccessful = attacker->bSuccess(bKnown, skill);
@@ -322,18 +275,9 @@ int TBeing::bashFail(TBeing* victim, spellNumT skill,
       victim, TO_VICT);
   }
 
-  if (hasLegs()) {
-    int rc = crashLanding(POSITION_SITTING);
-    if (IS_SET_DELETE(rc, DELETE_THIS))
-      return DELETE_THIS;
-
-    sendTo(format("%sYou fall over.%s\n\r") % red() % norm());
-    act("$n falls over.", TRUE, this, 0, 0, TO_ROOM);
-
-    rc = trySpringleap(victim);
-    if (IS_SET_DELETE(rc, DELETE_THIS) || IS_SET_DELETE(rc, DELETE_VICT))
-      return rc;
-  }
+  int rc = stumble();
+  if (IS_SET_DELETE(rc, DELETE_THIS))
+    return rc;
 
   reconcileDamage(victim, 0, skill);
   return FALSE;
@@ -341,18 +285,12 @@ int TBeing::bashFail(TBeing* victim, spellNumT skill,
 
 int TBeing::bashSuccess(TBeing* victim, spellNumT skill, bool isHoldingShield,
   TObj* itemInSecondaryHand) {
-  if (victim->riding) {
-    act("You knock $N off $p.", FALSE, this, victim->riding, victim, TO_CHAR);
-    act("$n knocks $N off $p.", FALSE, this, victim->riding, victim,
-      TO_NOTVICT);
-    act("$n knocks you off $p.", FALSE, this, victim->riding, victim, TO_VICT);
-    victim->dismount(POSITION_SITTING);
-  } else {
-    act("$n knocks $N on $S butt!", FALSE, this, 0, victim, TO_NOTVICT);
-    act("You send $N sprawling.", FALSE, this, 0, victim, TO_CHAR);
-    act("You tumble as $n knocks you over", FALSE, this, 0, victim, TO_VICT,
-      ANSI_BLUE);
-  }
+  const bool wasMounted = (victim->riding != nullptr);
+
+  // Describe the impact only — crashLanding/knockOffMount narrates the result.
+  act("You crash into $N!", false, this, nullptr, victim, TO_CHAR);
+  act("$n crashes into you!", false, this, nullptr, victim, TO_VICT, ANSI_BLUE);
+  act("$n crashes into $N!", false, this, nullptr, victim, TO_NOTVICT);
 
   int shieldDam =
     getSkillDam(victim, skill, getSkillLevel(skill), getAdvLearning(skill));
@@ -362,31 +300,44 @@ int TBeing::bashSuccess(TBeing* victim, spellNumT skill, bool isHoldingShield,
   // Determine which limb gets hit - same logic for all damage types
   wearSlotT limb = WEAR_BODY;
   if (!this->isTanking()) {
-    limb = WEAR_BACK; 
+    limb = WEAR_BACK;
   }
-  if (victim->isAgile(0)){
+  if (victim->isAgile(0)) {
     limb = WEAR_ARM_R;
-    if (percentChance(50)){
+    if (percentChance(50)) {
       limb = WEAR_ARM_L;
     }
-    
-    if ((victim->getHeight()*2/3) > this->getHeight()) {
+
+    if ((victim->getHeight() * 2 / 3) > this->getHeight()) {
       limb = WEAR_LEG_R;
-      if (percentChance(50)){
+      if (percentChance(50)) {
         limb = WEAR_LEG_L;
       }
     }
   }
-  if (this->getHeight() > (3*victim->getHeight()/2)){
+  if (this->getHeight() > (3 * victim->getHeight() / 2)) {
     limb = WEAR_HEAD;
   }
 
-  // Use impactSpec to handle all impact effects (spikes, thornflesh, hardness)
-  // This handles messaging, bleeding, equipment damage, etc.
   wearSlotT attackerLimb = isHoldingShield ? getSecondaryHold() : atkLimb;
-  shieldDam += impactSpec(this, victim, attackerLimb, limb);
 
-  if (reconcileDamage(victim, shieldDam, SKILL_BASH) == -1)
+  int dealt = 0;
+  int rc = reconcileDamage(victim, shieldDam, SKILL_BASH, &dealt);
+
+  act(format("Your bash deals <r>%d<z> damage to $N.") % dealt, false, this,
+    nullptr, victim, TO_CHAR);
+
+  if (rc == -1)
+    return DELETE_VICT;
+
+  // impactSpec applies its own damage (spikes, thornflesh, hardness), so it
+  // runs after the bash itself has landed.  Its damage is not part of the
+  // "deals N damage" figure above.  Poisoned spikes can crit-fail back onto
+  // us, so it can report either death.
+  int impactRc = impactSpec(this, victim, attackerLimb, limb);
+  if (IS_SET_DELETE(impactRc, DELETE_THIS))
+    return DELETE_THIS;
+  if (IS_SET_DELETE(impactRc, DELETE_VICT))
     return DELETE_VICT;
 
   int distractionBonus = 1;
@@ -398,17 +349,10 @@ int TBeing::bashSuccess(TBeing* victim, spellNumT skill, bool isHoldingShield,
   if (isLucky(levelLuckModifier(victim->GetMaxLevel())))
     distractionBonus++;
 
-  int rc = victim->crashLanding(POSITION_SITTING);
+  rc = wasMounted ? victim->knockOffMount(getSkillValue(skill) / 5)
+                  : victim->crashLanding();
   if (IS_SET_DELETE(rc, DELETE_THIS))
     return DELETE_VICT;
-
-  rc = victim->trySpringleap(this);
-  if (IS_SET_DELETE(rc, DELETE_THIS) && IS_SET_DELETE(rc, DELETE_VICT))
-    return rc;
-  else if (IS_SET_DELETE(rc, DELETE_THIS))
-    return DELETE_VICT;
-  else if (IS_SET_DELETE(rc, DELETE_VICT))
-    return DELETE_THIS;
 
   // see balance notes for bash:
   // the effect here should be strictly to prevent skill-use

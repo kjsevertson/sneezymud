@@ -223,7 +223,7 @@ TBeing::~TBeing() {
       // Other beings can hold raw pointers to this via affects. Clear or remove
       // those references here to prevent dangling access after delete.
       for (affectedData *aff = other->affected, *next_aff = nullptr; aff;
-        aff = next_aff) {
+           aff = next_aff) {
         next_aff = aff->next;
         if (aff->be != this) {
           continue;
@@ -374,7 +374,8 @@ TObj::TObj() :
   action_description(NULL),
   owners(NULL),
   isTasked(false),
-  isLocked(false) {
+  isLocked(false),
+  poison((liqTypeT)-1) {
   // change the default value here
   number = -1;
 
@@ -537,6 +538,9 @@ TRoom::~TRoom() {
       tri--;  // backup so we don't skip any
     }
   }
+
+  // remove room from affected rooms registry
+  std::erase(affectedRooms_db, this);
 
   // A whacky what-if contingency thing
   // save rooms 100 200
@@ -765,7 +769,7 @@ TThing& TRoom::operator+=(TThing& t) {
 
       if ((tBeing = dynamic_cast<TBeing*>((tThing = &t)))) {
         for (wearSlotT wearIndex = MIN_WEAR; wearIndex < MAX_WEAR;
-          wearIndex++) {
+             wearIndex++) {
           if ((tObjTemp = dynamic_cast<TObj*>(tBeing->equipment[wearIndex]))) {
             if (tObjTemp->isObjStat(ITEM_PROTOTYPE)) {
               tBeing->unequip(wearIndex);
@@ -777,7 +781,7 @@ TThing& TRoom::operator+=(TThing& t) {
               continue;
 
             for (StuffIter it = tObjTemp->stuff.begin();
-              it != tObjTemp->stuff.end();) {
+                 it != tObjTemp->stuff.end();) {
               tObj = *(it++);
 
               if ((tObjTemp2 = dynamic_cast<TObj*>(tObj)) &&
@@ -805,7 +809,7 @@ TThing& TRoom::operator+=(TThing& t) {
           continue;
 
         for (StuffIter it = tObjTemp->stuff.begin();
-          it != tObjTemp->stuff.end();) {
+             it != tObjTemp->stuff.end();) {
           tThing = *(it++);
 
           if ((tObjTemp2 = dynamic_cast<TObj*>(tThing)) &&
@@ -898,7 +902,7 @@ TThing& TThing::operator--() {
     if (tst && tst->givesOutsideLight()) {
       int best = 0, curr = 0;
       for (StuffIter it = rp->stuff.begin();
-        it != rp->stuff.end() && (tmp = *it); ++it) {
+           it != rp->stuff.end() && (tmp = *it); ++it) {
         TSeeThru* tst2 = dynamic_cast<TSeeThru*>(tmp);
         if (tst2 && tst2->givesOutsideLight()) {
           curr = tst2->getLightFromOutside();
@@ -1395,7 +1399,8 @@ TObj::TObj(const TObj& a) :
   TThing(a),
   obj_flags(a.obj_flags),
   isTasked(a.isTasked),
-  isLocked(a.isLocked) {
+  isLocked(a.isLocked),
+  poison(a.poison) {
   int i;
 
   for (i = 0; i < MAX_OBJ_AFFECT; i++)
@@ -1429,6 +1434,7 @@ TObj& TObj::operator=(const TObj& a) {
   int i;
 
   obj_flags = a.obj_flags;
+  poison = a.poison;
 
   for (i = 0; i < MAX_OBJ_AFFECT; i++) {
     affected[i] = a.affected[i];
@@ -1710,6 +1716,7 @@ roomDirData::roomDirData() :
   weight(-1),
   trap_info(0),
   trap_dam(0),
+  trap_setter(""),
   key(0),
   to_room(0) {}
 
@@ -1722,6 +1729,7 @@ roomDirData::roomDirData(const roomDirData& a) :
   weight(a.weight),
   trap_info(a.trap_info),
   trap_dam(a.trap_dam),
+  trap_setter(a.trap_setter),
   key(a.key),
   to_room(a.to_room) {}
 
@@ -1734,6 +1742,7 @@ roomDirData& roomDirData::operator=(const roomDirData& a) {
   weight = a.weight;
   trap_info = a.trap_info;
   trap_dam = a.trap_dam;
+  trap_setter = a.trap_setter;
   key = a.key;
   to_room = a.to_room;
   description = a.description;

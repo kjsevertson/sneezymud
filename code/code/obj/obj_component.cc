@@ -919,8 +919,6 @@ void buildComponentArray() {
     "You run $p up and down $N's arms.", "$n runs $p up and down $N's arms.",
     "$n runs $p up and down your arms.", "You run $p up and down your arms.",
     "$n runs $p up and down $s arms.", "", ""));
-  CompInfo.push_back(compInfo(SPELL_ANTIGRAVITY, "", "", "", "You chew on $p.",
-    "$n chews on $p.", "", ""));
   CompInfo.push_back(
     compInfo(SPELL_IDENTIFY, "You pop $p into your eye and examine $N.",
       "$n pops $p into $s eye and examines $N.",
@@ -1206,7 +1204,7 @@ void buildComponentArray() {
     "$n tosses $p at $N.", "$n tosses $p at you.", "You toss $p to the ground.",
     "$n tosses $p to the ground.", "", ""));
   CompInfo.push_back(
-    compInfo(SPELL_TRUE_SIGHT, "You nibble on $p and spit it upon $N.",
+    compInfo(SPELL_MAGE_SIGHT, "You nibble on $p and spit it upon $N.",
       "$n nibbles on $p and spits it at $N.",
       "$n nibbles on $p and spits it at you.",
       "You nibble on $p and swallow it down.",
@@ -1244,14 +1242,14 @@ void buildComponentArray() {
     "$n shatters $p.", "", ""));
   CompInfo.push_back(compInfo(SPELL_TSUNAMI, "", "", "", "You uncork $p.",
     "$n uncorks $p.", "", ""));
+  CompInfo.push_back(compInfo(SPELL_BLIZZARD, "", "", "",
+    "You place $p on your tongue.", "$n places $p on $s tongue.", "", ""));
   CompInfo.push_back(compInfo(SPELL_CONJURE_WATER, "", "", "",
     "You shatter $p.", "$n shatters $p.", "", ""));
   CompInfo.push_back(
     compInfo(SPELL_GILLS_OF_FLESH, "You apply $p to $N's throat.",
       "$n applies $p to $N's throat.", "$n applies $p to your throat.",
       "You apply $p to your throat.", "$n applies $p to $s throat.", "", ""));
-  CompInfo.push_back(compInfo(SPELL_BREATH_OF_SARAHAGE, "", "", "",
-    "You squeeze $p in your hands.", "$n squeezes $p in $s hands.", "", ""));
   CompInfo.push_back(compInfo(SPELL_INFRAVISION,
     "You grind $p against $N's eyelids.", "$n grinds $p against $N's eyelids.",
     "$n grinds $p against your eyelids.", "You grind $p against your eyelids.",

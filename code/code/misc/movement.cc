@@ -43,6 +43,7 @@
 #include "game_crazyeights.h"
 #include "game_drawpoker.h"
 #include "configuration.h"
+#include "task_regen_common.h"
 
 void TBeing::goThroughPortalMsg(const TPortal* o) const {
   char buf[256];
@@ -807,7 +808,7 @@ int TBeing::rawMove(dirTypeT dir) {
         sendTo(
           "Oops, you must have crashed into one of those purple elephants you "
           "keep seeing.\n\r");
-        rc = crashLanding(POSITION_SITTING);
+        rc = crashLanding();
         if (IS_SET_DELETE(rc, DELETE_THIS))
           return DELETE_THIS;
         return FALSE;
@@ -1717,7 +1718,8 @@ int TBeing::genericMovedIntoRoom(TRoom* rp, int was_in,
       continue;
 
     if (was_in != -1) {
-      // was_in (room number) is passed as a pointer - receivers cast back to int
+      // was_in (room number) is passed as a pointer - receivers cast back to
+      // int
       rc = tmons->checkSpec(this, CMD_MOB_MOVED_INTO_ROOM, "",
         reinterpret_cast<TThing*>(static_cast<uintptr_t>(was_in)));
       if (rc) {
@@ -2725,7 +2727,7 @@ void TBeing::doSit(const sstring& argument) {
   }
 #if 0
   int rc = triggerSpecial(this, CMD_OBJ_SATON, arg);
-  if (IS_SET_DELETE(rc, DELETE_THIS)) 
+  if (IS_SET_DELETE(rc, DELETE_THIS))
     return DELETE_THIS;
 
   if (rc)
@@ -2736,7 +2738,7 @@ void TBeing::doSit(const sstring& argument) {
   trimString(arg);
 
   if (arg.empty() && (!riding || dynamic_cast<TBeing*>(riding))) {
-    loseSneak();
+    breakStealth();
     switch (getPosition()) {
       case POSITION_STANDING:
       case POSITION_CRAWLING:
@@ -2745,8 +2747,7 @@ void TBeing::doSit(const sstring& argument) {
         act("You sit down.", FALSE, this, 0, 0, TO_CHAR);
         act("$n sits down.", TRUE, this, 0, 0, TO_ROOM);
         setPosition(POSITION_SITTING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_SIT, "", 350, 0, 1, 0, 4 * regenTime());
+        startRegenTask(*this, RegenTaskType::SIT);
         break;
       case POSITION_SITTING:
         sendTo("You're sitting already.\n\r");
@@ -2758,8 +2759,7 @@ void TBeing::doSit(const sstring& argument) {
         act("You stop resting, and sit up.", FALSE, this, 0, 0, TO_CHAR);
         act("$n stops resting.", TRUE, this, 0, 0, TO_ROOM);
         setPosition(POSITION_SITTING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_SIT, "", 350, 0, 1, 0, 4 * regenTime());
+        startRegenTask(*this, RegenTaskType::SIT);
         break;
       case POSITION_SLEEPING:
         act("You have to wake up first.", FALSE, this, 0, 0, TO_CHAR);
@@ -2776,8 +2776,7 @@ void TBeing::doSit(const sstring& argument) {
         act("$n stops floating around, and sits down.", TRUE, this, 0, 0,
           TO_ROOM);
         setPosition(POSITION_SITTING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_SIT, "", 350, 0, 1, 0, 4 * regenTime());
+        startRegenTask(*this, RegenTaskType::SIT);
         break;
     }
   } else {
@@ -2837,7 +2836,7 @@ void TBeing::doRest(const sstring& argument) {
   trimString(arg);
 
   if (arg.empty() && (!riding || dynamic_cast<TBeing*>(riding))) {
-    loseSneak();
+    breakStealth();
     switch (getPosition()) {
       case POSITION_STANDING:
       case POSITION_CRAWLING:
@@ -2845,8 +2844,7 @@ void TBeing::doRest(const sstring& argument) {
           0, 0, TO_CHAR);
         act("$n sits down, leans back and rests.", TRUE, this, 0, 0, TO_ROOM);
         setPosition(POSITION_RESTING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_REST, "", 350, 0, 1, 0, 2 * regenTime());
+        startRegenTask(*this, RegenTaskType::REST);
         break;
       case POSITION_SITTING:
         if (removeAllCasinoGames())
@@ -2856,8 +2854,7 @@ void TBeing::doRest(const sstring& argument) {
           TO_CHAR);
         act("$n leans back and rests.", TRUE, this, 0, 0, TO_ROOM);
         setPosition(POSITION_RESTING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_REST, "", 350, 0, 1, 0, 2 * regenTime());
+        startRegenTask(*this, RegenTaskType::REST);
         break;
       case POSITION_RESTING:
         act("You are already resting.", FALSE, this, 0, 0, TO_CHAR);
@@ -2873,8 +2870,7 @@ void TBeing::doRest(const sstring& argument) {
           FALSE, this, 0, 0, TO_CHAR);
         act("$n stops floating around, and rests.", FALSE, this, 0, 0, TO_ROOM);
         setPosition(POSITION_SITTING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_REST, "", 350, 0, 1, 0, 2 * regenTime());
+        startRegenTask(*this, RegenTaskType::REST);
         break;
     }
   } else {
@@ -2934,23 +2930,21 @@ void TBeing::doSleep(const sstring& argument) {
   trimString(arg);
 
   if (arg.empty() && (!riding || dynamic_cast<TBeing*>(riding))) {
-    loseSneak();
+    breakStealth();
     switch (getPosition()) {
       case POSITION_STANDING:
       case POSITION_RESTING:
         sendTo("You go to sleep.\n\r");
         act("$n lies down and falls asleep.", TRUE, this, 0, 0, TO_ROOM);
         setPosition(POSITION_SLEEPING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_SLEEP, "", 350, 0, 1, 0, regenTime());
+        startRegenTask(*this, RegenTaskType::SLEEP);
         break;
       case POSITION_CRAWLING:
       case POSITION_SITTING:
         sendTo("You go to sleep.\n\r");
         act("$n lies down and falls asleep.", TRUE, this, 0, 0, TO_ROOM);
         setPosition(POSITION_SLEEPING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_SLEEP, "", 350, 0, 1, 0, regenTime());
+        startRegenTask(*this, RegenTaskType::SLEEP);
         if (removeAllCasinoGames())
           break;
         break;
@@ -2966,8 +2960,7 @@ void TBeing::doSleep(const sstring& argument) {
         act("$n stops floating around, and lie down to sleep.", TRUE, this, 0,
           0, TO_ROOM);
         setPosition(POSITION_SLEEPING);
-        if (isPc())
-          start_task(this, 0, 0, TASK_SLEEP, "", 350, 0, 1, 0, regenTime());
+        startRegenTask(*this, RegenTaskType::SLEEP);
         break;
     }
   } else {
@@ -3321,6 +3314,18 @@ int TBeing::goDirection(dirTypeT dir) {
         act(buf, TRUE, this, 0, 0, TO_ROOM);
         return FALSE;
       }
+      if (IS_SET(exitp->condition, EXIT_TRAPPED)) {
+        if (doesKnowSkill(SKILL_DETECT_TRAP) && detectTrapDoor(this, dir)) {
+          sendTo(format("You start to open the %s, but then notice an "
+                        "insidious %s trap...\n\r") %
+                 sstring(exitp->getName()) %
+                 sstring(trap_types[exitp->trap_info]).uncap());
+          return false;
+        }
+        rc = triggerDoorTrap(dir);
+        if (IS_SET_DELETE(rc, DELETE_THIS))
+          return DELETE_THIS;
+      }
       rawOpenDoor(dir);
       return 0;
     } else if (!IS_SET(exitp->condition, EXIT_SECRET) &&
@@ -3452,68 +3457,94 @@ void TBeing::doLand() {
   setPosition(POSITION_STANDING);
 }
 
-int TBeing::crashLanding(positionTypeT pos, bool force, bool dam,
-  bool falling) {
-  if (force) {
-    // option to force this
-    setPosition(pos);
-    sendTo(COLOR_ROOMS,
-      format("You smash into the %s hard!\n\r") % roomp->describeGround());
-    act("$n tumbles end over end as $e crash lands!", TRUE, this, 0, 0,
-      TO_ROOM);
-  } else if (!isFlying()) {
-    setPosition(pos);
-    if ((getPosition() >= POSITION_RESTING) &&
-        ((pos == POSITION_FLYING) || roomp->isFlyingSector())) {
-      sendTo("You start flying around.\n\r");
-      act("$n starts to fly up in the air.", TRUE, this, 0, 0, TO_ROOM);
-      setPosition(POSITION_FLYING);
-      return FALSE;
-    } else if (roomp->isFallSector()) {
-      if (falling || IS_SET_DELETE(checkFalling(), DELETE_THIS))
-        return DELETE_THIS;
-      return TRUE;
-    }
-    return FALSE;
-  } else if (roomp->isFlyingSector()) {
-    if (pos == POSITION_FLYING) {
-      return FALSE;
-    } else if (getPosition() >= POSITION_RESTING) {
-      sendTo("You start flying around.\n\r");
-      act("$n starts to fly up in the air.", TRUE, this, 0, 0, TO_ROOM);
-      setPosition(POSITION_FLYING);
-      return FALSE;
-    } else {
-      setPosition(pos);
-      return FALSE;
-    }
-  } else if (roomp->isFallSector()) {
-    setPosition(pos);
-    if (falling || IS_SET_DELETE(checkFalling(), DELETE_THIS))
+// Knock the character to the ground. Higher severity makes the agility roll
+// harder, biasing toward POSITION_RESTING over POSITION_SITTING. Severity is
+// currently a placeholder int; future work will tie it to skill damage so each
+// caller passes a meaningful magnitude. Invokes springleap() for monks (return
+// ignored) so they may bounce back to standing in a single chain. Only
+// downgrades position — characters already at or below the rolled outcome keep
+// their current state.
+int TBeing::crashLanding(int severity, bool falling) {
+  positionTypeT newPos =
+    isAgile(-severity) ? POSITION_SITTING : POSITION_RESTING;
+  bool changed = (getPosition() > newPos);
+  if (changed)
+    setPosition(newPos);
+
+  // In fall sectors checkFalling handles the narrative — either the character
+  // plummets (with its own messaging) or is held in place by an upstream
+  // condition. Either way, the sit/sprawl flavor would be misleading, so skip
+  // the position-change messaging here.
+  if (roomp->isFallSector()) {
+    // falling=true is a recursion guard for flightCheck, not a death signal —
+    // skip the recursive checkFalling but don't fabricate a DELETE_THIS.
+    if (!falling && IS_SET_DELETE(checkFalling(), DELETE_THIS))
       return DELETE_THIS;
-    return TRUE;
-  } else if (doesKnowSkill(SKILL_CATFALL) && bSuccess(SKILL_CATFALL)) {
-    setPosition(POSITION_STANDING);
-    act("$n drops gracefully onto the $g.", FALSE, this, 0, 0, TO_ROOM);
-    sendTo(COLOR_ROOMS,
-      format("You drop gracefully to the %s.\n\r") % roomp->describeGround());
-    dam = false;
-  } else {
-    // Flying person
-    setPosition(pos);
-    sendTo(COLOR_ROOMS,
-      format("You smash into the %s hard!\n\r") % roomp->describeGround());
-    act("$n tumbles end over end as $e crash lands!", TRUE, this, 0, 0,
+  } else if (changed && getPosition() == POSITION_SITTING) {
+    act("<y>You drop to a sit on the $g.<1>", true, this, nullptr, nullptr,
+      TO_CHAR);
+    act("<y>$n drops to a sit on the $g.<1>", true, this, nullptr, nullptr,
+      TO_ROOM);
+  } else if (changed && getPosition() == POSITION_RESTING) {
+    act("<r>You sprawl across the $g.<1>", true, this, nullptr, nullptr,
+      TO_CHAR);
+    act("<r>$n sprawls across the $g.<1>", true, this, nullptr, nullptr,
       TO_ROOM);
   }
 
-  if (dam) {
-    // some things skip damage.  (e.g. already dead when crashed)
-    if (reconcileDamage(this, ::number(2, 8), DAMAGE_FALL) == -1)
-      return DELETE_THIS;
-  }
+  if (doesKnowSkill(SKILL_SPRINGLEAP))
+    springleap();
 
   return TRUE;
+}
+
+// Attacker self-stumble after a failed attempt. Two layered agility rolls give
+// agile characters a meaningfully better worst case: first roll here decides
+// whether the attacker stays standing; on failure crashLanding rolls again to
+// decide sitting vs. resting. The compounded distribution is intentional.
+int TBeing::stumble() {
+  if (!hasLegs())
+    return FALSE;
+
+  if (isFlying() && roomp->isFallSector()) {
+    act("<g>You falter in the air, but stay aloft!<1>", true, this, nullptr,
+      nullptr, TO_CHAR);
+    act("<g>$n falters in the air, but stays aloft!<1>", true, this, nullptr,
+      nullptr, TO_ROOM);
+    return FALSE;
+  }
+
+  if (!isAgile(0)) {
+    if (isFlying()) {
+      act("<r>You stumble out of the air and topple over.<1>", true, this,
+        nullptr, nullptr, TO_CHAR);
+      act("<r>$n stumbles out of the air and topples over.<1>", true, this,
+        nullptr, nullptr, TO_ROOM);
+    } else {
+      act("<r>You stumble and topple over.<1>", true, this, nullptr, nullptr,
+        TO_CHAR);
+      act("<r>$n stumbles and topples over.<1>", true, this, nullptr, nullptr,
+        TO_ROOM);
+    }
+
+    int rc = crashLanding();
+    if (IS_SET_DELETE(rc, DELETE_THIS))
+      return DELETE_THIS;
+  } else {
+    if (isFlying()) {
+      act("<g>You stumble out of the air, but land on your feet!<1>", true,
+        this, nullptr, nullptr, TO_CHAR);
+      act("<g>$n stumbles out of the air, but lands on $s feet!<1>", true, this,
+        nullptr, nullptr, TO_ROOM);
+    } else {
+      act("<g>You stumble, but catch yourself!<1>", true, this, nullptr,
+        nullptr, TO_CHAR);
+      act("<g>$n stumbles, but catches $mself!<1>", true, this, nullptr,
+        nullptr, TO_ROOM);
+    }
+    setPosition(POSITION_STANDING);
+  }
+  return FALSE;
 }
 
 int TBeing::doMortalGoto(const sstring& argument) {
