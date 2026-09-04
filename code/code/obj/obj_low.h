@@ -11,6 +11,8 @@
   See obj_low.cc for description
  ------------------------------------------------------------------*/
 
+#pragma once
+
 enum Tier {
   // equipment
   Tier_Clothing = 0,

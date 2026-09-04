@@ -223,6 +223,50 @@ class Obj {
     static constexpr int DAY_WEAPON = 29936;
     static constexpr int NIGHT_WEAPON = 29937;
 
+    // Blank prototypes for the three wearable types, twelve slots each, laid
+    // out head..finger in contiguous blocks. Rent rebuilds an item's C++ class
+    // and wear_flags from the prototype at its vnum rather than persisting
+    // them, so anything that creates or converts a wearable at runtime needs a
+    // real prototype for the type and slot it is producing.
+    static constexpr int TEMPLATE_CLOTHING_HEAD = 29503;
+    static constexpr int TEMPLATE_CLOTHING_NECK = 29504;
+    static constexpr int TEMPLATE_CLOTHING_BODY = 29505;
+    static constexpr int TEMPLATE_CLOTHING_BACK = 29506;
+    static constexpr int TEMPLATE_CLOTHING_ARM = 29507;
+    static constexpr int TEMPLATE_CLOTHING_WRIST = 29508;
+    static constexpr int TEMPLATE_CLOTHING_HAND = 29509;
+    static constexpr int TEMPLATE_CLOTHING_WAIST = 29510;
+    static constexpr int TEMPLATE_CLOTHING_LEG = 29511;
+    static constexpr int TEMPLATE_CLOTHING_FOOT = 29512;
+    static constexpr int TEMPLATE_CLOTHING_SHIELD = 29513;
+    static constexpr int TEMPLATE_CLOTHING_FINGER = 29514;
+
+    static constexpr int TEMPLATE_ARMOR_HEAD = 29515;
+    static constexpr int TEMPLATE_ARMOR_NECK = 29516;
+    static constexpr int TEMPLATE_ARMOR_BODY = 29517;
+    static constexpr int TEMPLATE_ARMOR_BACK = 29518;
+    static constexpr int TEMPLATE_ARMOR_ARM = 29519;
+    static constexpr int TEMPLATE_ARMOR_WRIST = 29520;
+    static constexpr int TEMPLATE_ARMOR_HAND = 29521;
+    static constexpr int TEMPLATE_ARMOR_WAIST = 29522;
+    static constexpr int TEMPLATE_ARMOR_LEG = 29523;
+    static constexpr int TEMPLATE_ARMOR_FOOT = 29524;
+    static constexpr int TEMPLATE_ARMOR_SHIELD = 29525;
+    static constexpr int TEMPLATE_ARMOR_FINGER = 29526;
+
+    static constexpr int TEMPLATE_JEWELRY_HEAD = 29527;
+    static constexpr int TEMPLATE_JEWELRY_NECK = 29528;
+    static constexpr int TEMPLATE_JEWELRY_BODY = 29529;
+    static constexpr int TEMPLATE_JEWELRY_BACK = 29530;
+    static constexpr int TEMPLATE_JEWELRY_ARM = 29531;
+    static constexpr int TEMPLATE_JEWELRY_WRIST = 29532;
+    static constexpr int TEMPLATE_JEWELRY_HAND = 29533;
+    static constexpr int TEMPLATE_JEWELRY_WAIST = 29534;
+    static constexpr int TEMPLATE_JEWELRY_LEG = 29535;
+    static constexpr int TEMPLATE_JEWELRY_FOOT = 29536;
+    static constexpr int TEMPLATE_JEWELRY_SHIELD = 29537;
+    static constexpr int TEMPLATE_JEWELRY_FINGER = 29538;
+
     Obj() = delete;
 };
 

@@ -2793,6 +2793,173 @@ void runMigrations() {
         "WHERE vnum BETWEEN 900 AND 934 AND type = 12");
     },
 
+    // Bulk gear template prototypes (vnums 29503-29538): three item types x
+    // twelve wear slots, extending the existing 29925/29926 pair to every
+    // slot. Gut, Plate and Bangle load the template matching the target type
+    // and slot and copy the consumed item's state into it; Weave and Forge
+    // load a blank directly.
+    //
+    // Only wear_flag and type vary across the block. Everything else is
+    // copied verbatim from 29925 (clothing) and 29926 (armor), and the
+    // jewelry set reuses the armor row wholesale. That is deliberate:
+    // conversion steals volume, weight, price, structure, material and
+    // affects from the item it consumes, and Weave/Forge set volume at
+    // creation, so any other value here would be overwritten before a player
+    // saw it. wear_flag and type are the exceptions - rent does not persist
+    // either one, it rebuilds them from the prototype, which is the whole
+    // reason these need real vnums instead of bare construction.
+    //
+    // action_flag is the one value NOT copied from 29925/29926: those carry
+    // anti-class flags (ITEM_ANTI_MONK | ITEM_ANTI_MAGE and ITEM_ANTI_MAGE),
+    // and read_object() assigns the prototype's flag word wholesale rather
+    // than OR-ing into it. A clothing template that is anti-monk would make
+    // every monk's own bulk clothing unwearable by its owner. A blank
+    // template carries no class restrictions; each caller sets its own.
+    // The trailing UPDATE clears the same flags on the two source rows,
+    // which have the identical problem.
+    //
+    // INSERT IGNORE makes this idempotent on the vnum primary key.
+    [&]() {
+      vlogf(LOG_MISC, "Creating bulk gear templates (29503-29538)");
+      sneezy.query(
+        "INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, "
+        "action_desc, type, action_flag, wear_flag, val0, val1, val2, val3, "
+        "weight, price, can_be_seen, spec_proc, max_exist, max_struct, "
+        "cur_struct, decay, volume, material) VALUES "
+        "(29503,'clothing basic head [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,17,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29504,'clothing basic neck [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,5,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29505,'clothing basic body [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,9,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29506,'clothing basic back [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,1025,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29507,'clothing basic arm [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,257,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29508,'clothing basic wrist [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,4097,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29509,'clothing basic hand [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,129,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29510,'clothing basic waist [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,2049,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29511,'clothing basic leg [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,33,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29512,'clothing basic foot [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,65,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29513,'clothing basic shield [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,16385,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29514,'clothing basic finger [bulk]','a basic piece of clothing','A "
+        "basic piece of clothing sits here in a "
+        "heap.','',11,0,3,0,0,0,0,15,5322,3,0,9999,40,40,-1,11000,52),"
+        "(29515,'armor common head [bulk]','a common piece of armor','A common "
+        "piece of armor sits here, looking "
+        "forgotten.','',9,0,17,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,159)"
+        ","
+        "(29516,'armor common neck [bulk]','a common piece of armor','A common "
+        "piece of armor sits here, looking "
+        "forgotten.','',9,0,5,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,159),"
+        "(29517,'armor common body [bulk]','a common piece of armor','A common "
+        "piece of armor sits here, looking "
+        "forgotten.','',9,0,9,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,159),"
+        "(29518,'armor common back [bulk]','a common piece of armor','A common "
+        "piece of armor sits here, looking "
+        "forgotten.','',9,0,1025,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29519,'armor common arm [bulk]','a common piece of armor','A common "
+        "piece of armor sits here, looking "
+        "forgotten.','',9,0,257,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29520,'armor common wrist [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',9,0,4097,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29521,'armor common hand [bulk]','a common piece of armor','A common "
+        "piece of armor sits here, looking "
+        "forgotten.','',9,0,129,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29522,'armor common waist [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',9,0,2049,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29523,'armor common leg [bulk]','a common piece of armor','A common "
+        "piece of armor sits here, looking "
+        "forgotten.','',9,0,33,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,159)"
+        ","
+        "(29524,'armor common foot [bulk]','a common piece of armor','A common "
+        "piece of armor sits here, looking "
+        "forgotten.','',9,0,65,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,159)"
+        ","
+        "(29525,'armor common shield [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',9,0,16385,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29526,'armor common finger [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',9,0,3,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,159),"
+        "(29527,'jewelry common head [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,17,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29528,'jewelry common neck [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,5,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,159)"
+        ","
+        "(29529,'jewelry common body [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,9,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,159)"
+        ","
+        "(29530,'jewelry common back [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,1025,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29531,'jewelry common arm [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,257,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29532,'jewelry common wrist [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,4097,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29533,'jewelry common hand [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,129,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29534,'jewelry common waist [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,2049,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29535,'jewelry common leg [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,33,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29536,'jewelry common foot [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,65,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29537,'jewelry common shield [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,16385,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159),"
+        "(29538,'jewelry common finger [bulk]','a common piece of armor','A "
+        "common piece of armor sits here, looking "
+        "forgotten.','',45,0,3,0,0,0,0,60,29068,3,0,9999,62,62,-1,11000,"
+        "159)");
+
+      sneezy.query(
+        "UPDATE obj SET action_flag = 0 WHERE vnum IN (29925, "
+        "29926) AND action_flag != 0");
+    },
   };
 
   int oldVersion = getVersion(sneezy);

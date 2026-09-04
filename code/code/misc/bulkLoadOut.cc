@@ -17,17 +17,15 @@
 #include "immunity.h"
 #include "materials.h"
 #include "monster.h"
-#include "obj_armor.h"
 #include "obj_base_clothing.h"
 #include "obj_commodity.h"
 #include "obj_general_weapon.h"
-#include "obj_jewelry.h"
-#include "obj_worn.h"
 #include "race.h"
 #include "shop.h"
 #include "shopowned.h"
 #include "spells.h"
 #include "stats.h"
+#include "wearTemplate.h"
 
 namespace {
 
@@ -209,48 +207,6 @@ static_assert(material_density[MAT_TIN] == 7.3);
 static_assert(material_density[MAT_ETERNIUM] == 9.0);
 
 // -----------------------------------------------------------------------
-// Bulk loot equipment slots
-// Maps to wear flag bits and race_vol_constants indices
-// -----------------------------------------------------------------------
-enum class BulkSlot {
-  Head,
-  Neck,
-  Body,
-  Back,
-  Arm,
-  Wrist,
-  Hand,
-  Waist,
-  Leg,
-  Foot,
-  Shield,
-  Finger,
-  COUNT
-};
-
-inline constexpr int BULK_SLOT_COUNT = static_cast<int>(BulkSlot::COUNT);
-
-struct BulkSlotInfo {
-  BulkSlot slot;
-  unsigned int wearFlag;
-};
-
-inline constexpr std::array<BulkSlotInfo, BULK_SLOT_COUNT> bulkSlots = {{
-    {BulkSlot::Head, ITEM_WEAR_HEAD},
-    {BulkSlot::Neck, ITEM_WEAR_NECK},
-    {BulkSlot::Body, ITEM_WEAR_BODY},
-    {BulkSlot::Back, ITEM_WEAR_BACK},
-    {BulkSlot::Arm, ITEM_WEAR_ARMS},
-    {BulkSlot::Wrist, ITEM_WEAR_WRISTS},
-    {BulkSlot::Hand, ITEM_WEAR_HANDS},
-    {BulkSlot::Waist, ITEM_WEAR_WAIST},
-    {BulkSlot::Leg, ITEM_WEAR_LEGS},
-    {BulkSlot::Foot, ITEM_WEAR_FEET},
-    {BulkSlot::Shield, ITEM_WEAR_HOLD},
-    {BulkSlot::Finger, ITEM_WEAR_FINGERS},
-}};
-
-// -----------------------------------------------------------------------
 // Quality tiers (determined by mob level)
 // -----------------------------------------------------------------------
 enum class Quality {
@@ -374,9 +330,9 @@ inline constexpr std::array<ClassPrimaryStats, MAX_CLASSES> classPrimaryStats =
 
 // -----------------------------------------------------------------------
 // Class → base object name per slot
-// Indexed by classIndT, then BulkSlot
+// Indexed by classIndT, then TemplateSlot
 // -----------------------------------------------------------------------
-inline constexpr auto CS = static_cast<int>(BulkSlot::COUNT);
+inline constexpr auto CS = static_cast<int>(TemplateSlot::COUNT);
 
 using SlotNames = std::array<const char*, CS>;
 
@@ -446,7 +402,7 @@ struct RaceSizeInfo {
 
 // Base volumes per slot at 100% (human) size, derived from newbie gear.
 // Actual volume = baseVolume * raceModifier.
-inline constexpr std::array<int, BULK_SLOT_COUNT> slotBaseVolumes = {{
+inline constexpr std::array<int, TEMPLATE_SLOT_COUNT> slotBaseVolumes = {{
     2500,   // Head
     900,    // Neck (race_vol_constants[neck] * 70)
     11000,  // Body
@@ -906,7 +862,7 @@ inline constexpr double RING_WEIGHT = 0.1;
 // Returns the created object, or nullptr on failure
 // -----------------------------------------------------------------------
 [[nodiscard]] TObj* generateBulkItem(classIndT classInd, int level,
-    race_t race, BulkSlot bulkSlot) {
+    race_t race, TemplateSlot templateSlot) {
   // Dead classes produce no bulk loot
   if (classInd == RANGER_LEVEL_IND || classInd == COMMONER_LEVEL_IND)
     return nullptr;
@@ -922,14 +878,14 @@ inline constexpr double RING_WEIGHT = 0.1;
   int mat = tierInfo.usesArmorMaterials ? smi.armorMat : smi.clothMat;
   const char* qualityName =
       tierInfo.usesArmorMaterials ? qi.armorName : qi.clothName;
-  auto slotIdx = static_cast<int>(bulkSlot);
+  auto slotIdx = static_cast<int>(templateSlot);
   const char* baseName = classSlotNames[classInd][slotIdx];
 
   if (!baseName)
     return nullptr;
 
-  bool isRing = (bulkSlot == BulkSlot::Finger);
-  bool isShield = (bulkSlot == BulkSlot::Shield);
+  bool isRing = (templateSlot == TemplateSlot::Finger);
+  bool isShield = (templateSlot == TemplateSlot::Shield);
 
   // --- Determine racial size ---
   const auto* raceSize = raceSizeInfo(race);
@@ -989,15 +945,14 @@ inline constexpr double RING_WEIGHT = 0.1;
   }
 
   // --- Create the object ---
-  TObj* obj;
-  if (isRing)
-    obj = new TJewelry();
-  else if (tierInfo.usesArmorMaterials)
-    obj = new TArmor();
-  else
-    obj = new TWorn();
+  itemTypeT itemType = isRing                        ? ITEM_JEWELRY
+                       : tierInfo.usesArmorMaterials ? ITEM_ARMOR
+                                                     : ITEM_WORN;
+  TObj* obj = makeBlankWearable(itemType, templateSlot);
+  if (!obj)
+    return nullptr;
 
-  obj->addObjStat(ITEM_STRUNG);
+  // Bulk gear stays unrentable until the monogrammer personalizes it.
   obj->addObjStat(ITEM_NORENT);
 
   // --- Set basic properties ---
@@ -1005,7 +960,7 @@ inline constexpr double RING_WEIGHT = 0.1;
   obj->name = keywords;
   obj->setDescr("A piece of equipment lies here.");
 
-  const auto& slotInfo = bulkSlots[slotIdx];
+  const auto& slotInfo = templateSlots[slotIdx];
   obj->obj_flags.wear_flags = ITEM_WEAR_TAKE | slotInfo.wearFlag;
 
   obj->setMaterial(mat);
@@ -1646,14 +1601,14 @@ void bulkLoadOut(TMonster* mob) {
   if (classInd == RANGER_LEVEL_IND || classInd == COMMONER_LEVEL_IND)
     return;
 
-  for (int i = 0; i < BULK_SLOT_COUNT; ++i) {
-    auto bulkSlot = static_cast<BulkSlot>(i);
+  for (int i = 0; i < TEMPLATE_SLOT_COUNT; ++i) {
+    auto templateSlot = static_cast<TemplateSlot>(i);
     // A shield belongs in the off hand, leaving the weapon hand free below.
     // slot_from_bit answers ITEM_WEAR_HOLD with a fixed side, so ask the mob
     // which side that is rather than hardcoding one.
-    wearSlotT wearSlot = (bulkSlot == BulkSlot::Shield)
+    wearSlotT wearSlot = (templateSlot == TemplateSlot::Shield)
                            ? mob->getSecondaryHold()
-                           : slot_from_bit(bulkSlots[i].wearFlag);
+                           : slot_from_bit(templateSlots[i].wearFlag);
 
     // Don't generate if mob already has something in this slot
     if (mob->equipment[wearSlot])
@@ -1663,7 +1618,7 @@ void bulkLoadOut(TMonster* mob) {
       continue;
 
     TObj* item = generateBulkItem(classInd, mob->GetMaxLevel(),
-        mob->getRace(), bulkSlot);
+        mob->getRace(), templateSlot);
     if (item) {
       buyCommodityForItem(mob, item->getMaterial(),
           static_cast<float>(item->getWeight()));
@@ -1704,9 +1659,9 @@ void bulkLoadOut(TMonster* mob) {
 [[nodiscard]] TObj* bulkLoadOutItem(classIndT classInd, int level,
     race_t race) {
   // The weapon competes as one more slot alongside the armor slots
-  int roll = ::number(0, BULK_SLOT_COUNT);
-  if (roll == BULK_SLOT_COUNT)
+  int roll = ::number(0, TEMPLATE_SLOT_COUNT);
+  if (roll == TEMPLATE_SLOT_COUNT)
     return generateBulkWeapon(classInd, level);
 
-  return generateBulkItem(classInd, level, race, static_cast<BulkSlot>(roll));
+  return generateBulkItem(classInd, level, race, static_cast<TemplateSlot>(roll));
 }
