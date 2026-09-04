@@ -232,7 +232,11 @@ This is what makes Transmute load-bearing rather than a curiosity: it is the gat
 
 C++ has no in-place type change, so each of these produces a new object rather than modifying the original. They do it by loading a template vnum — see Template Vnums below — copying the old item's state into it, splicing it into wherever the old one lived (inventory, equipment slot, or container), and deleting the old. Three skills need the identical operation, so it belongs in one shared helper. It must follow the ownership and container rules in `.claude/rules/safety-invariants.md`: remove from the container with `--(*item)` before deleting, and ensure `parent`, `equippedBy`, `stuckIn`, and `roomp` are all null before adding to the new location.
 
-Edge case: `TArmorWand` inherits `virtual TArmor, virtual TWand`. Converting one drops the wand half. Decide whether to refuse conversion on multiply-inherited types or accept the loss.
+Edge case, decided: **`TArmorWand` is not augmentable.** It inherits `virtual TArmor, virtual TWand`, and conversion picks a single template, so any conversion would drop the wand half. Rather than engineer a way to carry it across, the type is simply refused.
+
+It is the only multiply-inherited wearable in the tree -- `TSaddle`, `THarness`, `TJewelry` and `TWorn` derive from `TBaseClothing` plainly, and `TArmor` is the only virtual base -- so this is one exclusion, not a category needing a rule.
+
+**Key eligibility on the stored item type, not on a `dynamic_cast`.** `ITEM_ARMOR_WAND` is its own type, distinct from `ITEM_ARMOR` (`code/code/misc/obj.h:107`, factory row at `db.cc:4295`), so a type-keyed check excludes it for free: `templateVnum()` already returns 0 for anything outside `ITEM_WORN`, `ITEM_ARMOR` and `ITEM_JEWELRY`. A check written as `dynamic_cast<TArmor*>(obj)` would instead accept one, since a `TArmorWand` genuinely is a `TArmor`. Saddles and harnesses fall out the same way.
 
 ## Template vnums
 
