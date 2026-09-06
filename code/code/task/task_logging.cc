@@ -281,8 +281,12 @@ void procReforestation::run(const TPulse&) const {
       continue;
     }
 
-    // Make it only a chance.
-    if ((tRoom->getLogsHarvested() >= LOGS_PER_ROOM) && !::number(0, 24))
+    // Make it only a chance. The test is "anything harvested at all", not
+    // "harvested out": gating on LOGS_PER_ROOM let a room recover its first
+    // log and then stall forever one short of full, since it could never drop
+    // to zero and so was never dropped from the map either. Fishing has always
+    // done it this way -- see handleFishRespawning().
+    if ((tRoom->getLogsHarvested() > 0) && !::number(0, 24))
       tRoom->setLogsHarvested(tRoom->getLogsHarvested() - 1);
 
     if (tRoom->getLogsHarvested() <= 0) {
