@@ -1,0 +1,18 @@
+Gear can now be moved onto a different slot.
+
+1) FORGE REFIT <item> <slot> for metal, SEW REFIT <item> <slot> for cloth.
+   - A bracer becomes a greave, a cap becomes a collar.
+   - The body it was cut for does not change: a gnome's bracer becomes a
+     gnome's greave.
+
+2) The armor it offers is conserved across the move.
+   - A slot that carries more of a suit's protection needs a lower level to
+     offer the same defence, so a piece keeps what it was worth.
+   - Packing a large piece into a small slot loses whatever will not fit.
+     It does not concentrate.
+
+3) Material is accounted for as it is when resizing.
+   - Growing into a larger slot needs a bar or bolt for the difference.
+   - Shrinking into a smaller one leaves an offcut carrying the stats.
+
+See HELP FORGE and HELP SEW.

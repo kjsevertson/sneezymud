@@ -108,6 +108,14 @@ inline constexpr double kSkillCeilingFactor = 55.0 / 60.0;
 // real template vnum rather than a bare constructor.
 [[nodiscard]] TObj* convertWearableType(TBeing* ch, TObj* obj, itemTypeT type);
 
+// The same operation across slots rather than types: rebuild the item on
+// another slot's template, keeping what it is made of and what it carries.
+// The template is the slot -- rent rebuilds wear_flags from the prototype, so
+// this is the only way a piece can change where it is worn and still be there
+// after a night in storage.
+[[nodiscard]] TObj* convertWearableSlot(TBeing* ch, TObj* obj,
+  TemplateSlot slot);
+
 // The cloth-family materials Sew will work: everything soft enough to sit
 // under the clothing hardness threshold. Leather reads 20 and belongs to
 // Light, so it is not on the list.
@@ -462,6 +470,20 @@ void weaveFinish(TBeing* ch, TObj* obj, int hits, int misses);
 
 // Tailor's finish: the cloth twin, leaving clippings rather than metal.
 void tailorFinish(TBeing* ch, TObj* obj, race_t race);
+
+// The share of a suit's armor a slot carries, from TBaseClothing::armorPercs.
+// A body piece is worth seven times a wrist piece of the same level, which is
+// why moving a piece between slots has to move its level too.
+// Which body a piece was cut for, read back from its slot and volume.
+[[nodiscard]] race_t getRaceForVolume(TemplateSlot slot, int volume);
+
+[[nodiscard]] double getSlotArmorShare(TemplateSlot slot);
+
+// Refit's finish: the piece is rebuilt on another slot's template, its level
+// rescaled by the ratio between the two slots so the armor it actually offers
+// is unchanged -- capped at the tier ceiling, so packing a breastplate into a
+// bracer loses what will not fit rather than concentrating it.
+void refitFinish(TBeing* ch, TObj* obj, TemplateSlot slot);
 
 // Forge's finish: the projected level, less what the misses cost, written onto
 // the piece. penalty is a percentage.

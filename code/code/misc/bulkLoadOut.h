@@ -58,7 +58,7 @@ void bulkLoadOut(TMonster* mob);
 // Volume of a wearable in this slot at this race's size tier, or 0 for a slot
 // or race with no entry. Bulk loot, Weave and Forge all size their output the
 // same way: a per-slot human baseline scaled by the race's size modifier.
-[[nodiscard]] int slotVolumeForRace(TemplateSlot slot, race_t race);
+[[nodiscard]] int getSlotVolumeForRace(TemplateSlot slot, race_t race);
 
 // The weight an item of this volume and material comes out at. Weight is
 // derived, never set independently -- material density is what makes a silk
@@ -75,6 +75,28 @@ void bulkLoadOut(TMonster* mob);
 // nullptr for human-sized races, which take no adjective, and for races with
 // no size entry at all.
 [[nodiscard]] const char* raceSizeName(race_t race);
+
+// Name a crafted wearable the way bulk loot names a dropped one, so a forged
+// breastplate and a found one read alike:
+//
+//   a [pair of] [quality] [size] <material> <garment>
+//
+// The garment noun comes from the same per-class table bulk loot uses, chosen
+// by tier rather than by class, since a smith works to a tier and not to a
+// customer: clothing takes the monk's words, light the thief's, medium the
+// cleric's, heavy the warrior's.
+//
+// Sets shortDescr, name and description. quality may be nullptr for work that
+// has no grade of its own.
+void nameCraftedWearable(TObj* obj, Tier tier, TemplateSlot slot, race_t race,
+  int material, const char* quality);
+
+// The same for a weapon, which carries no size and takes its noun from the
+// kind being made:
+//
+//   a [quality] <material> <kind>
+void nameCraftedWeapon(TObj* obj, const char* kind, int material,
+  const char* quality);
 
 // Everything that defines one weapon, gathered from the two tables bulk loot
 // keeps it in: the physical spec (volume, sharpness, handedness) and the

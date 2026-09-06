@@ -8,9 +8,12 @@ THE TWO LINES
 Metal and cloth work the same way on opposite sides.
 
   SMELT  turns any metal thing into an ingot     WEAVE  turns any soft thing
-  FORGE  turns an ingot into armor or a weapon   SEW    turns a skein into
-         FORGE RESIZE refits a piece                     clothing or light
-         FORGE COMBINE makes a bigger bar        TAILOR refits a piece
+  FORGE  turns an ingot into armor or a weapon          into a skein
+         FORGE RESIZE  fits a piece to a body    SEW    turns a skein into
+         FORGE REFIT   moves it to a new slot           clothing or light
+         FORGE COMBINE makes a bigger bar               SEW REFIT moves a
+                                                        piece to a new slot
+                                                 TAILOR fits a piece to a body
 
 Both break-down skills grade what they produce from how cleanly the work
 went, and both build-up skills spend that grade: a poor bar makes a poorer

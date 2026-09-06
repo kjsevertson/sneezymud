@@ -1,4 +1,5 @@
 Syntax: sew <slot> <race> <skein> <tier>
+        sew refit <item> <slot>
 
 Sew makes clothing or light armor from a skein of thread, sized to the race
 you name.  It is the forge's mirror on the soft side, and it behaves the
@@ -8,6 +9,12 @@ have been and the skein a little of what is left.
 
 Hardness caps the tier here as everywhere.  Leather reaches light armor;
 silk, however fine, never leaves clothing.
+
+SEW REFIT <item> <slot> moves a soft piece onto a different part of the body,
+the same work a smith does at an anvil for metal.  The body it was cut for
+stays the same, the armor it offers is conserved across the move, growing
+into a larger slot needs cloth for the difference, and shrinking leaves
+clippings.
 
 See also: WEAVE, SKEIN, TAILOR, FORGE
 Related Topics: MONK

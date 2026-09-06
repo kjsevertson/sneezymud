@@ -3,8 +3,9 @@ Syntax: forge <slot> <race> <ingot> <tier>
         forge hone <weapon>
         forge combine <ingot> <ingot>
         forge resize <item> <race>
+        forge refit <item> <slot>
 
-Forge is five kinds of work at one anvil.
+Forge is six kinds of work at one anvil.
 
 FORGE <slot> <race> <ingot> <tier> beats out a piece of armor in light,
 medium or heavy, sized to the race you name.  Hardness caps the tier and
@@ -29,9 +30,26 @@ FORGE RESIZE <item> <race> reworks a finished piece to another body.  Making
 one bigger needs a bar of its own metal; making one smaller leaves an
 offcut carrying everything the piece carried but its armor.
 
-Every miss costs the work: a point off the projection, a point off one of
-the stats being carried, and metal off the bar it came from.  A poor bar
-misses more and punishes each miss harder.
+FORGE REFIT <item> <slot> moves a piece onto a different part of the body
+entirely -- a bracer becomes a greave.  The body it was cut for does not
+change: a gnome's bracer becomes a gnome's greave.
+
+The armor it offers is conserved across the move.  A slot that carries more
+of a suit's protection needs a lower level to offer the same defence, so the
+piece keeps what it was worth rather than gaining by the move.  Packing a
+large piece into a small slot loses whatever will not fit; it does not
+concentrate.
+
+Growing into a larger slot needs metal for the difference, and shrinking into
+a smaller one leaves an offcut, exactly as resizing does.
+
+When you are making something -- a piece, a weapon -- every miss costs the
+work: a point off the projection, a point off one of the stats being carried,
+and metal off the bar it came from.  A poor bar misses more and punishes each
+miss harder.
+
+Reshaping is different.  Resizing and refitting degrade nothing; a miss there
+costs you only the time and the sweat.
 
 See also: SMELT, INGOT, PLATE, SEW, WEAPONS
 Related Topics: WARRIOR

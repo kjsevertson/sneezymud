@@ -1587,7 +1587,7 @@ void buyCommodityForItem(TMonster* buyer, int material, float weight) {
 
 }  // anonymous namespace
 
-int slotVolumeForRace(TemplateSlot slot, race_t race) {
+int getSlotVolumeForRace(TemplateSlot slot, race_t race) {
   if (slot == TemplateSlot::COUNT)
     return 0;
 
@@ -1650,6 +1650,130 @@ bool findWeaponSpecByName(const char* name, ForgeWeaponSpec* out) {
   }
 
   return false;
+}
+
+namespace {
+  // A smith works to a tier, not to a customer, so the tier picks whose words
+  // the piece is described in. The nouns already suit: monk's wraps and frocks
+  // for clothing, thief's vests and cuffs for light, cleric's plate for
+  // medium, warrior's for heavy.
+  classIndT tierNounClass(Tier tier) {
+    switch (tier) {
+      case Tier_Heavy:
+        return WARRIOR_LEVEL_IND;
+      case Tier_Medium:
+        return CLERIC_LEVEL_IND;
+      case Tier_Light:
+        return THIEF_LEVEL_IND;
+      default:
+        return MONK_LEVEL_IND;
+    }
+  }
+}  // namespace
+
+void nameCraftedWearable(TObj* obj, Tier tier, TemplateSlot slot, race_t race,
+  int material, const char* quality) {
+  if (!obj || slot == TemplateSlot::COUNT)
+    return;
+
+  int slotIdx = static_cast<int>(slot);
+  const char* baseName =
+    classSlotNames[static_cast<int>(tierNounClass(tier))][slotIdx];
+  if (!baseName)
+    return;
+
+  // Rings and shields are the same size on everyone.
+  bool isRing = (slot == TemplateSlot::Finger);
+  bool isShield = (slot == TemplateSlot::Shield);
+  const char* sizeName = (isRing || isShield) ? nullptr : raceSizeName(race);
+
+  // Two of the leg nouns describe a garment that covers both legs, and bulk
+  // loot flags those ITEM_PAIRED and gives them double the volume and stats to
+  // match. A crafted piece is made one slot at a time, so unless it really is
+  // flagged as a pair it needs a word for a single leg -- otherwise it claims
+  // to be trousers while carrying one leg's worth of everything.
+  bool pairedNoun = !strcmp(baseName, "pants") || !strcmp(baseName, "trousers");
+  bool paired = pairedNoun && obj->isObjStat(ITEM_PAIRED);
+
+  // The shaman's word, not the thief's: light tier already calls its leg piece
+  // a legging, and the four tiers should not share a noun.
+  if (pairedNoun && !paired)
+    baseName = "leg-wrap";
+
+  const char* firstWord = quality    ? quality
+                          : sizeName ? sizeName
+                                     : material_nums[material].mat_name;
+  bool useAn = strchr("aeiouAEIOU", firstWord[0]) != nullptr;
+
+  sstring shortDesc;
+  shortDesc += paired ? "a pair of " : (useAn ? "an " : "a ");
+  if (quality) {
+    shortDesc += quality;
+    shortDesc += " ";
+  }
+  if (sizeName) {
+    shortDesc += sizeName;
+    shortDesc += " ";
+  }
+  shortDesc += material_nums[material].mat_name;
+  shortDesc += " ";
+  shortDesc += baseName;
+
+  sstring keywords = baseName;
+  keywords += " ";
+  keywords += material_nums[material].mat_name;
+  if (sizeName) {
+    keywords += " ";
+    keywords += sizeName;
+  }
+  if (quality) {
+    keywords += " ";
+    keywords += quality;
+  }
+
+  // Crafted work carries the race keyword bulk loot does, but never [bulk]:
+  // that tag marks gear the world generated, and this was made by hand.
+  if (const RaceSizeInfo* size = raceSizeInfo(race); size && !isRing &&
+                                                     !isShield) {
+    keywords += " [";
+    keywords += size->keyword;
+    keywords += "]";
+  }
+
+  obj->shortDescr = shortDesc;
+  obj->name = keywords;
+  obj->setDescr(format("%s lies here.") % sstring(shortDesc).cap());
+}
+
+void nameCraftedWeapon(TObj* obj, const char* kind, int material,
+  const char* quality) {
+  if (!obj || !kind)
+    return;
+
+  const char* firstWord = quality ? quality : material_nums[material].mat_name;
+  bool useAn = strchr("aeiouAEIOU", firstWord[0]) != nullptr;
+
+  sstring shortDesc;
+  shortDesc += useAn ? "an " : "a ";
+  if (quality) {
+    shortDesc += quality;
+    shortDesc += " ";
+  }
+  shortDesc += material_nums[material].mat_name;
+  shortDesc += " ";
+  shortDesc += kind;
+
+  sstring keywords = kind;
+  keywords += " ";
+  keywords += material_nums[material].mat_name;
+  if (quality) {
+    keywords += " ";
+    keywords += quality;
+  }
+
+  obj->shortDescr = shortDesc;
+  obj->name = keywords;
+  obj->setDescr(format("%s lies here.") % sstring(shortDesc).cap());
 }
 
 const char* raceSizeName(race_t race) {

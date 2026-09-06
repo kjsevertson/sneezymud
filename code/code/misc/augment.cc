@@ -1351,6 +1351,40 @@ TObj* makeOffcut(TBeing* ch, TObj* obj, int leftover) {
   return scrap;
 }
 
+TObj* convertWearableSlot(TBeing* ch, TObj* obj, TemplateSlot slot) {
+  if (slot == TemplateSlot::COUNT)
+    return nullptr;
+
+  TObj* fresh = makeBlankWearable(obj->itemType(), slot);
+  if (!fresh)
+    return nullptr;
+
+  // The template owns the wear flags, which is the whole point here: they are
+  // what rent rebuilds from the vnum, so the new slot has to come from a
+  // prototype that already has it.
+  unsigned int wearFlags = fresh->obj_flags.wear_flags;
+  fresh->obj_flags = obj->obj_flags;
+  fresh->obj_flags.wear_flags = wearFlags;
+  fresh->addObjStat(ITEM_STRUNG);
+
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++)
+    fresh->affected[i] = obj->affected[i];
+
+  fresh->name = obj->name;
+  fresh->shortDescr = obj->shortDescr;
+  fresh->setDescr(obj->getDescr());
+  fresh->action_description = obj->action_description;
+  fresh->setMaterial(obj->getMaterial());
+  fresh->setWeight(obj->getWeight());
+  fresh->canBeSeen = obj->canBeSeen;
+
+  --(*obj);
+  *ch += *fresh;
+  delete obj;
+
+  return fresh;
+}
+
 bool isOffcut(const TObj* obj) {
   return obj && obj->objVnum() == kOffcutVnum;
 }
@@ -1361,7 +1395,7 @@ void resizeFinish(TBeing* ch, TObj* obj, race_t race) {
     return;
 
   TemplateSlot slot = getWearableSlot(obj);
-  int wanted = slotVolumeForRace(slot, race);
+  int wanted = getSlotVolumeForRace(slot, race);
   int had = obj->getVolume();
 
   if (wanted <= 0) {
@@ -1437,7 +1471,7 @@ void TBeing::doForgeResize(const char* argument) {
     return;
   }
 
-  int wanted = slotVolumeForRace(slot, race);
+  int wanted = getSlotVolumeForRace(slot, race);
   if (wanted <= 0) {
     sendTo(format("You have no pattern that would fit a %s.\n\r") % raceName);
     return;
@@ -1502,7 +1536,7 @@ void TBeing::doForgeResize(const char* argument) {
 
 void tailorFinish(TBeing* ch, TObj* obj, race_t race) {
   TemplateSlot slot = getWearableSlot(obj);
-  int wanted = slotVolumeForRace(slot, race);
+  int wanted = getSlotVolumeForRace(slot, race);
   int had = obj->getVolume();
 
   if (wanted <= 0) {
@@ -1578,7 +1612,7 @@ void TBeing::doTailor(const char* argument) {
     return;
   }
 
-  int wanted = slotVolumeForRace(slot, race);
+  int wanted = getSlotVolumeForRace(slot, race);
   if (wanted <= 0) {
     sendTo(format("You have no pattern that would fit a %s.\n\r") % raceName);
     return;
@@ -2244,10 +2278,7 @@ void TBeing::doForgeWeapon(const char* argument) {
   if (spec.twoHanded)
     weapon->addObjStat(ITEM_PAIRED);
 
-  sstring metal = material_nums[ingot->getMaterial()].mat_name;
-  weapon->name = format("%s %s forged") % metal % spec.name;
-  weapon->shortDescr = format("a %s %s") % metal % spec.name;
-  weapon->setDescr(format("A %s %s lies here.") % metal % spec.name);
+  nameCraftedWeapon(weapon, spec.name, ingot->getMaterial(), nullptr);
 
   // The kind decides how it cuts and how keen it can be; the smith decides
   // how hard it hits.
@@ -2337,6 +2368,248 @@ void TBeing::doForgeHone(const char* argument) {
   // Ten landed pulses to the point. No fixed end: honing runs until the
   // ceiling, until the smith is spent, or until something stops them.
   start_task(this, blade, nullptr, TASK_HONE, "", 10, in_room, 0, 0, 0);
+}
+
+// A piece knows its slot and its volume, and the two together say what body
+// it was cut for. Refitting to another slot has to keep that body: a gnome's
+// bracer becomes a gnome's greave, not a human's.
+race_t getRaceForVolume(TemplateSlot slot, int volume) {
+  static const race_t candidates[] = {RACE_HOBBIT, RACE_GNOME, RACE_DWARF,
+    RACE_ELVEN, RACE_HUMAN, RACE_OGRE};
+
+  race_t best = RACE_HUMAN;
+  int bestGap = -1;
+
+  for (race_t race : candidates) {
+    int v = getSlotVolumeForRace(slot, race);
+    if (v <= 0)
+      continue;
+
+    int gap = abs(v - volume);
+    if (bestGap < 0 || gap < bestGap) {
+      bestGap = gap;
+      best = race;
+    }
+  }
+
+  return best;
+}
+
+double getSlotArmorShare(TemplateSlot slot) {
+  // Mirrors TBaseClothing::armorPercs(). Kept here as its own table because
+  // this system owns what a slot is worth when moving a piece between two of
+  // them, and armorPercs answers a different question -- what an item already
+  // on a slot is worth.
+  switch (slot) {
+    case TemplateSlot::Shield:
+      return 0.25;
+    case TemplateSlot::Body:
+      return 0.15;
+    case TemplateSlot::Waist:
+      return 0.08;
+    case TemplateSlot::Head:
+    case TemplateSlot::Back:
+      return 0.07;
+    case TemplateSlot::Leg:
+      return 0.05;
+    case TemplateSlot::Neck:
+    case TemplateSlot::Arm:
+      return 0.04;
+    case TemplateSlot::Hand:
+      return 0.03;
+    case TemplateSlot::Wrist:
+    case TemplateSlot::Foot:
+      return 0.02;
+    case TemplateSlot::Finger:
+      return 0.01;
+    default:
+      return 0.01;
+  }
+}
+
+void refitFinish(TBeing* ch, TObj* obj, TemplateSlot slot) {
+  TBaseClothing* clothing = dynamic_cast<TBaseClothing*>(obj);
+  if (!clothing)
+    return;
+
+  TemplateSlot from = getWearableSlot(obj);
+  if (from == TemplateSlot::COUNT || from == slot)
+    return;
+
+  Tier tier = getWearableTier(clothing);
+  double level = clothing->armorLevel(ARMOR_LEV_REAL);
+
+  // The same armor, moved. A slot that carries more of a suit's protection
+  // needs a lower level to offer the same absolute defence, and a smaller slot
+  // a higher one -- so the piece keeps what it was worth rather than gaining
+  // or losing by the move alone.
+  double share = getSlotArmorShare(slot);
+  if (share <= 0.0)
+    return;
+
+  level = level * getSlotArmorShare(from) / share;
+
+  // Except upward, where the ceiling bites. Packing a breastplate into a
+  // bracer loses whatever will not fit; it does not concentrate.
+  double ceiling = getTierSkillMax(tier);
+  if (ceiling > 0.0)
+    level = min(level, ceiling);
+
+  // The piece has to become the size of the thing it is now. Whatever is left
+  // over comes off as an offcut, the same as a resize -- and what it carried
+  // goes with it.
+  race_t race = getRaceForVolume(from, obj->getVolume());
+  int wanted = getSlotVolumeForRace(slot, race);
+  int had = obj->getVolume();
+
+  TObj* fresh = convertWearableSlot(ch, obj, slot);
+  if (!fresh) {
+    act("$p will not take the shape you want of it.", false, ch, obj, 0,
+      TO_CHAR);
+    return;
+  }
+
+  TBaseClothing* worked = dynamic_cast<TBaseClothing*>(fresh);
+  if (!worked)
+    return;
+
+  if (wanted > 0) {
+    fresh->setVolume(wanted);
+    fresh->setWeight(weightForVolume(wanted, fresh->getMaterial()));
+    makeOffcut(ch, fresh, had - wanted);
+  }
+
+  worked->setDefArmorLevel(static_cast<float>(level));
+
+  act("You work $p onto a different part of the body entirely.", false, ch,
+    fresh, 0, TO_CHAR);
+  act("$n finishes reworking $p.", true, ch, fresh, 0, TO_ROOM);
+}
+
+// forge refit and sew refit are one function: the material decides which
+// craftsman may do it and what the difference is paid in, exactly as with
+// resizing.
+void TBeing::doRefit(const char* argument, bool metal) {
+  sstring args(argument);
+  sstring itemName = args.word(1);
+  sstring slotName = args.word(2);
+
+  spellNumT skill = metal ? SKILL_FORGE : SKILL_SEW;
+
+  if (itemName.empty() || slotName.empty()) {
+    sendTo("Refit what, onto what?\n\r");
+    sendTo(format("Syntax: %s refit <item> <slot>\n\r") %
+           (metal ? "forge" : "sew"));
+    return;
+  }
+
+  TThing* found = searchLinkedListVis(this, itemName.c_str(), stuff);
+  TObj* obj = dynamic_cast<TObj*>(found);
+  TBaseClothing* clothing = dynamic_cast<TBaseClothing*>(found);
+
+  if (!obj || !clothing) {
+    sendTo("You need to be carrying that to refit it.\n\r");
+    return;
+  }
+
+  if (isMetalMaterial(obj->getMaterial()) != metal) {
+    if (metal)
+      act("$p is not metal. That is work for a tailor.", false, this, obj, 0,
+        TO_CHAR);
+    else
+      act("$p is metal. That is work for a forge.", false, this, obj, 0,
+        TO_CHAR);
+    return;
+  }
+
+  TemplateSlot from = getWearableSlot(obj);
+  TemplateSlot slot = getTemplateSlotFromName(slotName);
+
+  if (from == TemplateSlot::COUNT) {
+    act("You cannot make sense of how $p is meant to be worn.", false, this,
+      obj, 0, TO_CHAR);
+    return;
+  }
+
+  if (slot == TemplateSlot::COUNT) {
+    sendTo(format("There is no %s to fit anything to.\n\r") % slotName);
+    return;
+  }
+
+  if (slot == from) {
+    act("$p is already worn there.", false, this, obj, 0, TO_CHAR);
+    return;
+  }
+
+  // The body it was cut for stays the body it is cut for.
+  race_t race = getRaceForVolume(from, obj->getVolume());
+  int wanted = getSlotVolumeForRace(slot, race);
+
+  if (wanted <= 0) {
+    sendTo("You have no pattern for that.\n\r");
+    return;
+  }
+
+  // Growing into a larger slot needs material for the difference, the same as
+  // letting a piece out does. Shrinking leaves an offcut instead.
+  if (wanted > obj->getVolume()) {
+    int needUnits = max(1, static_cast<int>(
+      weightForVolume(wanted - obj->getVolume(), obj->getMaterial()) * 10.0f));
+
+    if (metal) {
+      TIngot* bar = nullptr;
+      for (StuffIter it = stuff.begin(); it != stuff.end(); ++it) {
+        TIngot* candidate = dynamic_cast<TIngot*>(*it);
+        if (candidate && candidate->getMaterial() == obj->getMaterial() &&
+            candidate->getIngotUnits() >= needUnits) {
+          bar = candidate;
+          break;
+        }
+      }
+
+      if (!bar) {
+        sendTo(format("That would need %d units of %s, and you have no bar "
+                      "with that much in it.\n\r") %
+               needUnits % material_nums[obj->getMaterial()].mat_name);
+        return;
+      }
+
+      int left = bar->getIngotUnits() - needUnits;
+      if (left <= 0) {
+        --(*bar);
+        delete bar;
+      } else {
+        bar->setIngotUnits(left);
+        bar->setWeight(left / 10.0);
+        bar->setVolume(volumeForWeight(left / 10.0f, bar->getMaterial()));
+        bar->setMaxStructPoints(getIngotStructure(bar->getMaterial(), left));
+        bar->setStructPoints(bar->getMaxStructPoints());
+      }
+    } else {
+      TCommodity* bolt = findCommodity(this, obj->getMaterial());
+      if (!bolt || bolt->numUnits() < needUnits) {
+        sendTo(format("That would need %d units of %s, and you have %d.\n\r") %
+               needUnits % material_nums[obj->getMaterial()].mat_name %
+               (bolt ? bolt->numUnits() : 0));
+        return;
+      }
+
+      consumeCommodity(this, obj->getMaterial(), needUnits);
+    }
+  }
+
+  if (task)
+    stopTask();
+
+  act("You begin working $p onto a different part of the body.", false, this,
+    obj, 0, TO_CHAR);
+  act("$n begins reworking $p.", true, this, obj, 0, TO_ROOM);
+
+  learnFromDoingUnusual(LEARN_UNUSUAL_NORM_LEARN, skill, 8);
+
+  start_task(this, obj, nullptr, metal ? TASK_REFIT : TASK_REFIT_CLOTH, "",
+    max(1, static_cast<int>(obj->getMaxStructPoints())), in_room,
+    static_cast<ubyte>(slot), 0, 0);
 }
 
 void TBeing::doStrip(const char* argument) {
@@ -2508,6 +2781,12 @@ void TBeing::doBangle(const char* argument) {
 }
 void TBeing::doSew(const char* argument) {
   sstring args(argument);
+
+  if (sstring(args.word(0)).lower() == "refit") {
+    doRefit(argument, false);
+    return;
+  }
+
   sstring slotName = args.word(0);
   sstring raceName = args.word(1);
   sstring skeinName = args.word(2);
@@ -2539,7 +2818,7 @@ void TBeing::doSew(const char* argument) {
     return;
   }
 
-  int volume = slotVolumeForRace(slot, race);
+  int volume = getSlotVolumeForRace(slot, race);
   if (volume <= 0) {
     sendTo(format("You have no pattern that would fit a %s.\n\r") % raceName);
     return;
@@ -2589,13 +2868,7 @@ void TBeing::doSew(const char* argument) {
   piece->setWeight(needWeight);
   piece->addObjStat(getTierFlags(tier));
 
-  sstring fibre = material_nums[skein->getMaterial()].mat_name;
-  piece->name = format("%s %s sewn %s") % fibre % slotName.c_str() %
-                RaceNames[race];
-  piece->shortDescr = format("a %s %s %s") % RaceNames[race] % fibre %
-                      slotName.c_str();
-  piece->setDescr(format("A %s %s %s lies here.") % RaceNames[race] % fibre %
-                  slotName.c_str());
+  nameCraftedWearable(piece, tier, slot, race, skein->getMaterial(), nullptr);
 
   for (int i = 0; i < MAX_OBJ_AFFECT; i++)
     piece->affected[i] = skein->affected[i];
@@ -2667,7 +2940,7 @@ void TBeing::doForgePiece(const char* argument) {
     return;
   }
 
-  int volume = slotVolumeForRace(slot, race);
+  int volume = getSlotVolumeForRace(slot, race);
   if (volume <= 0) {
     sendTo(format("You have no pattern that would fit a %s.\n\r") % raceName);
     return;
@@ -2717,13 +2990,7 @@ void TBeing::doForgePiece(const char* argument) {
   piece->setWeight(needWeight);
   piece->addObjStat(getTierFlags(tier));
 
-  sstring metal = material_nums[ingot->getMaterial()].mat_name;
-  piece->name = format("%s %s armor forged %s") % metal % slotName.c_str() %
-                RaceNames[race];
-  piece->shortDescr = format("a %s %s %s") % RaceNames[race] % metal %
-                      slotName.c_str();
-  piece->setDescr(format("A %s %s %s lies here.") % RaceNames[race] % metal %
-                  slotName.c_str());
+  nameCraftedWearable(piece, tier, slot, race, ingot->getMaterial(), nullptr);
 
   // What the metal remembered comes across whole. The quality of the bar
   // decides how much of it survives the work, one point at a time, as the
@@ -2818,6 +3085,11 @@ void TBeing::doForge(const char* argument) {
 
   if (first.lower() == "weapon") {
     doForgeWeapon(argument);
+    return;
+  }
+
+  if (first.lower() == "refit") {
+    doRefit(argument, true);
     return;
   }
 

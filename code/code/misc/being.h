@@ -1385,6 +1385,7 @@ class TBeing : public TThing {
     void doForge(const char*);
     void doForgePiece(const char*);
     void doForgeResize(const char*);
+    void doRefit(const char*, bool);
     void doForgeWeapon(const char*);
     void doForgeHone(const char*);
     void doSmelt(const char*);

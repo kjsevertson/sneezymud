@@ -294,6 +294,9 @@ TaskEntry tasks[NUM_TASKS] = {
     task_transmute},
   {"honing a weapon", "You are too busy at the stone.\n\r", task_hone},
   {"mining", "You are too busy mining.\n\r", task_mining},
+  {"refitting armor", "You are too busy at the anvil.\n\r", task_refit},
+  {"refitting clothing", "You are too busy sewing.\n\r",
+    task_refit_cloth},
 };
 
 bool TBeing::nobrainerTaskCommand(cmdTypeT cmd) {

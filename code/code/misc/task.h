@@ -110,6 +110,8 @@ extern int task_infuse(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_transmute(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_hone(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_mining(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_refit(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_refit_cloth(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 
 typedef struct _tasks_entry {
     const char* const name;
@@ -193,6 +195,8 @@ enum taskTypeT {
   TASK_TRANSMUTE,
   TASK_HONE,
   TASK_MINING,
+  TASK_REFIT,
+  TASK_REFIT_CLOTH,
   NUM_TASKS  // keep this as max
 };
 
