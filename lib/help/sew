@@ -1,0 +1,13 @@
+Syntax: sew <slot> <race> <skein> <tier>
+
+Sew makes clothing or light armor from a skein of thread, sized to the race
+you name.  It is the forge's mirror on the soft side, and it behaves the
+same way: the skein's grade decides how much of the stats it carries come
+through, and every missed stitch costs the piece a little of what it would
+have been and the skein a little of what is left.
+
+Hardness caps the tier here as everywhere.  Leather reaches light armor;
+silk, however fine, never leaves clothing.
+
+See also: WEAVE, SKEIN, TAILOR, FORGE
+Related Topics: MONK

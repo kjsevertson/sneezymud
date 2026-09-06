@@ -1,0 +1,16 @@
+New thief skill: strip.
+
+1) Strip cuts a piece of armor down one tier.
+   - Heavy becomes medium, medium becomes light, light becomes clothing.
+   - The classes that tier locked out can wear the result.
+   - The item's own level is rescaled by the ratio between the tiers, so a
+     fine piece stripped down is still fine for what it now is.
+
+2) The work is measured by the item's structure.
+   - A missed cut costs the piece a point of structure, unless your wits
+     save it.
+   - An item cut to nothing is destroyed.
+
+3) Light armor stripped to clothing becomes a worn item outright.
+
+See HELP STRIP and HELP AUGMENTATION.

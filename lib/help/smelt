@@ -1,0 +1,19 @@
+Syntax: smelt <item>
+
+Smelt reduces anything made of metal to an ingot.  It does not care what the
+thing is -- a key, a shield, a ring, a chunk of ore off a cave wall -- only
+what it is made of.
+
+Half the weight comes back as metal.  Three quarters comes back if you have
+gone deep into advanced blacksmithing.
+
+Every pulse of the work is counted, landed or missed, and the ratio between
+them is the grade of the bar you end with: nine tenths landed makes a
+flawless ingot, less than half makes a crude one.  That grade decides how
+much of the item's old stats survive being forged into something new.
+
+The stats come across.  The armor does not, and a paired item's stats are
+halved, since being a pair is what doubled them.
+
+See also: FORGE, INGOT, MINE, WEAVE
+Related Topics: WARRIOR

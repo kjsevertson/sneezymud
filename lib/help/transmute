@@ -1,0 +1,23 @@
+Syntax: transmute <item> <material>
+
+Transmute changes what a thing is made of.  It is what opens the tier ladder
+above soft stock, and it is the only bridge between the smith's materials and
+the tailor's.
+
+An opal is the price, crushed at the start and gone whether the working takes
+or not.  Its carats are what make a hard change possible: every one of them
+buys ten off the difficulty.
+
+Distance is what costs.  The materials run metal, crystal, rock, dead,
+generic, organic, hide, wood, magical, spiritual, and every family crossed is
+ten more against you, plus whatever the target is worth on its own.  Working
+inside one family gives back half of what you started with, so mithril into
+starmetal is a short reach where cloth into starmetal is the length of the
+world.
+
+The length of the working is that same distance plus the weight of the
+thing.  Nothing changes until the end: every pulse is counted, and the change
+takes only if two thirds of them landed.
+
+See also: PLATE, WEAVE, SMELT
+Related Topics: MAGE

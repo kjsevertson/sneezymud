@@ -1,0 +1,17 @@
+New deikhan skill: plate.
+
+1) Plate builds a piece of armor up one tier.
+   - Clothing becomes light, light medium, medium heavy.
+   - More protection, fewer classes able to wear it.
+
+2) Material hardness caps how far anything can climb.
+   - Silk will never be plate armor, whatever your skill.
+   - A mage's transmutation is what opens the ladder above soft stock.
+   - The material is checked again when you finish, in case it changed
+     while you worked.
+
+3) What a smith can install is capped.
+   - A piece already finer than that ceiling keeps what it has and only
+     changes tier.
+
+See HELP PLATE and HELP AUGMENTATION.

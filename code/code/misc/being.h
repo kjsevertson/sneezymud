@@ -1196,6 +1196,7 @@ class TBeing : public TThing {
     virtual int trapTeleport(int);
     virtual int trapSpike(int);
     virtual int trapTnt(int, TThing*);
+    int chainRoomExplosives(int);
     virtual void trapBlade(int);
     virtual void trapFire(int);
     virtual void trapAcid(int);

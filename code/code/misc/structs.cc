@@ -496,11 +496,11 @@ TRoom::TRoom(int r) :
   teleTarg(0),
   moblim(0),
   roomHeight(-1),
-  minedOut(0),
   roomFlags(0),
   descPos(-1),
   fished(0),
   logsHarvested(0),
+  minedOut(0),
   treetype(0),
   tBornInsideMe(NULL) {
   spec = 0;

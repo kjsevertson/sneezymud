@@ -1,0 +1,21 @@
+Syntax: infuse <item> <essence>
+
+Infuse writes what an essence holds onto a piece of gear.
+
+The essence's quality is what it writes, and the whole essence is spent
+however little of it lands -- so grow one to exactly the size you need and
+never overshoot.
+
+A piece holds three stats at most.  The first may reach five, the second
+four, the third three, and a fourth will not go on at all.  The essence
+costs the same wherever you put it, so a piece that concentrates on one
+thing beats a piece spread across three.
+
+Writing over a stat already there only ever raises it.  An essence that
+would match it or fall short is refused rather than wasted.
+
+Hit points, mana and movement are written in blocks of five and do not count
+against the three.
+
+See also: DISTILL, ESSENCE, BOLSTER
+Related Topics: MAGE

@@ -1154,12 +1154,106 @@ int TBeing::trapSpike(int amt) {
   }
   return 0;
 }
+// A charge in a room sets off whatever else is armed in it: mines on the
+// floor, traps on the doors, traps on the portals. Grenades are deliberately
+// left out -- they are detonated by a pulse process that owns their deletion,
+// and reaching in to fire one from here would mean owning that cleanup from
+// inside a loop over the room's contents.
+//
+// Everything is collected before anything fires. Each of the three trigger
+// paths disarms its own trap before dealing damage -- doors and portals clear
+// EXIT_TRAPPED on both sides, mines decrement charges -- so nothing re-fires
+// itself, and the cascade is bounded by how many armed traps the world holds.
+//
+// Door traps already damage the room on the far side, so a chain that follows
+// them into the next room is consistent with what a door trap always did. The
+// depth cap is insurance against a world file with a long enough line of
+// trapped doors to matter, not against a loop.
+static int chainDepth = 0;
+const int MAX_CHAIN_DEPTH = 8;
+
+int TBeing::chainRoomExplosives(int trapLevel) {
+  if (!roomp || chainDepth >= MAX_CHAIN_DEPTH)
+    return false;
+
+  std::vector<dirTypeT> doors;
+  std::vector<TPortal*> portals;
+  std::vector<TTrap*> mines;
+
+  for (dirTypeT door = MIN_DIR; door < MAX_DIR; door++) {
+    roomDirData* exitp = exitDir(door);
+    if (exitp && IS_SET(exitp->condition, EXIT_TRAPPED))
+      doors.push_back(door);
+  }
+
+  for (StuffIter it = roomp->stuff.begin(); it != roomp->stuff.end(); ++it) {
+    if (TPortal* portal = dynamic_cast<TPortal*>(*it)) {
+      if (portal->isPortalFlag(EXIT_TRAPPED))
+        portals.push_back(portal);
+      continue;
+    }
+
+    if (TTrap* mine = dynamic_cast<TTrap*>(*it)) {
+      // A mine is a trap lying in wait for someone to walk into it, which is
+      // what TRAP_EFF_MOVE means. Traps armed only for get or put are not
+      // going to answer a blast.
+      if (mine->getTrapCharges() > 0 &&
+          mine->isTrapEffectType(TRAP_EFF_MOVE | TRAP_EFF_ROOM))
+        mines.push_back(mine);
+    }
+  }
+
+  if (doors.empty() && portals.empty() && mines.empty())
+    return false;
+
+  act("The blast sets off everything else in the room!", false, this, nullptr,
+    nullptr, TO_CHAR);
+  act("The blast sets off everything else in the room!", false, this, nullptr,
+    nullptr, TO_ROOM);
+
+  chainDepth++;
+  int rc = 0;
+
+  for (dirTypeT door : doors) {
+    rc = triggerDoorTrap(door);
+    if (IS_SET_DELETE(rc, DELETE_THIS)) {
+      chainDepth--;
+      return DELETE_THIS;
+    }
+  }
+
+  for (TPortal* portal : portals) {
+    rc = triggerPortalTrap(portal);
+    if (IS_SET_DELETE(rc, DELETE_ITEM))
+      delete portal;
+    if (IS_SET_DELETE(rc, DELETE_THIS)) {
+      chainDepth--;
+      return DELETE_THIS;
+    }
+  }
+
+  for (TTrap* mine : mines) {
+    rc = triggerTrap(mine);
+    if (IS_SET_DELETE(rc, DELETE_THIS)) {
+      chainDepth--;
+      return DELETE_THIS;
+    }
+  }
+
+  chainDepth--;
+  return false;
+}
+
 int TBeing::trapTnt(int amt, TThing* carrier) {
   int material = carrier ? carrier->getMaterial() : MAT_WOOD;
 
   // Rock answers a charge the way it answers a pick, only faster. A blast in a
   // minable room shakes ore loose for whoever is still standing.
   revealOreFromBlast(this, amt);
+
+  // And anything else armed in the room goes with it.
+  if (IS_SET_DELETE(chainRoomExplosives(amt), DELETE_THIS))
+    return DELETE_THIS;
 
   // The blast throws amt/10 burning shards, each at a random limb.
   for (int i = amt / 10; i > 0; --i) {

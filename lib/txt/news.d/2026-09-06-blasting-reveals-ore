@@ -1,0 +1,17 @@
+Explosives will now shake ore loose from rock.
+
+1) A TNT blast in hills, mountains or a cave reveals ore.
+   - What comes out is what a pick would have found there, so depth and
+     sector still decide it.
+   - The chunks land on the floor for whoever is still standing.
+
+2) How much depends on the size of the charge.
+   - The blast level is rolled as a percentage, then eight less, then
+     eight less again, each its own chance at another chunk.
+   - A small charge usually shakes nothing loose.  A large one opens a
+     seam.
+
+3) A blast works a face as hard as a day of swinging.
+   - It carries the same chance of finishing the room off.
+
+See HELP MINE and HELP TRAPS.

@@ -1,0 +1,12 @@
+New monk skill: sew.
+
+1) Sew makes clothing or light armor from a skein, sized to any race.
+   - It is the forge's mirror: the skein's grade decides how much of the
+     stats it carries come through.
+   - A missed stitch costs the piece and wastes thread off the skein.
+
+2) Hardness caps the tier here as everywhere.
+   - Leather reaches light armor.
+   - Silk, however fine, never leaves clothing.
+
+See HELP SEW and HELP WEAVE.

@@ -1,0 +1,23 @@
+New warrior skill: forge.
+
+1) FORGE <slot> <race> <ingot> <tier> makes armor from a bar.
+   - Light, medium or heavy, sized to any race.
+   - Hardness caps the tier; volume decides how much metal it takes.
+
+2) FORGE WEAPON <kind> <ingot> makes weapons.
+   - The finer the weapon, the more skill it takes to attempt at all.
+   - What comes off the anvil strikes at six sevenths of your level, and
+     your level stops counting at 35.
+
+3) FORGE HONE <weapon> is the only way past that.
+   - Ten landed strokes buy a point of damage.
+   - The ceiling is your level plus a point for every twenty of the skill.
+
+4) FORGE COMBINE <ingot> <ingot> folds two bars of the same metal into
+   one larger bar, no worse than the better of the two.
+
+5) FORGE RESIZE <item> <race> refits a finished piece.
+   - Growing one needs a bar; shrinking one leaves an offcut carrying
+     everything the piece carried but its armor.
+
+See HELP FORGE and HELP AUGMENTATION.

@@ -1,0 +1,21 @@
+New adventuring skill: bolster.
+
+1) Bolster works armor up toward the most it could ever be, spending
+   soulstone charges.
+   - There is no set length.  It runs until the piece reaches its ceiling,
+     the stone runs dry, or something stops you.
+
+2) The ceiling is the tier's own maximum, opening fully at level 35.
+   - Heavy armor can reach 55; clothing tops out well short of that.
+
+3) Every attempt costs charges whether it lands or not.
+   - The cost rises with the piece, so a fine piece is dear to improve.
+   - A level ten stone pays a tenth of what a level one stone pays for the
+     same work.
+
+4) Difficulty is read fresh each attempt from how far along the piece
+   already is.
+   - The last stretch of a heavy piece is the hardest work there is.
+   - Monk's clothing is comparatively easy to finish.
+
+See HELP BOLSTER and HELP SOULSTONE.

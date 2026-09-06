@@ -38,16 +38,6 @@
 #include "obj_general_weapon.h"
 #include "wearTemplate.h"
 
-namespace {
-  void notYetImplemented(TBeing* ch, spellNumT skill) {
-    if (!ch->doesKnowSkill(skill)) {
-      ch->sendTo("You know nothing about that.\n\r");
-      return;
-    }
-    ch->sendTo("You aren't able to do that yet.\n\r");
-  }
-}  // namespace
-
 unsigned int getTierRungFlags(Tier tier) {
   // The masks ArmorEvaluator::getTier() layers: clothing carries nothing,
   // light adds mage and shaman, medium adds monk and thief, heavy adds cleric

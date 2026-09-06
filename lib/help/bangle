@@ -1,0 +1,16 @@
+Syntax: bangle <item>
+
+Bangle works a wearable down into jewelry of the same slot.  Anyone may wear
+what comes out, whatever their class, and the stats it carried come through
+untouched.
+
+The trade is severe and deliberate.  Jewelry is priced on the clothing
+scale, so a heavy piece rescales down to it, and then its armor and its
+structure are both halved.  What you get back is twice the room for stats,
+by the same convention every jeweller works to.
+
+Bangle is the only road from a wearable to something a mage can distill, so
+it stands at the front of the essence trade.
+
+See also: DISTILL, INFUSE, STRIP
+Related Topics: SHAMAN

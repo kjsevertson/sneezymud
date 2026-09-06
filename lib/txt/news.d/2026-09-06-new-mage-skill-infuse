@@ -1,0 +1,21 @@
+New mage skill: infuse.
+
+1) Infuse writes what an essence holds onto a piece of gear.
+   - The essence's quality is what it writes.
+   - The whole essence is spent however little of it lands, so grow one to
+     exactly the size you need.
+
+2) A piece holds three stats at most.
+   - The first may reach five, the second four, the third three.
+   - A fourth will not go on at all.
+   - The essence costs the same wherever you put it, so concentrating on
+     one stat beats spreading across three.
+
+3) Writing over a stat already there only ever raises it.
+   - An essence that would match it or fall short is refused rather than
+     wasted.
+
+4) Hit points, mana and movement are written in blocks of five and do not
+   count against the three.
+
+See HELP INFUSE and HELP ESSENCE.

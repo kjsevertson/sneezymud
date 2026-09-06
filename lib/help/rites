@@ -1,0 +1,19 @@
+Syntax: rites <corpse>
+
+Rites draws what is left of a soul out of a body and puts it into a
+soulstone, where it waits to be spent on armor.
+
+You must be seated, holding your holy symbol, with holy water to hand and a
+soulstone to catch what comes.  The body must be whole: skinned, butchered
+or dissected, it has already been opened and there is nothing left to call.
+
+What a stone takes is its own level against a tenth of the corpse's, so a
+deep stone takes more from the same body.  Your own level never enters it,
+and your skill decides only whether the words land, never how much they
+yield.
+
+A body the rites have been said over is finished.  Nothing else can be taken
+from it, and it cannot be sacrificed.
+
+See also: ENSOUL, BOLSTER, SOULSTONE
+Related Topics: CLERIC

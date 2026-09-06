@@ -1,0 +1,20 @@
+Syntax: distill <item>
+
+Distill destroys a piece of jewelry and draws what it carried into essence.
+
+Only jewelry.  A shaman's bangle is how anything else becomes distillable,
+which is why the two skills stand together.
+
+Every stat on the piece deposits, not one chosen from among them: a ring of
+strength and dexterity yields both.  How much depends on the size of the
+stat and on how well you know the work, and it is never nothing.
+
+What you deposit goes into an essence of that stat you already carry, if you
+have one, rather than making a second.  That is what lets essence grow at
+all -- charges scattered across duplicates never reach anything.
+
+Armor is not among the stats an essence can hold.  Armor belongs to the
+body, and to the smiths.
+
+See also: INFUSE, BANGLE, ESSENCE
+Related Topics: MAGE

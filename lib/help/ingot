@@ -1,0 +1,17 @@
+An ingot is a bar of metal, the thing a crucible leaves behind and the thing
+a forge eats.
+
+Two numbers matter.  Its size, in units, is how much metal is in it -- a
+piece of gear takes as many units as its volume comes to, so a bar of light
+metal goes less far than its weight suggests.  Its quality, one to five, is
+a record of how cleanly it was smelted, and it decides how badly a smith is
+punished for a missed stroke.
+
+An ingot carries whatever stats the thing it was made from carried, though
+never its armor.  Those stats pass into whatever is forged from it.
+
+FORGE COMBINE will fold one bar into another of the same metal, making one
+larger and no worse than the better of the two.
+
+See also: SMELT, FORGE, SKEIN
+Related Topics: WARRIOR

@@ -1,0 +1,15 @@
+New monk skill: weave.
+
+1) Weave picks a worn thing apart and winds it back into thread.
+   - It works on anything of a soft material: cloth, wool, fur, leather,
+     hemp, silk, and the clippings a tailor leaves behind.
+
+2) It is the crucible's twin and behaves the same way.
+   - Half the weight comes back as thread.
+   - Landed and missed pulses are counted, and the ratio grades the skein.
+
+3) Fine fibre resists.
+   - Common cloth comes apart easily; silk and laminate fight you.
+   - Nothing buys that back the way advanced blacksmithing does for metal.
+
+See HELP WEAVE and HELP SKEIN.

@@ -1,0 +1,20 @@
+Syntax: strip <item>
+
+Strip cuts a piece of armor down a tier: heavy becomes medium, medium light,
+light clothing.  The classes locked out of it by that tier can wear it once
+you are done, and the armor it offers falls to match.
+
+The item's own level is what falls, rescaled by the ratio between the two
+tiers, so a fine piece stripped down is still a fine piece of what it now
+is.  Nothing is capped and nothing is gained: stripping only ever takes
+away, which is why it answers to no skill ceiling.
+
+The work is measured by the item's structure and a clumsy cut costs it a
+point of that.  Intelligence is what keeps your knife off the piece; wits
+enough and a slip costs only the time.  An item cut to nothing is destroyed.
+
+Light armor stripped to clothing stops being armor at all and becomes a
+worn thing, which is a different sort of object entirely.
+
+See also: PLATE, BANGLE, BOLSTER
+Related Topics: THIEF

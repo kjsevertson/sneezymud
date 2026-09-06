@@ -1,0 +1,14 @@
+Syntax: tailor <item> <race>
+
+Tailor cuts a piece of clothing or soft armor to fit another body.  Letting
+a piece out needs cloth of its own material to let it out with; taking one
+in leaves clippings.
+
+Those clippings are not nothing.  They carry every stat the piece carried,
+though never its armor, and they can be woven back into thread or handed to
+a mage who knows what to do with them.
+
+Metal is a smith's work, not a tailor's.  See FORGE RESIZE.
+
+See also: WEAVE, SEW, FORGE
+Related Topics: ADVENTURE

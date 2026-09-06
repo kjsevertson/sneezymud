@@ -1,0 +1,20 @@
+New mage skill: distill.
+
+1) Distill destroys a piece of jewelry and draws what it carried into
+   essence.
+   - Jewelry only.  A shaman's bangle is how anything else becomes
+     distillable.
+
+2) Every stat on the piece deposits, not one chosen among them.
+   - A ring of strength and dexterity yields both.
+   - How much depends on the size of the stat and on how well you know the
+     work, and it is never nothing.
+
+3) What you deposit goes into an essence of that stat you already carry.
+   - Only when you have none does it make a new one.
+   - This is what lets essence grow at all: charges scattered across
+     duplicates never reach anything.
+
+4) Armor is not among the stats an essence can hold.
+
+See HELP DISTILL and HELP ESSENCE.

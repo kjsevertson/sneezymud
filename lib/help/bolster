@@ -1,0 +1,20 @@
+Syntax: bolster <item>
+
+Bolster works a piece of armor up toward the most it could ever be, spending
+soulstone charges to do it.
+
+There is no set length.  It runs until the piece reaches its ceiling, until
+the stone runs dry, or until something stops you.  The ceiling is the tier's
+own maximum, opening fully at level thirty-five, so heavy armor can reach
+fifty-five and clothing something well short of that.
+
+Every attempt costs charges whether it lands or not, and the cost rises with
+the piece: a fine piece is dear to improve and a plain one is cheap.  A
+better stone pays a tenth of what a poor one pays for the same work.
+
+The difficulty is read fresh each attempt from how far along the piece
+already is, so the last stretch of a heavy piece is the hardest work in the
+game, and monk's clothing is comparatively easy to finish.
+
+See also: RITES, ENSOUL, PLATE, SOULSTONE
+Related Topics: ADVENTURE

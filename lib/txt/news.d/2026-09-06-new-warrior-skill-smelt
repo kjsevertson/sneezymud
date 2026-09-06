@@ -1,0 +1,21 @@
+New warrior skill: smelt.
+
+1) Smelt reduces anything metal to an ingot.
+   - It cares only about material, not item type: a key, a shield, a ring
+     and a chunk of ore all melt the same.
+
+2) Half the weight comes back as metal.
+   - Three quarters comes back with 50 or better in advanced
+     blacksmithing.
+
+3) Every pulse is counted, landed or missed.
+   - The ratio grades the bar from one to five.
+   - Nine tenths landed makes a flawless ingot; under half makes a crude
+     one.
+   - That grade decides how much of the item's stats survive being forged
+     into something new.
+
+4) Stats cross over.  Armor does not, and a paired item's stats are
+   halved.
+
+See HELP SMELT and HELP INGOT.

@@ -1,0 +1,12 @@
+Chopped forests grow back again.
+
+1) A room that had been logged only recovered if it was chopped completely
+   bare, and even then stalled one log short of full forever.
+   - Rooms chopped partway recovered nothing at all.
+
+2) Reforestation now works the way fishing always has.
+   - Any room with logs taken from it recovers, a log at a time.
+   - Both run on the same pulse at the same rate, so a stripped grove takes
+     about as long to come back as a fished-out pool.
+
+See HELP LUMBERJACK.

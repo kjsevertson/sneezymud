@@ -1,0 +1,37 @@
+Syntax: forge <slot> <race> <ingot> <tier>
+        forge weapon <kind> <ingot>
+        forge hone <weapon>
+        forge combine <ingot> <ingot>
+        forge resize <item> <race>
+
+Forge is five kinds of work at one anvil.
+
+FORGE <slot> <race> <ingot> <tier> beats out a piece of armor in light,
+medium or heavy, sized to the race you name.  Hardness caps the tier and
+volume decides how much metal it takes, so a bar of mithril goes further
+than a bar of iron of the same weight.
+
+FORGE WEAPON <kind> <ingot> makes any weapon you know how to make.  The
+finer the kind, the more skill it asks: a pickaxe is open to anyone, a
+stiletto to very few.  What comes off the anvil strikes at six sevenths of
+your level and stops counting at level thirty-five.
+
+FORGE HONE <weapon> is the only way past that.  Ten landed strokes buy a
+point of damage, up to your own level plus a point for every twenty of the
+skill you know.  Hard metal resists being made finer.
+
+FORGE COMBINE <ingot> <ingot> folds the second bar into the first, making
+one bigger bar.  Both must be the same metal and the second must carry no
+stats.  The grade of the result is the two averaged by size, and it never
+comes out worse than the first bar was.
+
+FORGE RESIZE <item> <race> reworks a finished piece to another body.  Making
+one bigger needs a bar of its own metal; making one smaller leaves an
+offcut carrying everything the piece carried but its armor.
+
+Every miss costs the work: a point off the projection, a point off one of
+the stats being carried, and metal off the bar it came from.  A poor bar
+misses more and punishes each miss harder.
+
+See also: SMELT, INGOT, PLATE, SEW, WEAPONS
+Related Topics: WARRIOR

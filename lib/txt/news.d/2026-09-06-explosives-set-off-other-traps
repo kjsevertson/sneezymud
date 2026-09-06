@@ -1,0 +1,15 @@
+Explosives now set off other explosives.
+
+1) A TNT blast sets off everything else armed in the room.
+   - Mines on the floor, traps on the doors, traps on the portals.
+   - Grenades are not included; they answer only to their own fuse.
+
+2) Door traps have always damaged the room on the far side.
+   - A chain that follows them into the next room does the same.
+   - It can carry up to eight rooms from the original charge.
+
+3) Nothing can set itself off twice.
+   - Doors and portals disarm on both sides before they deal damage.
+   - Mines spend a charge first.
+
+See HELP TRAPS.

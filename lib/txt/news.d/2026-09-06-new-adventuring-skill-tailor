@@ -1,0 +1,13 @@
+New adventuring skill: tailor.
+
+1) Tailor cuts clothing or soft armor to fit another body.
+   - Letting a piece out needs cloth of its own material.
+   - Taking one in leaves clippings.
+
+2) The clippings are worth keeping.
+   - They carry every stat the piece carried, though never its armor.
+   - They can be woven back into thread, or handed to a mage.
+
+3) Metal is a smith's work.  See FORGE RESIZE.
+
+See HELP TAILOR.

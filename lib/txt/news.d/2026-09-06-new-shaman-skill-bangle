@@ -1,0 +1,16 @@
+New shaman skill: bangle.
+
+1) Bangle works a wearable down into jewelry of the same slot.
+   - Anyone may wear the result, whatever their class.
+   - The stats it carried come through untouched.
+
+2) The trade is steep.
+   - Jewelry is priced on the clothing scale, so a heavy piece rescales
+     down to it.
+   - Its armor and structure are then both halved.
+   - In exchange it has twice the room for stats.
+
+3) Bangle is the only road from a wearable to something a mage can
+   distill.
+
+See HELP BANGLE and HELP AUGMENTATION.

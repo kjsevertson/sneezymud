@@ -1,0 +1,45 @@
+Gear augmentation is a set of crafts for making gear into other gear.  It
+exists so that a fine piece you cannot use is worth something anyway: the
+wrong size, the wrong class, the wrong slot.  Nothing in it is faster than
+hunting.  It is the slow road, and it costs more than it returns.
+
+THE TWO LINES
+
+Metal and cloth work the same way on opposite sides.
+
+  SMELT  turns any metal thing into an ingot     WEAVE  turns any soft thing
+  FORGE  turns an ingot into armor or a weapon   SEW    turns a skein into
+         FORGE RESIZE refits a piece                     clothing or light
+         FORGE COMBINE makes a bigger bar        TAILOR refits a piece
+
+Both break-down skills grade what they produce from how cleanly the work
+went, and both build-up skills spend that grade: a poor bar makes a poorer
+piece and loses more of what it carried.
+
+THE LADDER
+
+  STRIP    cuts a piece down a tier, widening who can wear it
+  PLATE    builds a piece up a tier, narrowing it, capped by hardness
+  BANGLE   drops anything to jewelry, half the armor for twice the stats
+  BOLSTER  raises a piece's armor toward the most its tier allows
+
+TRANSMUTE changes what a thing is made of, which is what lets a soft piece
+climb the ladder at all, and the only way between the two lines.
+
+THE SOUL OF A THING
+
+Stats survive everything.  They ride in ingots, in skeins, in the offcuts a
+resize leaves behind, and they come out the far end of the work.
+
+  DISTILL  destroys jewelry and yields its stats as essence
+  INFUSE   spends an essence to write a stat onto a piece
+  RITES    draws a soul from a corpse into a soulstone
+  ENSOUL   makes a soulstone out of an opal
+
+RAW MATERIAL
+
+  MINE     cuts ore out of hills, mountains and caves
+
+See also: STRIP, PLATE, BANGLE, SMELT, FORGE, WEAVE, SEW, TAILOR, BOLSTER,
+          DISTILL, INFUSE, TRANSMUTE, RITES, ENSOUL, MINE
+Related Topics: GENERAL INFO

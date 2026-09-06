@@ -1,0 +1,17 @@
+Syntax: plate <item>
+
+Plate builds a piece of armor up a tier: clothing becomes light, light
+medium, medium heavy.  It offers more protection and fewer people can wear
+it, which is the whole of the bargain.
+
+Two things limit it.  Material hardness caps how far anything can climb --
+silk will never be plate, whatever your skill -- so a mage's transmutation
+is what opens the ladder above soft stock.  And what a smith can install is
+capped by the skill ceiling: a piece already finer than that keeps what it
+has and merely changes tier.
+
+The material is checked when you start and again when you finish, since a
+mage may transmute the piece while you work.
+
+See also: STRIP, TRANSMUTE, BOLSTER, FORGE
+Related Topics: DEIKHAN

@@ -1,0 +1,14 @@
+A soulstone holds what a cleric draws out of the dead, and a bolsterer
+spends it on armor.
+
+Its level runs one to ten and decides two things: how much a single rite
+puts into it, and how much it can hold at all.  A stone deepens when it holds
+a hundred charges for each level it already has, and never falls back.
+Spending does not cost it a level, but the charges spent have to be earned
+again before it deepens.
+
+Stones are made by a shaman out of an opal, and the size of the opal decides
+where the stone starts.
+
+See also: RITES, ENSOUL, BOLSTER
+Related Topics: CLERIC
