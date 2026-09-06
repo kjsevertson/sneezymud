@@ -224,6 +224,8 @@ void stripFinish(TBeing* ch, TObj* obj) {
   act("You cut $p down to something a good deal less demanding.", false, ch,
     obj, 0, TO_CHAR);
   act("$n finishes cutting away at $p.", true, ch, obj, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_STRIP, obj);
 }
 
 void plateFinish(TBeing* ch, TObj* obj) {
@@ -283,6 +285,8 @@ void plateFinish(TBeing* ch, TObj* obj) {
   act("You work $p into something that will turn a heavier blow.", false, ch,
     obj, 0, TO_CHAR);
   act("$n finishes working at $p.", true, ch, obj, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_PLATE, obj);
 }
 
 // The soft end of the material table. Every one of these reads under the
@@ -403,6 +407,8 @@ void sewFinish(TBeing* ch, TObj* obj) {
   // here; the work is simply done.
   act("You work the last of the thread into $p.", false, ch, obj, 0, TO_CHAR);
   act("$n finishes sewing $p.", true, ch, obj, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_SEW, obj);
 }
 
 unsigned int allTierFlags() {
@@ -469,6 +475,8 @@ void bangleFinish(TBeing* ch, TObj* obj) {
     0, TO_CHAR);
   act("$n finishes working $p into something ornamental.", true, ch, jewel, 0,
     TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_BANGLE, jewel);
 }
 
 bool isMetalMaterial(unsigned short material) {
@@ -563,6 +571,8 @@ void smeltFinish(TBeing* ch, TObj* obj, int hits, int misses) {
 
   act("You pour off $p, and the rest is slag.", false, ch, ingot, 0, TO_CHAR);
   act("$n pours off $p.", true, ch, ingot, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_SMELT, ingot);
 }
 
 int getMetalDifficulty(unsigned short material) {
@@ -648,6 +658,8 @@ void combineFinish(TBeing* ch, TObj* target, TObj* donor, int hits,
 
   act("You beat the two together into $p.", false, ch, into, 0, TO_CHAR);
   act("$n beats two bars together into $p.", true, ch, into, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_FORGE, into);
 }
 
 Tier getTierFromName(const sstring& name) {
@@ -798,6 +810,8 @@ void forgeFinish(TBeing* ch, TObj* obj, int penalty) {
       obj, 0, TO_CHAR);
 
   act("$n finishes work on $p.", true, ch, obj, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_FORGE, obj);
 }
 
 // Carats convert evenly onto the ten Soulstone Levels: five carats to a Level,
@@ -831,6 +845,8 @@ void ensoulFinish(TBeing* ch, TObj* obj, int carats) {
   stone->shortDescr = format("a soulstone of level %d") % stone->getSoulLevel();
   stone->setDescr(
     format("A soulstone of level %d lies here.") % stone->getSoulLevel());
+
+  augmentTaskExp(ch, SKILL_ENSOUL, obj);
 
   --(*obj);
   delete obj;
@@ -965,6 +981,10 @@ void ritesFinish(TBeing* ch, TObj* corpse) {
     act("$p deepens, and holds more than it did.", false, ch, stone, 0,
       TO_CHAR);
   }
+
+  ch->gainTaskExp(SKILL_RITES,
+    max(1, static_cast<int>(body->getCorpseLevel())),
+    max(1.0, static_cast<double>(gained)), false);
 }
 
 void TBeing::doRites(const char* argument) {
@@ -1245,6 +1265,8 @@ void distillFinish(TBeing* ch, TObj* obj) {
 
   act("$p comes apart in $n's hands.", true, ch, obj, 0, TO_ROOM);
 
+  augmentTaskExp(ch, SKILL_DISTILL, obj);
+
   --(*obj);
   delete obj;
 }
@@ -1430,6 +1452,8 @@ void resizeFinish(TBeing* ch, TObj* obj, race_t race) {
   act("You finish reworking $p, and set the offcut aside.", false, ch, obj, 0,
     TO_CHAR);
   act("$n finishes reworking $p.", true, ch, obj, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_FORGE, obj);
 }
 
 void TBeing::doForgeResize(const char* argument) {
@@ -1564,6 +1588,8 @@ void tailorFinish(TBeing* ch, TObj* obj, race_t race) {
   act("You finish $p, and fold the clippings aside.", false, ch, obj, 0,
     TO_CHAR);
   act("$n finishes work on $p.", true, ch, obj, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_TAILOR, obj);
 }
 
 void TBeing::doTailor(const char* argument) {
@@ -1732,6 +1758,8 @@ void weaveFinish(TBeing* ch, TObj* obj, int hits, int misses) {
 
   act("You wind $p off the last of it.", false, ch, skein, 0, TO_CHAR);
   act("$n winds $p off what $e was working.", true, ch, skein, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_WEAVE, skein);
 }
 
 void TBeing::doWeave(const char* argument) {
@@ -2002,6 +2030,8 @@ void infuseFinish(TBeing* ch, TObj* obj, const char* essenceName) {
   act("You work the last of it into $p.", false, ch, obj, 0, TO_CHAR);
   ch->sendTo(format("It carries +%d of %s now.\n\r") % amount % what);
   act("$n finishes working something into $p.", true, ch, obj, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_INFUSE, obj);
 }
 
 MaterialFamily getMaterialFamily(unsigned short material) {
@@ -2052,6 +2082,50 @@ int getMaterialRarity(unsigned short material) {
     return m->difficultyMod;
 
   return 0;
+}
+
+int getMaterialLevelReq(unsigned short material) {
+  if (const MetalMaterial* m = findMetalMaterial(material))
+    return m->levelMod;
+  if (const CrystalMaterial* m = findCrystalMaterial(material))
+    return m->levelMod;
+  if (const RockMaterial* m = findRockMaterial(material))
+    return m->levelMod;
+  if (const DeadMaterial* m = findDeadMaterial(material))
+    return m->levelMod;
+  if (const GenericMaterial* m = findGenericMaterial(material))
+    return m->levelMod;
+  if (const OrganicMaterial* m = findOrganicMaterial(material))
+    return m->levelMod;
+  if (const HideMaterial* m = findHideMaterial(material))
+    return m->levelMod;
+  if (const WoodMaterial* m = findWoodMaterial(material))
+    return m->levelMod;
+  if (const MagicalMaterial* m = findMagicalMaterial(material))
+    return m->levelMod;
+  if (const SpiritualMaterial* m = findSpiritualMaterial(material))
+    return m->levelMod;
+
+  return 1;
+}
+
+// Whittle passes gainTaskExp the recipe's required knowledge and a multiplier
+// of the piece's weight plus its difficulty grade. The same two quantities
+// exist here already: levelMod is what the metal asks of a smith, and rarity
+// is the grade. Nothing is invented, and nothing here depends on who is
+// swinging the hammer -- advLearning inside gainTaskExp does that part.
+void augmentTaskExp(TBeing* ch, spellNumT skill, const TObj* obj) {
+  if (!ch || !obj)
+    return;
+
+  unsigned short material = obj->getMaterial();
+  int baseLevel = max(1, getMaterialLevelReq(material));
+  // getWeight() is a float and rarity an int, so the sum has to be widened
+  // before max sees it against a double literal.
+  double multiplier = max(
+    1.0, static_cast<double>(obj->getWeight()) + getMaterialRarity(material));
+
+  ch->gainTaskExp(skill, baseLevel, multiplier, false);
 }
 
 int getTransmuteRollMod(unsigned short from, unsigned short to) {
@@ -2110,6 +2184,8 @@ void transmuteFinish(TBeing* ch, TObj* obj, unsigned short material, int hits,
   act("$p shivers, and is something else now.", false, ch, obj, 0, TO_CHAR);
   ch->sendTo(format("It is %s.\n\r") % material_nums[material].mat_name);
   act("$p shivers in $n's hands and changes.", true, ch, obj, 0, TO_ROOM);
+
+  augmentTaskExp(ch, SKILL_TRANSMUTE, obj);
 }
 
 void TBeing::doTransmute(const char* argument) {
@@ -2484,6 +2560,9 @@ void refitFinish(TBeing* ch, TObj* obj, TemplateSlot slot) {
   act("You work $p onto a different part of the body entirely.", false, ch,
     fresh, 0, TO_CHAR);
   act("$n finishes reworking $p.", true, ch, fresh, 0, TO_ROOM);
+
+  augmentTaskExp(ch, getMaterialFamily(fresh->getMaterial()) == FAM_METAL ? SKILL_FORGE
+                                                            : SKILL_SEW, fresh);
 }
 
 // forge refit and sew refit are one function: the material decides which

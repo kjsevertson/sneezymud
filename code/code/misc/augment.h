@@ -383,6 +383,18 @@ enum MaterialFamily {
 // is what makes distances between them comparable.
 [[nodiscard]] int getMaterialRarity(unsigned short material);
 
+// The character level the material's family table asks of whoever works it:
+// 1 for tin, 5 for iron, 25 for mithril, 50 for eternium. Every family table
+// has carried it since they were written; nothing read it until now.
+[[nodiscard]] int getMaterialLevelReq(unsigned short material);
+
+// What a finished augment pays, on Whittle's terms: what the work demands
+// sets the base, and the material's resistance plus the piece's bulk set the
+// multiplier. gainTaskExp scales that by depth in the discipline, so the same
+// piece pays the same whoever makes it. Rarity is negative for common metals,
+// which is why the multiplier floors at 1 exactly as whittle's does.
+void augmentTaskExp(TBeing* ch, spellNumT skill, const TObj* obj);
+
 // What a transmutation costs on the roll: ten per family crossed, plus the
 // target's rarity. Working inside one family gives back half of what the
 // starting material was worth, so beginning from something already fine makes

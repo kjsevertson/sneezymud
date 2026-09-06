@@ -293,6 +293,13 @@ static void mining_pulse(TBeing* ch) {
   act("You work $p free of the rock.", false, ch, ore, 0, TO_CHAR);
   act("$n works $p free of the rock.", true, ch, ore, 0, TO_ROOM);
 
+  // Paid the way lumberjack pays: what the miner knows is the base, and the
+  // multiplier stays at one. Logging divides that base by the logs already
+  // taken from the room; rock keeps no such tally -- it is worked or it is
+  // barren -- so there is nothing here to divide by.
+  int learning = ch->getSkillValue(SKILL_MINE);
+  ch->gainTaskExp(SKILL_MINE, max(1, learning), 1.0, false);
+
   // Every seam taken is a chance the room is finished. Deep rock gives out
   // slowly; a hillside is worked bare in a few swings.
   if (::number(1, 100) <= getMinedOutChance(rp)) {

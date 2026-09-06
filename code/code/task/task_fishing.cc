@@ -450,10 +450,9 @@ int task_fishing(TBeing* ch, cmdTypeT cmd, const char*, int pulse, TRoom* rp,
               (::number(5, 10) > rp->getFished())) {
             *ch += *fish;
 
+            // A fished-out pool already pays less by yielding fewer fish; it
+            // does not also pay less per fish.
             int exp = ch->getSkillValue(SKILL_FISHING);
-            if (rp->getFished() > 0) {
-              exp = ch->getSkillValue(SKILL_FISHING) / rp->getFished();
-            }
             if (exp < 1) {
               exp = 1;
             }
