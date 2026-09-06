@@ -25,6 +25,7 @@ class CDThief : public CDiscipline {
     CSkill skTrack;
     CSkill skRepairThief;
     CSkill skSerrate;
+    CSkill skStrip;
 
     virtual CDThief* cloneMe() { return new CDThief(*this); }
 

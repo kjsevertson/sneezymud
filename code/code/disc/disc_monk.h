@@ -28,6 +28,8 @@ class CDMonk : public CDiscipline {
     CSkill skCatfall;
     CSkill skRepairMonk;
     CSkill skCatleap;
+    CSkill skSew;
+    CSkill skWeave;
 
     virtual CDMonk* cloneMe() { return new CDMonk(*this); }
 

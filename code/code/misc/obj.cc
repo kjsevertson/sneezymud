@@ -394,6 +394,14 @@ itemTypeT mapFileToItemType(int num) {
       return ITEM_TRAP_COMPONENT;
     case 78:
       return ITEM_TRAPCOMP_BAG;
+    case 79:
+      return ITEM_INGOT;
+    case 80:
+      return ITEM_SOULSTONE;
+    case 81:
+      return ITEM_ESSENCE;
+    case 82:
+      return ITEM_SKEIN;
   }
   vlogf(LOG_BUG, format("Unknown type %d in map file") % num);
   return ITEM_UNDEFINED;
@@ -559,6 +567,14 @@ int mapItemTypeToFile(itemTypeT itt) {
       return 77;
     case ITEM_TRAPCOMP_BAG:
       return 78;
+    case ITEM_INGOT:
+      return 79;
+    case ITEM_SOULSTONE:
+      return 80;
+    case ITEM_ESSENCE:
+      return 81;
+    case ITEM_SKEIN:
+      return 82;
     case MAX_OBJ_TYPES:
       break;
   }

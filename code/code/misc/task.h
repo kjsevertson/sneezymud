@@ -92,6 +92,24 @@ extern int task_trap_portal(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_serrate(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_jam(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 extern int task_keycut(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_strip(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_plate(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_sew(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_bangle(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_smelt(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_combine(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_forge(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_ensoul(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_rites(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_bolster(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_distill(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_resize(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_tailor(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_weave(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_infuse(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_transmute(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_hone(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
+extern int task_mining(TBeing*, cmdTypeT, const char*, int, TRoom*, TObj*);
 
 typedef struct _tasks_entry {
     const char* const name;
@@ -157,6 +175,24 @@ enum taskTypeT {
   TASK_SERRATE,
   TASK_JAM,
   TASK_KEYCUT,
+  TASK_STRIP,
+  TASK_PLATE,
+  TASK_SEW,
+  TASK_BANGLE,
+  TASK_SMELT,
+  TASK_COMBINE,
+  TASK_FORGE,
+  TASK_ENSOUL,
+  TASK_RITES,
+  TASK_BOLSTER,
+  TASK_DISTILL,
+  TASK_RESIZE,
+  TASK_TAILOR,
+  TASK_WEAVE,
+  TASK_INFUSE,
+  TASK_TRANSMUTE,
+  TASK_HONE,
+  TASK_MINING,
   NUM_TASKS  // keep this as max
 };
 

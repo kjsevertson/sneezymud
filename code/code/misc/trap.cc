@@ -26,6 +26,7 @@
 #include "obj_trapcomp_bag.h"
 #include "loadset.h"
 #include "trap.h"
+#include "mining.h"
 
 extern const char* const GRENADE_EX_DESC = "__grenade_puller";
 extern const char* const TRAP_EX_DESC = "__trap_setter";
@@ -1155,6 +1156,11 @@ int TBeing::trapSpike(int amt) {
 }
 int TBeing::trapTnt(int amt, TThing* carrier) {
   int material = carrier ? carrier->getMaterial() : MAT_WOOD;
+
+  // Rock answers a charge the way it answers a pick, only faster. A blast in a
+  // minable room shakes ore loose for whoever is still standing.
+  revealOreFromBlast(this, amt);
+
   // The blast throws amt/10 burning shards, each at a random limb.
   for (int i = amt / 10; i > 0; --i) {
     wearSlotT limb = pickRandomLimb();

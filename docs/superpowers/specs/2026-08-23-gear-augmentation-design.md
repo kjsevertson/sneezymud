@@ -18,7 +18,7 @@ The body is its tier, material, size, and AC. The soul is its stat affects. The 
 
 ```
                        ── the body ──
-     Clothing  ←Gut→  Light  ←Gut→  Medium  ←Gut→  Heavy
+     Clothing  ←Strip→  Light  ←Strip→  Medium  ←Strip→  Heavy
         ↑ Plate         ↑ Plate       ↑ Plate
      (max tier capped by material hardness)
 
@@ -55,7 +55,7 @@ Unqualified "tier" in this document means Armor Tier.
 
 | Class | Skill | Effect |
 |---|---|---|
-| Thief | Gut | Demote one tier rung |
+| Thief | Strip | Demote one tier rung |
 | Deikhan | Plate | Promote one tier rung, capped by material hardness |
 | Shaman | Bangle | Convert a wearable into jewelry; one item in, one out, no byproduct |
 | Mage | Distill | Destroy a jewelry item, yielding its stats as essence |
@@ -197,13 +197,35 @@ And that is the floor, not the estimate. Failures burn charges at the current le
 
 ## The tier ladder
 
-Tier is not stored. `ArmorEvaluator::getTier()` (`code/code/obj/obj_low.cc:422`) derives it from the item's cumulative `ITEM_ANTI_*` flags, so Gut and Plate operate by moving flag bits.
+Tier is not stored. `ArmorEvaluator::getTier()` (`code/code/obj/obj_low.cc:422`) derives it from the item's cumulative `ITEM_ANTI_*` flags, so Strip and Plate operate by moving flag bits.
 
 Wearability is enforced in exactly one place — `TBeing::canUseEquipment()` (`code/code/misc/equip.cc:120`), reached only through `TBeing::wear()`. All eight anti-flags are read there, warrior and deikhan included. `getTier()` masks those two out, but that is a valuation concern and does not mean they go unenforced.
 
-**Tier movement must move AC.** Without it, Plate costs you classes and returns nothing, and Gut hands out universal wearability at full heavy AC. Promotion raises AC and narrows the wearer set; demotion lowers AC and widens it. That trade is the entire point of the ladder.
+**Tier movement must move AC.** Without it, Plate costs you classes and returns nothing, and Strip hands out universal wearability at full heavy AC. Promotion raises AC and narrows the wearer set; demotion lowers AC and widens it. That trade is the entire point of the ladder.
 
 The AC step per rung comes from a table owned by this system. It is deliberately **not** sourced from `pointsPerAC[]` in `obj_low.cc`, even though that table expresses a similar ratio — see Independent Tables below.
+
+### The tier table
+
+AC and structure both derive from a single number: the level of the mob that loads the gear, over 70. The four tiers sit at fixed points on that scale.
+
+| Tier | Loading level | Base ratio |
+|---|---|---|
+| Heavy | 60 | 60/70 |
+| Medium | 50 | 50/70 |
+| Light | 40 | 40/70 |
+| Clothing | 30 | 30/70 |
+
+**Skills do not reach the top of that scale.** Gear built or promoted by Plate, Weave, Forge and Bolster caps below what the world loads, so hunting stays the primary source and the craft path stays the slow one. Heavy's skill ceiling is level **55**, and every other tier scales from it by the same factor, 55/60:
+
+| Tier | Skill ceiling | Ratio of 70 |
+|---|---|---|
+| Heavy | 55 | 0.7857 |
+| Medium | 45.83 | 0.6548 |
+| Light | 36.67 | 0.5238 |
+| Clothing | 27.5 | 0.3929 |
+
+The factor is uniform across the ladder, not per rung. A rung-by-rung penalty would apply the tier spread twice — the base ratios already encode it — and the compounding falls hardest on the bottom, which is where it is least wanted: clothing would land at 20, under half of heavy, for gear that is already the weakest thing on the ladder. A uniform factor holds the designed 6:5:4:3 spread, and clothing comes out at exactly half of heavy.
 
 ### Material hardness caps the ladder
 
@@ -226,7 +248,7 @@ This is what makes Transmute load-bearing rather than a curiosity: it is the gat
 
 `TArmor`, `TWorn`, and `TJewelry` are all siblings under `TBaseClothing`. The tier ladder is a flag operation everywhere except at the bottom rung, where it crosses a C++ type boundary:
 
-- Gut demoting Light → Clothing must produce a `TWorn`
+- Strip demoting Light → Clothing must produce a `TWorn`
 - Plate promoting Clothing → Light must produce a `TArmor`
 - Bangle produces a `TJewelry`
 
@@ -240,7 +262,7 @@ It is the only multiply-inherited wearable in the tree -- `TSaddle`, `THarness`,
 
 ## Template vnums
 
-Gut, Plate, Bangle, Weave, and Forge all need a real object prototype to build from. They must not modify the original object in place.
+Strip, Plate, Bangle, Weave, and Forge all need a real object prototype to build from. They must not modify the original object in place.
 
 This is a persistence requirement, not a style preference. `bulkLoadOut` currently builds gear with bare `new TArmor()` / `new TWorn()` / `new TJewelry()` (`code/code/misc/bulkLoadOut.cc:992-998`) and sets `ITEM_NORENT` at `:1001` — with no vnum there is nothing for rent to reconstruct from, so the item evaporates when the player rents. Disposable loot can live with that. Augmented gear cannot.
 
@@ -262,7 +284,7 @@ Two consequences:
 
 Excluding `ITEM_WEAR_TAKE`, `ITEM_WEAR_THROW`, and the two unused bits, there are twelve wearable slots (`code/code/misc/obj.h:232-247`): Fingers, Neck, Body, Head, Legs, Feet, Hands, Arms, Back, Waist, Wrists, Hold. These are the same twelve the `BulkSlot` enum already enumerates at `bulkLoadOut.cc:233-250`.
 
-Build all thirty-six combinations rather than pruning the odd-looking ones. Bangle is slot-preserving, so Bangling a body-slot breastplate requires a body-slot `TJewelry`; the same reasoning gives Gut and Plate a `TWorn` and a `TArmor` in every slot they touch. Gaps in the block would force the conversion helper to special-case them, which is worse than a few unused rows. The cost is seed-data plumbing in `_Setup-data/`, not design.
+Build all thirty-six combinations rather than pruning the odd-looking ones. Bangle is slot-preserving, so Bangling a body-slot breastplate requires a body-slot `TJewelry`; the same reasoning gives Strip and Plate a `TWorn` and a `TArmor` in every slot they touch. Gaps in the block would force the conversion helper to special-case them, which is worse than a few unused rows. The cost is seed-data plumbing in `_Setup-data/`, not design.
 
 **Multi-slot items are a non-problem.** Conversion picks exactly one template, so an item with two slot bits would collapse to one and silently lose the other. Checked against the world data: zero items of type `ITEM_ARMOR`, `ITEM_WORN`, or `ITEM_JEWELRY` carry more than one slot bit once `ITEM_WEAR_TAKE` and `ITEM_WEAR_THROW` are masked off. The handful that look multi-slot are throwables — a shoe, a barrel lid — and `ITEM_WEAR_THROW` is not a wear slot. An assert is enough; no rule is needed.
 
@@ -272,13 +294,13 @@ Built. Vnums 29503-29538, created by a migration in `code/code/sys/migrations.cc
 
 ### One mechanism
 
-This gives creation and conversion a single shared operation: **load the template vnum for the target type and slot, then copy state into it.** Weave and Forge load a blank and fill it. Gut, Plate, and Bangle load the target type's template and copy the old item across.
+This gives creation and conversion a single shared operation: **load the template vnum for the target type and slot, then copy state into it.** Weave and Forge load a blank and fill it. Strip, Plate, and Bangle load the target type's template and copy the old item across.
 
 Side effect worth having: augmenting a bulk-loot item gives it a real vnum, so it becomes rentable. The system quietly promotes disposable generated loot into gear worth keeping.
 
 ### Lossy
 
-Conversions are lossy. An item Gutted and then Plated back does not return to exactly where it started.
+Conversions are lossy. An item Stripped and then Plated back does not return to exactly where it started.
 
 **The loss is the integer rounding, and nothing more.** Round the resulting AC down on every conversion and the brake falls out for free — no loss table, no stored base AC, no separate tax. This is a deliberate choice not to engineer the loss: the rounding is already there, and it is enough.
 
@@ -385,7 +407,7 @@ Three class restrictions are not flag-driven and cannot be moved by any amount o
 - Shamans have the same `TArmor` prohibition.
 - Rangers cannot wear metal `TArmor`.
 
-So making an armor piece monk- or shaman-wearable requires changing its C++ type, not its flags. Gut's demotion to Clothing must therefore produce a `TWorn`, not a low-tier `TArmor`, or it will not achieve what it exists to achieve.
+So making an armor piece monk- or shaman-wearable requires changing its C++ type, not its flags. Strip's demotion to Clothing must therefore produce a `TWorn`, not a low-tier `TArmor`, or it will not achieve what it exists to achieve.
 
 ## Open items
 

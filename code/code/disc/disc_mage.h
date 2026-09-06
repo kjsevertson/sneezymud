@@ -59,6 +59,9 @@ class CDMage : public CDiscipline {
     CSkill skHaste;
     CSkill skMageSight;
     CSkill skRepairMage;
+    CSkill skDistill;
+    CSkill skInfuse;
+    CSkill skTransmute;
 
     virtual CDMage* cloneMe() { return new CDMage(*this); }
 

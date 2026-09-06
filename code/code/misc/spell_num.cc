@@ -1084,6 +1084,36 @@ int mapSpellnumToFile(spellNumT stt) {
       return 746;
     case SKILL_KEYCUT:
       return 747;
+    case SKILL_STRIP:
+      return 753;
+    case SKILL_PLATE:
+      return 754;
+    case SKILL_BANGLE:
+      return 755;
+    case SKILL_DISTILL:
+      return 756;
+    case SKILL_INFUSE:
+      return 757;
+    case SKILL_TRANSMUTE:
+      return 758;
+    case SKILL_SEW:
+      return 759;
+    case SKILL_FORGE:
+      return 760;
+    case SKILL_SMELT:
+      return 761;
+    case SKILL_RITES:
+      return 762;
+    case SKILL_BOLSTER:
+      return 763;
+    case SKILL_ENSOUL:
+      return 764;
+    case SKILL_TAILOR:
+      return 765;
+    case SKILL_WEAVE:
+      return 766;
+    case SKILL_MINE:
+      return 767;
     case AFFECT_DISEASE:
       return 2500;
     case AFFECT_COMBAT:
@@ -2264,6 +2294,36 @@ spellNumT mapFileToSpellnum(int stt) {
       return SKILL_JAM;
     case 747:
       return SKILL_KEYCUT;
+    case 753:
+      return SKILL_STRIP;
+    case 754:
+      return SKILL_PLATE;
+    case 755:
+      return SKILL_BANGLE;
+    case 756:
+      return SKILL_DISTILL;
+    case 757:
+      return SKILL_INFUSE;
+    case 758:
+      return SKILL_TRANSMUTE;
+    case 759:
+      return SKILL_SEW;
+    case 760:
+      return SKILL_FORGE;
+    case 761:
+      return SKILL_SMELT;
+    case 762:
+      return SKILL_RITES;
+    case 763:
+      return SKILL_BOLSTER;
+    case 764:
+      return SKILL_ENSOUL;
+    case 765:
+      return SKILL_TAILOR;
+    case 766:
+      return SKILL_WEAVE;
+    case 767:
+      return SKILL_MINE;
     case 2500:
       return AFFECT_DISEASE;
     case 2501:

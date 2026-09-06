@@ -16,6 +16,8 @@ class CDWarrior : public CDiscipline {
     CSkill skBloodlust;
     CSkill skWhirlwind;
     CSkill skRally;
+    CSkill skForge;
+    CSkill skSmelt;
 
     virtual CDWarrior* cloneMe() { return new CDWarrior(*this); }
 

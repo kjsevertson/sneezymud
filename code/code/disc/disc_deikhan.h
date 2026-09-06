@@ -33,6 +33,7 @@ class CDDeikhan : public CDiscipline {
     CSkill skRepairDeikhan;
     CSkill skAuraMight;
     CSkill skAuraRegeneration;
+    CSkill skPlate;
 
     virtual CDDeikhan* cloneMe() { return new CDDeikhan(*this); }
 

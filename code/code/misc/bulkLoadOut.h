@@ -14,6 +14,7 @@
 #include "enum.h"
 #include "obj_low.h"
 #include "race.h"
+#include "wearTemplate.h"
 
 class TMonster;
 class TObj;
@@ -53,6 +54,46 @@ inline constexpr std::array tierHeavyClasses{WARRIOR_LEVEL_IND,
 // a random item appropriate for the mob's class, level, and race.
 // Should be called after all zone-reset equipment loading is complete.
 void bulkLoadOut(TMonster* mob);
+
+// Volume of a wearable in this slot at this race's size tier, or 0 for a slot
+// or race with no entry. Bulk loot, Weave and Forge all size their output the
+// same way: a per-slot human baseline scaled by the race's size modifier.
+[[nodiscard]] int slotVolumeForRace(TemplateSlot slot, race_t race);
+
+// The weight an item of this volume and material comes out at. Weight is
+// derived, never set independently -- material density is what makes a silk
+// wrap and a steel plate of the same size weigh differently.
+[[nodiscard]] float weightForVolume(int volume, int material);
+
+// The inverse: how much room a given weight of a material takes up. Smelt
+// needs it because an ingot is created from an item's weight but has to carry
+// an honest volume -- a pound of mithril is better than twice the bar that a
+// pound of iron is, and Forge sizes gear by volume, not weight.
+[[nodiscard]] int volumeForWeight(float weight, int material);
+
+// The word for this race's size tier -- "tiny", "large" and so on -- or
+// nullptr for human-sized races, which take no adjective, and for races with
+// no size entry at all.
+[[nodiscard]] const char* raceSizeName(race_t race);
+
+// Everything that defines one weapon, gathered from the two tables bulk loot
+// keeps it in: the physical spec (volume, sharpness, handedness) and the
+// damage types it deals. Forge builds from this, so a forged dagger is the
+// same object a dropped one is.
+struct ForgeWeaponSpec {
+    const char* name;
+    int volume;
+    int maxSharp;
+    bool twoHanded;
+    int type1;
+    int freq1;
+    int type2;
+    int freq2;
+};
+
+// Look a weapon up by the name a player would type. False if there is no such
+// weapon.
+[[nodiscard]] bool findWeaponSpecByName(const char* name, ForgeWeaponSpec* out);
 
 // Generate one loose bulk loot item -- a random armor slot, or a weapon.
 // Unlike bulkLoadOut(), this neither equips the result nor buys its raw

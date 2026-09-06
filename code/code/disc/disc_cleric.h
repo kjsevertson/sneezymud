@@ -40,6 +40,7 @@ class CDCleric : public CDiscipline {
     CSkill skKnitBone;
     CSkill skBlindness;
     CSkill skRepairCleric;
+    CSkill skRites;
 
     virtual CDCleric* cloneMe() { return new CDCleric(*this); }
 

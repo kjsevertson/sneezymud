@@ -129,6 +129,10 @@ enum itemTypeT {
   ITEM_FRUIT,
   ITEM_TRAP_COMPONENT,
   ITEM_TRAPCOMP_BAG,
+  ITEM_INGOT,
+  ITEM_SOULSTONE,
+  ITEM_ESSENCE,
+  ITEM_SKEIN,
   MAX_OBJ_TYPES
 };
 const itemTypeT MIN_OBJ_TYPE = itemTypeT(0);
@@ -417,8 +421,13 @@ const unsigned int CORPSE_NO_BUTCHER = (1 << 6);
 const unsigned int CORPSE_HALF_BUTCHERED = (1 << 7);
 const unsigned int CORPSE_PC_BUTCHERING = (1 << 8);
 const unsigned int CORPSE_DENY_LOOT = (1 << 9);
+// Set by Rites, which takes the soul out of a corpse. Nothing else reads a
+// corpse's past this way -- the other extractions are blocked by the NO_ flags
+// Rites also sets -- but sacrifice destroys a corpse outright and so needs its
+// own record that there is nothing left in this one to give.
+const unsigned int CORPSE_NO_RITES = (1 << 10);
 
-const int MAX_CORPSE_FLAGS = 10;  // move and change
+const int MAX_CORPSE_FLAGS = 11;  // move and change
 
 /* for containers  - value[1] */
 

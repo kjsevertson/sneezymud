@@ -2241,6 +2241,21 @@ sstring TBeing::describeAffects(TBeing* ch, showMeT showme,
       case SKILL_SCRUTINY:
       case SKILL_JAM:
       case SKILL_KEYCUT:
+      case SKILL_STRIP:
+      case SKILL_PLATE:
+      case SKILL_BANGLE:
+      case SKILL_ENSOUL:
+      case SKILL_TAILOR:
+      case SKILL_WEAVE:
+      case SKILL_MINE:
+      case SKILL_DISTILL:
+      case SKILL_INFUSE:
+      case SKILL_TRANSMUTE:
+      case SKILL_SEW:
+      case SKILL_FORGE:
+      case SKILL_SMELT:
+      case SKILL_RITES:
+      case SKILL_BOLSTER:
       case SKILL_PLANT:
       case ABSOLUTE_MAX_SKILL:
         vlogf(LOG_BUG,

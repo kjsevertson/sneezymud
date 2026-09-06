@@ -618,6 +618,23 @@ enum spellNumT {
   SKILL_JAM,
   SKILL_KEYCUT,
 
+  // gear augmentation
+  SKILL_STRIP,
+  SKILL_PLATE,
+  SKILL_BANGLE,
+  SKILL_DISTILL,
+  SKILL_INFUSE,
+  SKILL_TRANSMUTE,
+  SKILL_SEW,
+  SKILL_FORGE,
+  SKILL_SMELT,
+  SKILL_RITES,
+  SKILL_BOLSTER,
+  SKILL_ENSOUL,
+  SKILL_TAILOR,
+  SKILL_WEAVE,
+  SKILL_MINE,
+
   // keep this as the last of the true skills
   MAX_SKILL,
 

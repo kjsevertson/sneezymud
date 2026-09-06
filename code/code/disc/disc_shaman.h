@@ -30,6 +30,8 @@ class CDShaman : public CDiscipline {
     CSkill skDancingBones;
     CSkill skRepairShaman;
     CSkill skEmbalm;
+    CSkill skBangle;
+    CSkill skEnsoul;
 
     virtual CDShaman* cloneMe() { return new CDShaman(*this); }
 

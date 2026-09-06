@@ -392,6 +392,18 @@ void assign_item_info() {
   ItemInfo[ITEM_TRAP_COMPONENT] = new itemInfo("Trap Component",
     "a trap component", "Number of uses left", 100, 0, "", 0, 0, "", 0, 0,
     "Component type flags", 65535, 0);
+  ItemInfo[ITEM_SKEIN] = new itemInfo("Skein", "a skein of thread",
+    "Quality of the weaving (1-5)", 5, 0, "Units of thread", 10000, 0, "", 0, 0,
+    "", 0, 0);
+  ItemInfo[ITEM_ESSENCE] = new itemInfo("Essence", "an essence",
+    "Apply type carried", 400, 0, "Quality (1-10)", 10, 0, "Charges held",
+    10000, 0, "", 0, 0);
+  ItemInfo[ITEM_SOULSTONE] = new itemInfo("Soulstone", "a soulstone",
+    "Soulstone level (1-10)", 10, 0, "Charges held", 1000, 0, "", 0, 0, "", 0,
+    0);
+  ItemInfo[ITEM_INGOT] = new itemInfo("Ingot", "an ingot of metal",
+    "Quality of the smelting (1-5)", 5, 0, "Units of metal", 10000, 0, "", 0, 0,
+    "", 0, 0);
   ItemInfo[ITEM_BOOK] =
     new itemInfo("Book", "a book", "", 0, 0, "", 0, 0, "", 0, 0, "", 0, 0);
   ItemInfo[ITEM_PORTAL] =
@@ -1527,6 +1539,14 @@ const char* const corpse_flags[MAX_CORPSE_FLAGS] = {
   "No-Resurrection",
   "No-Dissection",
   "No-Skinning",
+  "Half-Skinned",
+  "PC-Skinning",
+  "Sacrifice",
+  "No-Butchering",
+  "Half-Butchered",
+  "PC-Butchering",
+  "Deny-Loot",
+  "No-Rites",
 };
 
 const char* const deities[MAX_DEITIES] = {

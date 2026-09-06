@@ -20,6 +20,7 @@
 #include "obj_base_clothing.h"
 #include "obj_commodity.h"
 #include "obj_general_weapon.h"
+#include "bulkLoadOut.h"
 #include "race.h"
 #include "shop.h"
 #include "shopowned.h"
@@ -1585,6 +1586,97 @@ void buyCommodityForItem(TMonster* buyer, int material, float weight) {
 }
 
 }  // anonymous namespace
+
+int slotVolumeForRace(TemplateSlot slot, race_t race) {
+  if (slot == TemplateSlot::COUNT)
+    return 0;
+
+  const RaceSizeInfo* size = raceSizeInfo(race);
+  if (!size)
+    return 0;
+
+  return static_cast<int>(
+    slotBaseVolumes[static_cast<int>(slot)] * size->modifier);
+}
+
+bool findWeaponSpecByName(const char* name, ForgeWeaponSpec* out) {
+  if (!name || !*name || !out)
+    return false;
+
+  // The damage types live in the class pools rather than in weaponSpecs, so
+  // the lookup has to walk both: the pools say what a weapon does, the spec
+  // table says what it is.
+  for (int i = 0; i < WEAPON_ID_COUNT; i++) {
+    if (strcasecmp(weaponSpecs[i].name, name))
+      continue;
+
+    // Each pool is a std::array of its own size, so they are different types
+    // and cannot be walked through one list of pointers. A generic lambda can
+    // take them one at a time.
+    const WeaponPoolEntry* entry = nullptr;
+    auto scan = [&](const auto& pool) {
+      if (entry)
+        return;
+      for (const auto& candidate : pool) {
+        if (static_cast<int>(candidate.id) == i) {
+          entry = &candidate;
+          return;
+        }
+      }
+    };
+
+    scan(universalWeapons);
+    scan(warriorWeapons);
+    scan(deikhanWeapons);
+    scan(clericWeapons);
+    scan(thiefWeapons);
+    scan(mageWeapons);
+    scan(shamanWeapons);
+    scan(monkWeapons);
+
+    if (!entry)
+      return false;
+
+    out->name = weaponSpecs[i].name;
+    out->volume = weaponSpecs[i].volume;
+    out->maxSharp = weaponSpecs[i].maxSharp;
+    out->twoHanded = weaponSpecs[i].twoHanded;
+    out->type1 = static_cast<int>(entry->type1);
+    out->freq1 = entry->freq1;
+    out->type2 = static_cast<int>(entry->type2);
+    out->freq2 = entry->freq2;
+
+    return true;
+  }
+
+  return false;
+}
+
+const char* raceSizeName(race_t race) {
+  const RaceSizeInfo* size = raceSizeInfo(race);
+  return size ? size->name : nullptr;
+}
+
+float weightForVolume(int volume, int material) {
+  if (volume <= 0 || material < 0 || material >= 200)
+    return 0.0f;
+
+  return static_cast<float>(volume * material_density[material] *
+                            WEIGHT_CONSTANT);
+}
+
+int volumeForWeight(float weight, int material) {
+  if (weight <= 0.0f || material < 0 || material >= 200)
+    return 0;
+
+  // Density is zero for materials the table never filled in; there is no
+  // volume that answers for those, so report none rather than divide by it.
+  double density = material_density[material];
+  if (density <= 0.0)
+    return 0;
+
+  return static_cast<int>(weight / (density * WEIGHT_CONSTANT));
+}
 
 // -----------------------------------------------------------------------
 // Public interface: attempt to generate bulk loot on a humanoid mob

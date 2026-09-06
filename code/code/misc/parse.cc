@@ -1614,6 +1614,66 @@ int TBeing::doCommand(cmdTypeT cmd, const sstring& argument, TThing* vict,
           doSerrate(newarg.c_str());
           addToLifeforce(1);
           break;
+        case CMD_STRIP:
+          doStrip(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_PLATE:
+          doPlate(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_BANGLE:
+          doBangle(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_DISTILL:
+          doDistill(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_INFUSE:
+          doInfuse(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_TRANSMUTE:
+          doTransmute(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_SEW:
+          doSew(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_FORGE:
+          doForge(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_SMELT:
+          doSmelt(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_RITES:
+          doRites(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_BOLSTER:
+          doBolster(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_ENSOUL:
+          doEnsoul(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_TAILOR:
+          doTailor(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_WEAVE:
+          doWeave(newarg.c_str());
+          addToLifeforce(1);
+          break;
+        case CMD_MINE:
+          doMine(newarg.c_str());
+          addToLifeforce(1);
+          break;
         case CMD_MESSAGE:
           doMessage(newarg.c_str());
           addToLifeforce(1);
@@ -3032,6 +3092,21 @@ void buildCommandArray(void) {
     new commandInfo("powers", POSITION_STANDING, GOD_LEVEL1);
   commandArray[CMD_WHITTLE] = new commandInfo("whittle", POSITION_STANDING, 0);
   commandArray[CMD_SERRATE] = new commandInfo("serrate", POSITION_STANDING, 0);
+  commandArray[CMD_STRIP] = new commandInfo("strip", POSITION_STANDING, 0);
+  commandArray[CMD_PLATE] = new commandInfo("plate", POSITION_STANDING, 0);
+  commandArray[CMD_BANGLE] = new commandInfo("bangle", POSITION_STANDING, 0);
+  commandArray[CMD_DISTILL] = new commandInfo("distill", POSITION_STANDING, 0);
+  commandArray[CMD_INFUSE] = new commandInfo("infuse", POSITION_STANDING, 0);
+  commandArray[CMD_TRANSMUTE] = new commandInfo("transmute", POSITION_STANDING, 0);
+  commandArray[CMD_SEW] = new commandInfo("sew", POSITION_STANDING, 0);
+  commandArray[CMD_FORGE] = new commandInfo("forge", POSITION_STANDING, 0);
+  commandArray[CMD_SMELT] = new commandInfo("smelt", POSITION_STANDING, 0);
+  commandArray[CMD_RITES] = new commandInfo("rites", POSITION_STANDING, 0);
+  commandArray[CMD_BOLSTER] = new commandInfo("bolster", POSITION_STANDING, 0);
+  commandArray[CMD_ENSOUL] = new commandInfo("ensoul", POSITION_STANDING, 0);
+  commandArray[CMD_TAILOR] = new commandInfo("tailor", POSITION_STANDING, 0);
+  commandArray[CMD_WEAVE] = new commandInfo("weave", POSITION_STANDING, 0);
+  commandArray[CMD_MINE] = new commandInfo("mine", POSITION_STANDING, 0);
   commandArray[CMD_MESSAGE] =
     new commandInfo("message", POSITION_DEAD, GOD_LEVEL1);
   commandArray[CMD_SMOKE] = new commandInfo("smoke", POSITION_RESTING, 0);

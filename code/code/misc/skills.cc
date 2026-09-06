@@ -926,6 +926,36 @@ CSkill* TBeing::getSkill(spellNumT skill) const {
       return &((CDLooting*)cd)->skJam;
     case SKILL_KEYCUT:
       return &((CDLooting*)cd)->skKeycut;
+    case SKILL_STRIP:
+      return &((CDThief*)cd)->skStrip;
+    case SKILL_PLATE:
+      return &((CDDeikhan*)cd)->skPlate;
+    case SKILL_BANGLE:
+      return &((CDShaman*)cd)->skBangle;
+    case SKILL_ENSOUL:
+      return &((CDShaman*)cd)->skEnsoul;
+    case SKILL_DISTILL:
+      return &((CDMage*)cd)->skDistill;
+    case SKILL_INFUSE:
+      return &((CDMage*)cd)->skInfuse;
+    case SKILL_TRANSMUTE:
+      return &((CDMage*)cd)->skTransmute;
+    case SKILL_SEW:
+      return &((CDMonk*)cd)->skSew;
+    case SKILL_WEAVE:
+      return &((CDMonk*)cd)->skWeave;
+    case SKILL_FORGE:
+      return &((CDWarrior*)cd)->skForge;
+    case SKILL_SMELT:
+      return &((CDWarrior*)cd)->skSmelt;
+    case SKILL_RITES:
+      return &((CDCleric*)cd)->skRites;
+    case SKILL_BOLSTER:
+      return &((CDAdventuring*)cd)->skBolster;
+    case SKILL_TAILOR:
+      return &((CDAdventuring*)cd)->skTailor;
+    case SKILL_MINE:
+      return &((CDAdventuring*)cd)->skMine;
 
       // disc_murder
 

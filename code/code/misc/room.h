@@ -172,6 +172,7 @@ class TRoom : public TThing {
     int x = 0, y = 0, z = 0;       // x,y,z location in the world
     unsigned short fished;         // how fished out the room is
     unsigned short logsHarvested;  // how deforested the room is
+    unsigned short minedOut;       // how worked out the rock is
     int treetype;                  // the kind of tree growing in the room
 
     // Room affects (transient spell effects on the room itself). Private to
@@ -245,6 +246,8 @@ class TRoom : public TThing {
     void setZCoord(int newz) { z = newz; }
     int getFished() const { return fished; }
     void setFished(int newfished) { fished = newfished; }
+    int getMinedOut() const { return minedOut; }
+    void setMinedOut(int newMinedOut) { minedOut = newMinedOut; }
     int getLogsHarvested() const { return logsHarvested; }
     void setLogsHarvested(int newLogsHarvested) {
       logsHarvested = newLogsHarvested;

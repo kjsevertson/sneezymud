@@ -2781,16 +2781,23 @@ void runMigrations() {
     // consumed one charge at a time instead of by whole-object delete.
     // type 77 == ITEM_TRAP_COMPONENT's file value (obj.cc mapFileToItemType);
     // the enum is append-only, so this value is stable. Seed every reagent at
-    // 1 charge so it stacks on pickup. The "type = 12" (ITEM_OTHER) guard
-    // selects exactly these reagents, excludes the real trap objects 924/925
-    // (type 14 == ITEM_TRAP), and is self-idempotent: a re-run finds nothing
-    // left at type 12.
+    // 1 charge so it stacks on pickup.
+    //
+    // The block mixes parts with finished traps, so the guard names the types
+    // to convert rather than the vnums. Reagents ship as type 12 (ITEM_OTHER),
+    // except 914, a large vial of contact poison, which ships as type 63
+    // (ITEM_POISON) -- it is a component like the rest and stacks like one.
+    // Casings (926 mine, 927 grenade) are already reagents and convert with
+    // them. The assembled traps, 924 a land mine and 925 a grenade, are type
+    // 14 (ITEM_TRAP) and stay that way: they are the trap itself, not a part
+    // of one. Listing only 12 and 63 leaves them untouched and makes the
+    // migration self-idempotent -- a re-run finds nothing left at either type.
     [&]() {
       vlogf(LOG_MISC,
         "Converting trap reagents (900-934) to ITEM_TRAP_COMPONENT");
       sneezy.query(
         "UPDATE obj SET type = 77, val0 = 1 "
-        "WHERE vnum BETWEEN 900 AND 934 AND type = 12");
+        "WHERE vnum BETWEEN 900 AND 934 AND type IN (12, 63)");
     },
 
     // Bulk gear template prototypes (vnums 29503-29538): three item types x
@@ -2960,6 +2967,150 @@ void runMigrations() {
         "UPDATE obj SET action_flag = 0 WHERE vnum IN (29925, "
         "29926) AND action_flag != 0");
     },
+    // The ingot prototype (vnum 29539). One row serves every metal: rent
+    // persists an item's material, quality and units (val0/val1) but rebuilds
+    // its C++ class and wear flags from the prototype at its vnum, so a
+    // smelted ingot needs a real vnum to come back as a TIngot -- but only
+    // one, since everything that differs between a steel ingot and a mithril
+    // one is persisted state.
+    //
+    // type 79 == ITEM_INGOT's file value (obj.cc mapFileToItemType). wear_flag
+    // 1 is ITEM_WEAR_TAKE and nothing else: an ingot is carried, never worn.
+    // Material, weight, volume, quality and units are all stamped at smelt
+    // time; the values here are placeholders that no player ever sees.
+    //
+    // INSERT IGNORE makes this idempotent on the vnum primary key.
+    [&]() {
+      vlogf(LOG_MISC, "Creating the ingot prototype (29539)");
+      sneezy.query(
+        "INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, "
+        "action_desc, type, action_flag, wear_flag, val0, val1, val2, val3, "
+        "weight, price, can_be_seen, spec_proc, max_exist, max_struct, "
+        "cur_struct, decay, volume, material) VALUES "
+        "(29539,'ingot metal smelted','an ingot of metal','An ingot of metal "
+        "lies here.','',79,0,1,1,0,0,0,10,100,3,0,9999,10,10,-1,500,159)");
+    },
+
+    // The soulstone prototype (vnum 29540). As with the ingot, one row serves
+    // every stone: Level and charges live in val0/val1, which rent persists,
+    // so all ten Levels share this vnum and differ only in state.
+    //
+    // type 80 == ITEM_SOULSTONE's file value (obj.cc mapFileToItemType).
+    // wear_flag 1 is ITEM_WEAR_TAKE: a soulstone is carried, not worn.
+    //
+    // INSERT IGNORE makes this idempotent on the vnum primary key.
+    [&]() {
+      vlogf(LOG_MISC, "Creating the soulstone prototype (29540)");
+      sneezy.query(
+        "INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, "
+        "action_desc, type, action_flag, wear_flag, val0, val1, val2, val3, "
+        "weight, price, can_be_seen, spec_proc, max_exist, max_struct, "
+        "cur_struct, decay, volume, material) VALUES "
+        "(29540,'soulstone stone soul','a soulstone','A soulstone lies "
+        "here.','',80,0,1,1,0,0,0,2,1000,3,0,9999,20,20,-1,50,45)");
+    },
+
+    // The essence prototype (vnum 29541). One row again: the apply an essence
+    // carries, its Quality and its charges are all persisted state in
+    // val0/val1/val2, and only the C++ class comes from the vnum.
+    //
+    // type 81 == ITEM_ESSENCE's file value (obj.cc mapFileToItemType).
+    // val0 is APPLY_NONE on the prototype; Distill stamps the real apply.
+    //
+    // INSERT IGNORE makes this idempotent on the vnum primary key.
+    [&]() {
+      vlogf(LOG_MISC, "Creating the essence prototype (29541)");
+      sneezy.query(
+        "INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, "
+        "action_desc, type, action_flag, wear_flag, val0, val1, val2, val3, "
+        "weight, price, can_be_seen, spec_proc, max_exist, max_struct, "
+        "cur_struct, decay, volume, material) VALUES "
+        "(29541,'essence','an essence','An essence hangs in the air "
+        "here.','',81,0,1,0,1,0,0,1,500,3,0,9999,5,5,-1,10,45)");
+    },
+
+    // The offcut prototype (vnum 29542). Resizing a piece down leaves metal
+    // behind, and that metal is not an ingot -- it has to go back through the
+    // crucible before it can be worked again, which is what makes resizing a
+    // step rather than a shortcut.
+    //
+    // type 13 == ITEM_TRASH's file value: junk to everything except Smelt,
+    // which cares only that it is metal. Material, weight, volume and the
+    // affects it carries are all stamped when it is cut.
+    //
+    // INSERT IGNORE makes this idempotent on the vnum primary key.
+    [&]() {
+      vlogf(LOG_MISC, "Creating the offcut prototype (29542)");
+      sneezy.query(
+        "INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, "
+        "action_desc, type, action_flag, wear_flag, val0, val1, val2, val3, "
+        "weight, price, can_be_seen, spec_proc, max_exist, max_struct, "
+        "cur_struct, decay, volume, material) VALUES "
+        "(29542,'offcut scrap metal','a piece of scrap','A piece of scrap "
+        "lies here.','',13,0,1,0,0,0,0,5,10,3,0,9999,10,10,-1,1000,159)");
+    },
+
+    // The skein prototype (vnum 29543), the ingot's twin on the soft side.
+    // One row again: material, quality and units are persisted state, and only
+    // the C++ class comes from the vnum.
+    //
+    // type 82 == ITEM_SKEIN's file value (obj.cc mapFileToItemType).
+    //
+    // INSERT IGNORE makes this idempotent on the vnum primary key.
+    [&]() {
+      vlogf(LOG_MISC, "Creating the skein prototype (29543)");
+      sneezy.query(
+        "INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, "
+        "action_desc, type, action_flag, wear_flag, val0, val1, val2, val3, "
+        "weight, price, can_be_seen, spec_proc, max_exist, max_struct, "
+        "cur_struct, decay, volume, material) VALUES "
+        "(29543,'skein thread woven','a skein of thread','A skein of thread "
+        "lies here.','',82,0,1,1,0,0,0,2,100,3,0,9999,10,10,-1,500,2)");
+    },
+
+    // The weapon template (vnum 29544). One row covers all eighty weapons:
+    // everything that tells a dagger from a maul -- name, volume, weight,
+    // sharpness, damage level and deviation, damage types and their
+    // frequencies, and the two-handed flag -- is persisted state. Only the C++
+    // class and the base wear flags come from the prototype, which is the one
+    // thing a forged weapon cannot carry itself.
+    //
+    // type 5 == ITEM_WEAPON's file value. wear_flag 8193 is
+    // ITEM_WEAR_TAKE | ITEM_WEAR_HOLD.
+    //
+    // INSERT IGNORE makes this idempotent on the vnum primary key.
+    [&]() {
+      vlogf(LOG_MISC, "Creating the weapon template (29544)");
+      sneezy.query(
+        "INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, "
+        "action_desc, type, action_flag, wear_flag, val0, val1, val2, val3, "
+        "weight, price, can_be_seen, spec_proc, max_exist, max_struct, "
+        "cur_struct, decay, volume, material) VALUES "
+        "(29544,'weapon forged blank','a forged weapon','A forged weapon lies "
+        "here.','',5,0,8193,0,0,0,0,5,1000,3,0,9999,40,40,-1,1000,159)");
+    },
+
+    // The ore prototype (vnum 29545). What a pick brings out of a wall is not
+    // metal yet: it is a lump of rock with something in it, junk to everything
+    // until it is worked. Metal ore goes to a crucible -- Smelt takes any
+    // metal object that is not already a bar or a commodity -- and stone and
+    // crystal wait on hands that know what to do with them.
+    //
+    // type 13 == ITEM_TRASH's file value, the same shape the resize offcut
+    // uses. Material, weight and volume are stamped when it is cut loose.
+    //
+    // INSERT IGNORE makes this idempotent on the vnum primary key.
+    [&]() {
+      vlogf(LOG_MISC, "Creating the ore prototype (29545)");
+      sneezy.query(
+        "INSERT IGNORE INTO obj (vnum, name, short_desc, long_desc, "
+        "action_desc, type, action_flag, wear_flag, val0, val1, val2, val3, "
+        "weight, price, can_be_seen, spec_proc, max_exist, max_struct, "
+        "cur_struct, decay, volume, material) VALUES "
+        "(29545,'ore chunk rough','a chunk of ore','A chunk of ore lies "
+        "here.','',13,0,1,0,0,0,0,10,20,3,0,9999,20,20,-1,2000,159)");
+    },
+
   };
 
   int oldVersion = getVersion(sneezy);

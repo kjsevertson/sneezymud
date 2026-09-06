@@ -99,6 +99,16 @@ void TBeing::doSacrifice(const char* arg) {
     return;
   }
 
+  // A corpse the rites have been said over has already given up what a
+  // sacrifice would ask for. The other extractions are blocked by the NO_
+  // flags Rites sets; sacrifice destroys the body outright, so it needs its
+  // own check.
+  if (corpse->isCorpseFlag(CORPSE_NO_RITES)) {
+    act("$p has already been given up; there is nothing left in it to offer.",
+      false, this, corpse, nullptr, TO_CHAR);
+    return;
+  }
+
   if (!corpse->isCorpseFlag(CORPSE_SACRIFICE))
     corpse->addCorpseFlag(CORPSE_SACRIFICE);
 

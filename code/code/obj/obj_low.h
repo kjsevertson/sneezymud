@@ -58,6 +58,10 @@ class ObjectEvaluator {
     int getPointValue(PointType type = PointType_All);
     double getLoadLevel(PointType type = PointType_All);
 
+    // Public because the augmentation skills move items between tiers and so
+    // have to ask what tier an item is on. It stays virtual and read-only.
+    virtual Tier getTier() = 0;
+
   private:
     int m_stat;
     const TObj* m_obj;
@@ -69,7 +73,6 @@ class ObjectEvaluator {
 
   protected:
     virtual int getMainPointsRaw() = 0;
-    virtual Tier getTier() = 0;
     virtual bool IgnoreApply(applyTypeT t) { return false; }
 };
 
@@ -79,6 +82,8 @@ class ArmorEvaluator : public ObjectEvaluator {
     ArmorEvaluator(const TBaseClothing* o);
     virtual ~ArmorEvaluator(){};
 
+    virtual Tier getTier();
+
   private:
     const TBaseClothing* m_clothing;
     int m_main;
@@ -86,7 +91,6 @@ class ArmorEvaluator : public ObjectEvaluator {
 
   protected:
     virtual int getMainPointsRaw();
-    virtual Tier getTier();
     virtual bool IgnoreApply(applyTypeT t) { return t == APPLY_ARMOR; }
 };
 

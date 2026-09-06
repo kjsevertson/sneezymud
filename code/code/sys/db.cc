@@ -60,6 +60,10 @@
 #include "obj_book.h"
 #include "obj_component.h"
 #include "obj_trap_component.h"
+#include "obj_ingot.h"
+#include "obj_soulstone.h"
+#include "obj_essence.h"
+#include "obj_skein.h"
 #include "obj_trapcomp_bag.h"
 #include "obj_gemstone.h"
 #include "obj_key.h"
@@ -4250,6 +4254,14 @@ TObj* makeNewObj(itemTypeT tmp) {
       return new TComponent();
     case ITEM_TRAP_COMPONENT:
       return new TTrapComponent();
+    case ITEM_INGOT:
+      return new TIngot();
+    case ITEM_SOULSTONE:
+      return new TSoulstone();
+    case ITEM_ESSENCE:
+      return new TEssence();
+    case ITEM_SKEIN:
+      return new TSkein();
     case ITEM_BOOK:
       return new TBook();
     case ITEM_PORTAL:
