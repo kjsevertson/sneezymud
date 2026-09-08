@@ -254,12 +254,40 @@ void TBaseClothing::setDefArmorLevel(float lev) {
   new_acVal = min(1000.0, max(-1000.0, new_acVal));
   new_strVal = min(100.0, max(0.0, new_strVal));
 
-  setMaxStructPoints((int)new_strVal);
-  setStructPoints((int)new_strVal);
+  // Rounded up rather than truncated. Both values are stored as ints, and a
+  // level is worth 25 * the slot's share of a suit -- which on the small slots
+  // is a fraction of a point. Truncating threw that fraction away, and because
+  // the level is re-derived from what was stored rather than carried along, the
+  // fraction never got a chance to accumulate: a ring or a pair of boots read
+  // back at exactly the level it started, so Bolster would spend a whole
+  // soulstone raising it and never move it at all.
+  setMaxStructPoints((int)ceil(new_strVal));
+  setStructPoints((int)ceil(new_strVal));
 
+  bool wrote = false;
   for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++)
-    if (affected[applyIndex].location == APPLY_ARMOR)
-      affected[applyIndex].modifier = -(int)new_acVal;
+    if (affected[applyIndex].location == APPLY_ARMOR) {
+      affected[applyIndex].modifier = -(int)ceil(new_acVal);
+      wrote = true;
+    }
+
+  if (wrote)
+    return;
+
+  // A piece with no APPLY_ARMOR entry has nowhere to keep AC, and the loop
+  // above would drop the value on the floor while the structure half above it
+  // still landed -- armor that reads as armor and protects like cloth. Every
+  // caller here is asking for an armor level, so claim a free slot rather than
+  // half-applying. Only bulkLoadOut seeded the slot for itself; the wearable
+  // templates carry no applies at all, so anything built off one arrives here
+  // empty.
+  for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++)
+    if (affected[applyIndex].location == APPLY_NONE) {
+      affected[applyIndex].location = APPLY_ARMOR;
+      affected[applyIndex].modifier = -(int)ceil(new_acVal);
+      affected[applyIndex].modifier2 = 0;
+      return;
+    }
 }
 
 // takes stats of eq, and returns a "level" for it
