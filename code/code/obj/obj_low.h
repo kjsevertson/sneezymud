@@ -29,6 +29,47 @@ enum Tier {
   Tier_Max
 };
 
+// AC and structure both derive from one number: the level of the mob that
+// loads the gear. Each armor tier sits at a fixed point on that scale, and a
+// tier move is a rescale between two of these -- see the tier table in
+// docs/superpowers/specs/2026-08-23-gear-augmentation-design.md.
+//
+// Demotion rescales the item's own level rather than snapping it to the tier's
+// number, so a piece that loaded off a level 70 mob keeps what made it good --
+// but only as far as the rung it lands on will hold. Subtracting absolutely is
+// not the same as staying in range: the ceiling falls faster than the ratio
+// does, so an uncapped demotion arrives above the tier's own best, with the
+// class restrictions shed on the way down. Demotion therefore caps at the load
+// level here; promotion caps at the skill ceiling below, which is the lower
+// number because it holds down skills that *add* value.
+[[nodiscard]] constexpr double getTierLoadLevel(Tier tier) {
+  switch (tier) {
+    case Tier_Heavy:
+      return 60.0;
+    case Tier_Medium:
+      return 50.0;
+    case Tier_Light:
+      return 40.0;
+    case Tier_Clothing:
+      return 30.0;
+    default:
+      return 0.0;
+  }
+}
+
+// The rung a piece's armor level alone puts it on: the lowest one whose load
+// level can still hold it. A level 55 piece is past medium's 50, so heavy is
+// the only rung that fits it, whatever its flags say.
+[[nodiscard]] constexpr Tier tierForArmorLevel(double level) {
+  if (level > getTierLoadLevel(Tier_Medium))
+    return Tier_Heavy;
+  if (level > getTierLoadLevel(Tier_Light))
+    return Tier_Medium;
+  if (level > getTierLoadLevel(Tier_Clothing))
+    return Tier_Light;
+  return Tier_Clothing;
+}
+
 enum PointType {
   PointType_All = 0,
   PointType_Stats,

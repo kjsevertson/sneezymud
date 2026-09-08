@@ -23,9 +23,9 @@ class TObj;
 // Armor tiers nest downward -- heavy-wearers wear every tier below -- so it is
 // this marginal set, not the cumulative allowed set, that ties an item to a
 // class. Ranger holds no slot, leaving Medium with cleric alone.
-inline constexpr std::array tierClothingClasses{MAGE_LEVEL_IND,
-  SHAMAN_LEVEL_IND};
-inline constexpr std::array tierLightClasses{MONK_LEVEL_IND, THIEF_LEVEL_IND};
+inline constexpr std::array tierClothingClasses{SHAMAN_LEVEL_IND,
+  MONK_LEVEL_IND};
+inline constexpr std::array tierLightClasses{MAGE_LEVEL_IND, THIEF_LEVEL_IND};
 inline constexpr std::array tierMediumClasses{CLERIC_LEVEL_IND};
 inline constexpr std::array tierHeavyClasses{WARRIOR_LEVEL_IND,
   DEIKHAN_LEVEL_IND};

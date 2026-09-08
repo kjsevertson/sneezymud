@@ -16,30 +16,6 @@ class TBeing;
 class TBaseClothing;
 class TCommodity;
 
-// AC and structure both derive from one number: the level of the mob that
-// loads the gear. Each armor tier sits at a fixed point on that scale, and a
-// tier move is a rescale between two of these -- see the tier table in
-// docs/superpowers/specs/2026-08-23-gear-augmentation-design.md.
-//
-// Demotion rescales the item's own level rather than snapping it to the tier's
-// number, so a piece that loaded off a level 70 mob keeps what made it good.
-// The skill ceiling in that table caps the skills that *add* value; Strip only
-// ever subtracts, so it needs no cap.
-[[nodiscard]] constexpr double getTierLoadLevel(Tier tier) {
-  switch (tier) {
-    case Tier_Heavy:
-      return 60.0;
-    case Tier_Medium:
-      return 50.0;
-    case Tier_Light:
-      return 40.0;
-    case Tier_Clothing:
-      return 30.0;
-    default:
-      return 0.0;
-  }
-}
-
 // Skills that add value do not reach what the world loads: heavy tops out at
 // level 55 rather than 60, and every other tier scales by the same factor. The
 // factor is uniform across the ladder on purpose -- the base levels above
@@ -89,6 +65,12 @@ inline constexpr double kSkillCeilingFactor = 55.0 / 60.0;
 // below: clearing them is what a demotion physically does. Mirrors the mask
 // layering in ArmorEvaluator::getTier().
 [[nodiscard]] unsigned int getTierRungFlags(Tier tier);
+
+// Write an item's tier flags wholesale, replacing whatever was there. Every
+// alteration that moves a tier goes through this rather than toggling the rung
+// it stepped over -- see the note at the definition for why the difference
+// matters.
+void setTierFlags(TObj* obj, unsigned int flags);
 
 // The item's tier as the evaluator sees it, including the restrictions that
 // getTier() infers rather than reads off flags.

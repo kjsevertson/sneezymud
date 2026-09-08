@@ -421,33 +421,51 @@ ArmorEvaluator::ArmorEvaluator(const TBaseClothing* o) : ObjectEvaluator(o) {
 }
 
 Tier ArmorEvaluator::getTier() {
-  // mages and shaman are clothing
-  static unsigned int lightFlags =
-    ITEM_ANTI_MAGE | ITEM_ANTI_SHAMAN;  // thieves and monks are light
-  static unsigned int mediumFlags = ITEM_ANTI_MONK | ITEM_ANTI_THIEF |
-                                    lightFlags;  // clerics and rangers are med
-  static unsigned int heavyFlags =
-    ITEM_ANTI_CLERIC | ITEM_ANTI_RANGER |
-    mediumFlags;  // diekhan and warriors are heavy
-  unsigned int objStat = m_clothing->getObjStat() & heavyFlags;
+  // A rung is owned by the pair of classes that stop there: shaman and monk
+  // wear clothing and no more, thief and mage stop at light, cleric at medium,
+  // warrior and deikhan are stopped by nothing. Ranger is a dead class and owns
+  // no rung, so its flag is not consulted and not inferred.
+  unsigned int objStat = m_clothing->getObjStat();
 
-  // some classes impose even more restrictions than simple obj flags
+  // Some classes are turned away by more than the flag word says. A monk or a
+  // shaman cannot use armor at all, whatever a builder wrote -- and builders
+  // routinely leave those two flags off armor for exactly that reason, so the
+  // inference is not a corner case, it is how most armor reaches its rung.
   if (m_clothing->monkRestrictedItem(NULL))
     objStat |= ITEM_ANTI_MONK;
   if (m_clothing->shamanRestrictedItem(NULL))
     objStat |= ITEM_ANTI_SHAMAN;
-  if (m_clothing->rangerRestrictedItem(NULL))
-    objStat |= ITEM_ANTI_RANGER;
 
   if (NULL != dynamic_cast<const TJewelry*>(m_clothing))
     return Tier_Jewelry;
-  else if ((objStat & heavyFlags) == heavyFlags)
-    return Tier_Heavy;
-  else if ((objStat & mediumFlags) == mediumFlags)
-    return Tier_Medium;
-  else if ((objStat & lightFlags) == lightFlags)
-    return Tier_Light;
-  return Tier_Clothing;
+
+  // The most restrictive class excluded decides the rung, rather than the
+  // highest rung whose every flag happens to be present. Each flag is a
+  // complete statement on its own -- anti-cleric means clerics cannot wear
+  // this, and medium is a cleric's ceiling, so anti-cleric already says heavy
+  // and there is nothing further to check.
+  //
+  // The two readings agree on a fully flagged piece and part company on a
+  // partly flagged one, which is most of the world: builders set the flag that
+  // expresses their intent and leave the rest. Testing for the whole set lets a
+  // *missing* flag outrank a *present* one, so a single omission costs every
+  // rung above the gap -- a level 55 anti-cleric plate reading as light armor,
+  // and then being valued and rescaled as light armor.
+  Tier byFlag = Tier_Clothing;
+  if (objStat & ITEM_ANTI_CLERIC)
+    byFlag = Tier_Heavy;
+  else if (objStat & (ITEM_ANTI_MAGE | ITEM_ANTI_THIEF))
+    byFlag = Tier_Medium;
+  else if (objStat & (ITEM_ANTI_SHAMAN | ITEM_ANTI_MONK))
+    byFlag = Tier_Light;
+
+  // What the piece carries is the second reading, and the one a builder cannot
+  // forget to write: each rung has a level it tops out at, so AC past medium's
+  // ceiling can only be heavy armor no matter how it is flagged. Take whichever
+  // reading is higher -- a rung has to satisfy both to be the answer.
+  Tier byLevel = tierForArmorLevel(m_clothing->armorLevel(ARMOR_LEV_AC));
+
+  return max(byFlag, byLevel);
 }
 
 int ArmorEvaluator::getMainPointsRaw() {

@@ -40,19 +40,35 @@
 
 unsigned int getTierRungFlags(Tier tier) {
   // The masks ArmorEvaluator::getTier() layers: clothing carries nothing,
-  // light adds mage and shaman, medium adds monk and thief, heavy adds cleric
-  // and ranger. A rung owns the pair its own layer added, so clearing that
-  // pair is exactly one step down.
+  // light adds shaman and monk, medium adds mage and thief, heavy adds cleric.
+  // A rung owns the pair its own layer added -- the pair of classes that stop
+  // there -- so clearing that pair is exactly one step down.
   switch (tier) {
     case Tier_Heavy:
-      return ITEM_ANTI_CLERIC | ITEM_ANTI_RANGER;
+      return ITEM_ANTI_CLERIC;
     case Tier_Medium:
-      return ITEM_ANTI_MONK | ITEM_ANTI_THIEF;
+      return ITEM_ANTI_MAGE | ITEM_ANTI_THIEF;
     case Tier_Light:
-      return ITEM_ANTI_MAGE | ITEM_ANTI_SHAMAN;
+      return ITEM_ANTI_SHAMAN | ITEM_ANTI_MONK;
     default:
       return 0;
   }
+}
+
+// Every alteration that moves a piece between tiers sets the whole flag word
+// through here, rather than toggling the one rung it stepped over. Two things
+// make the wholesale write the safer one. A rung only counts when its whole
+// pair is present, so a flag from a rung the piece does not sit on rides along
+// invisibly until a demotion strands it. And getTier() infers restrictions the
+// flags do not carry -- a monk cannot use a heavy item whatever its flags say
+// -- so a piece can read at a tier whose flags it does not actually hold, and
+// an incremental toggle leaves that gap standing for the next skill to inherit.
+//
+// After this, what a piece reads as and what it is flagged as are the same
+// thing at every stage, and no skill has to trust the one before it.
+void setTierFlags(TObj* obj, unsigned int flags) {
+  obj->remObjStat(allTierFlags());
+  obj->addObjStat(flags);
 }
 
 Tier getWearableTier(const TBaseClothing* clothing) {
@@ -183,29 +199,46 @@ void stripFinish(TBeing* ch, TObj* obj) {
     return;
   }
 
-  obj->remObjStat(getTierRungFlags(tier));
+  // The piece comes out carrying exactly what the tier below means -- not the
+  // tier it had minus one rung, which is a different thing whenever a stray
+  // flag rode along. See setTierFlags().
+  unsigned int before = obj->getObjStat() & allTierFlags();
+  double priorLevel = clothing->armorLevel(ARMOR_LEV_AC);
+  setTierFlags(obj, getTierFlags(target));
 
-  // getTier() infers restrictions the flags do not carry -- a monk cannot use
-  // a heavy item whatever its flags say -- so clearing the pair does not
-  // always move the tier. When it does not, the item would lose AC and gain
-  // nothing, so put the flags back.
-  if (getWearableTier(clothing) != target) {
-    obj->addObjStat(getTierRungFlags(tier));
-    act("You cannot find a seam in $p that would give.", false, ch, obj, 0,
-      TO_CHAR);
-    return;
-  }
-
-  double level = clothing->armorLevel(ARMOR_LEV_REAL) *
-                 (getTierLoadLevel(target) / getTierLoadLevel(tier));
+  // Rescaling alone lets a piece land above what the rung it drops into can
+  // hold: a heavy piece off a level 70 mob comes out of three strips at 35 in
+  // clothing, where the world's best is 30 -- and the class restrictions came
+  // off on the way down. So the ratio move is capped at the tier's own load
+  // level: stripped work can equal the best that tier natively carries, and
+  // never beat it.
+  //
+  // The cap is the load level rather than the skill ceiling Plate answers to.
+  // That ceiling holds down skills which *add* value, and this piece was
+  // already this good before anyone touched it.
+  //
+  // AC is what the cap is about, so the level read is the AC one.
+  // ARMOR_LEV_REAL folds structure in at a quarter weight, which would let a
+  // piece that is merely sturdy rescale as though it were well armored.
+  double level = min(clothing->armorLevel(ARMOR_LEV_AC) *
+                       (getTierLoadLevel(target) / getTierLoadLevel(tier)),
+    getTierLoadLevel(target));
 
   // The bottom rung crosses a C++ type boundary: light armor demoted to
   // clothing has to become a TWorn, which means a new object off the clothing
   // template for this slot.
+  //
+  // This happens before the tier is re-read, and it has to. getTier() infers
+  // anti-monk and anti-shaman on any TArmor whatever its flags say -- and
+  // builders often leave those flags off armor precisely because the wear
+  // command already turns both classes away from it. Those two are the light
+  // rung exactly, so a piece still armor by C++ type reads at least light no
+  // matter what was cleared. Becoming a TWorn is what actually drops it, so
+  // asking first would refuse every armor piece on the bottom rung.
   if (target == Tier_Clothing && obj->itemType() == ITEM_ARMOR) {
     TObj* worn = convertWearableType(ch, obj, ITEM_WORN);
     if (!worn) {
-      obj->addObjStat(getTierRungFlags(tier));
+      setTierFlags(obj, before);
       act("$p will not come apart cleanly, and you leave it whole.", false, ch,
         obj, 0, TO_CHAR);
       return;
@@ -220,6 +253,19 @@ void stripFinish(TBeing* ch, TObj* obj) {
   // truncates on the way in. That truncation is the whole cost of a
   // conversion: strip a piece and plate it back and it does not return.
   clothing->setDefArmorLevel(static_cast<float>(level));
+
+  // Only now is the piece everything it will be -- reflagged, retyped and cut
+  // down to the level its new rung holds -- so only now is the tier worth
+  // re-reading. getTier() weighs what a piece carries as well as what it is
+  // flagged, and the AC is not cut until the line above, so asking any earlier
+  // would see the old armor and refuse the very demotion that fixes it.
+  if (getWearableTier(clothing) != target) {
+    setTierFlags(obj, before);
+    clothing->setDefArmorLevel(static_cast<float>(priorLevel));
+    act("You cannot find a seam in $p that would give.", false, ch, obj, 0,
+      TO_CHAR);
+    return;
+  }
 
   act("You cut $p down to something a good deal less demanding.", false, ch,
     obj, 0, TO_CHAR);
@@ -248,10 +294,15 @@ void plateFinish(TBeing* ch, TObj* obj) {
     return;
   }
 
-  obj->addObjStat(getTierRungFlags(target));
+  // The whole set for the tier above, not the old set plus a rung: a piece that
+  // reached its current tier on an inferred restriction rather than a flag has
+  // a hole in the middle of its flag word, and promoting it would carry that
+  // hole upward. See setTierFlags().
+  unsigned int before = obj->getObjStat() & allTierFlags();
+  setTierFlags(obj, getTierFlags(target));
 
   if (getWearableTier(clothing) != target) {
-    obj->remObjStat(getTierRungFlags(target));
+    setTierFlags(obj, before);
     act("The plates will not sit right on $p.", false, ch, obj, 0, TO_CHAR);
     return;
   }
@@ -269,7 +320,7 @@ void plateFinish(TBeing* ch, TObj* obj) {
   if (tier == Tier_Clothing && obj->itemType() == ITEM_WORN) {
     TObj* armor = convertWearableType(ch, obj, ITEM_ARMOR);
     if (!armor) {
-      obj->remObjStat(getTierRungFlags(target));
+      setTierFlags(obj, before);
       act("$p will not take a frame, and you leave it as it is.", false, ch,
         obj, 0, TO_CHAR);
       return;
@@ -411,10 +462,7 @@ void sewFinish(TBeing* ch, TObj* obj) {
   augmentTaskExp(ch, SKILL_SEW, obj);
 }
 
-unsigned int allTierFlags() {
-  return getTierRungFlags(Tier_Heavy) | getTierRungFlags(Tier_Medium) |
-         getTierRungFlags(Tier_Light);
-}
+unsigned int allTierFlags() { return getTierFlags(Tier_Heavy); }
 
 void halveArmorValues(TBaseClothing* clothing) {
   if (!clothing)
@@ -446,8 +494,10 @@ void bangleFinish(TBeing* ch, TObj* obj) {
   // higher tier rescales onto that scale first -- the same ratio move Strip
   // makes, without the flag work, since jewelry's tier does not come from
   // flags at all.
-  double level = clothing->armorLevel(ARMOR_LEV_REAL) *
-                 (getTierLoadLevel(Tier_Clothing) / getTierLoadLevel(tier));
+  double level =
+    min(clothing->armorLevel(ARMOR_LEV_AC) *
+          (getTierLoadLevel(Tier_Clothing) / getTierLoadLevel(tier)),
+      getTierLoadLevel(Tier_Clothing));
 
   TObj* jewel = convertWearableType(ch, obj, ITEM_JEWELRY);
   if (!jewel) {
@@ -461,8 +511,8 @@ void bangleFinish(TBeing* ch, TObj* obj) {
     return;
 
   // Anyone may wear jewelry: the anti-class flags come off with the tier they
-  // used to mean.
-  jewel->remObjStat(allTierFlags());
+  // used to mean. Jewelry is not a rung, so the set it wants is the empty one.
+  setTierFlags(jewel, 0);
 
   worked->setDefArmorLevel(static_cast<float>(level));
 
@@ -2945,7 +2995,7 @@ void TBeing::doSew(const char* argument) {
   piece->setMaterial(skein->getMaterial());
   piece->setVolume(volume);
   piece->setWeight(needWeight);
-  piece->addObjStat(getTierFlags(tier));
+  setTierFlags(piece, getTierFlags(tier));
 
   nameCraftedWearable(piece, tier, slot, race, skein->getMaterial(), nullptr);
 
@@ -3067,7 +3117,7 @@ void TBeing::doForgePiece(const char* argument) {
   piece->setMaterial(ingot->getMaterial());
   piece->setVolume(volume);
   piece->setWeight(needWeight);
-  piece->addObjStat(getTierFlags(tier));
+  setTierFlags(piece, getTierFlags(tier));
 
   nameCraftedWearable(piece, tier, slot, race, ingot->getMaterial(), nullptr);
 
