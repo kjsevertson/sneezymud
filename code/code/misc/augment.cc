@@ -454,9 +454,13 @@ void stripFinish(TBeing* ch, TObj* obj) {
     return;
   }
 
+  // Said before the renaming, so $p is the piece that was cut rather than the
+  // one the cutting produced.
   act("You cut $p down to something a good deal less demanding.", false, ch,
     obj, 0, TO_CHAR);
   act("$n finishes cutting away at $p.", true, ch, obj, 0, TO_ROOM);
+
+  renameAugmented(obj);
 
   augmentTaskExp(ch, SKILL_STRIP, obj);
 }
@@ -520,9 +524,13 @@ void plateFinish(TBeing* ch, TObj* obj) {
 
   clothing->setDefArmorLevel(static_cast<float>(level));
 
+  // Said before the renaming, so $p is the piece that was worked rather than
+  // the one the work produced.
   act("You work $p into something that will turn a heavier blow.", false, ch,
     obj, 0, TO_CHAR);
   act("$n finishes working at $p.", true, ch, obj, 0, TO_ROOM);
+
+  renameAugmented(obj);
 
   augmentTaskExp(ch, SKILL_PLATE, obj);
 }
@@ -728,10 +736,15 @@ void bangleFinish(TBeing* ch, TObj* obj) {
   // across untouched -- they are what Distill is for.
   halveArmorValues(worked);
 
+  // Said before the renaming, so $p is the piece that went in. Working a bauble
+  // down into something small and ornamental says nothing at all.
   act("You work $p down into something small and ornamental.", false, ch, jewel,
     0, TO_CHAR);
   act("$n finishes working $p into something ornamental.", true, ch, jewel, 0,
     TO_ROOM);
+
+  // The piece is an ornament now and takes an ornament's noun.
+  renameAugmented(jewel);
 
   augmentTaskExp(ch, SKILL_BANGLE, jewel);
 }
@@ -1810,9 +1823,10 @@ void TBeing::doForgeResize(const char* argument) {
     }
 
     if (!bar) {
-      sendTo(format("Making $p that much bigger needs %d units of %s, and you "
-                    "have no bar with that much in it.\n\r") %
-             needUnits % material_nums[obj->getMaterial()].mat_name);
+      act(format("Making $p that much bigger needs %d units of %s, and you "
+                 "have no bar with that much in it.") %
+            needUnits % material_nums[obj->getMaterial()].mat_name,
+        false, this, obj, 0, TO_CHAR);
       return;
     }
 
@@ -2207,9 +2221,9 @@ void TBeing::doInfuse(const char* argument) {
     // thing is spent either way, and a piece that already carries one virtue
     // gives back less for the next. Anything above the cap is simply lost.
     if (amount > cap) {
-      sendTo(format("$p will take only +%d of %s from that; the rest is "
-                    "lost.\n\r") %
-             cap % what);
+      act(format("$p will take only +%d of %s from that; the rest is lost.") %
+             cap % what,
+        false, this, obj, 0, TO_CHAR);
       amount = cap;
     }
   }
@@ -2218,8 +2232,9 @@ void TBeing::doInfuse(const char* argument) {
     // Raising only. An essence that would write what the piece already has,
     // or less, is refused rather than spent.
     if (amount <= obj->affected[found].modifier) {
-      sendTo(format("$p already carries +%d of %s.\n\r") %
-             obj->affected[found].modifier % what);
+      act(format("$p already carries +%d of %s.") %
+             obj->affected[found].modifier % what,
+        false, this, obj, 0, TO_CHAR);
       return;
     }
   } else if (empty < 0) {
@@ -2445,6 +2460,7 @@ void transmuteFinish(TBeing* ch, TObj* obj, unsigned short material, int hits,
     return;
   }
 
+  unsigned short was = obj->getMaterial();
   obj->setMaterial(material);
 
   // Volume is what a thing is; weight is what that volume of this stuff comes
@@ -2453,9 +2469,20 @@ void transmuteFinish(TBeing* ch, TObj* obj, unsigned short material, int hits,
   if (obj->getVolume() > 0)
     obj->setWeight(weightForVolume(obj->getVolume(), material));
 
+  // Said before the renaming below, so $p is still the thing that went into the
+  // working rather than the thing that came out. "A steel vest shivers, and is
+  // something else now" only means anything if the steel vest is what it was.
   act("$p shivers, and is something else now.", false, ch, obj, 0, TO_CHAR);
-  ch->sendTo(format("It is %s.\n\r") % material_nums[material].mat_name);
   act("$p shivers in $n's hands and changes.", true, ch, obj, 0, TO_ROOM);
+
+  // The material word is in the name and in the keywords. A wearable and a
+  // byproduct can each be named again from scratch; everything else -- a
+  // weapon above all -- can only have the one wrong word replaced, so it is
+  // tried last and only where no generator owns the name.
+  if (!renameAugmented(obj) && !renameByMaterial(obj))
+    renameMaterialWord(obj, was);
+
+  ch->sendTo(format("It is %s.\n\r") % material_nums[material].mat_name);
 
   augmentTaskExp(ch, SKILL_TRANSMUTE, obj);
 }
@@ -2534,14 +2561,14 @@ void TBeing::doTransmute(const char* argument) {
   if (task)
     stopTask();
 
-  act("You crush $p into the working, and it begins.", false, this, opal, 0,
+  act("You crush $p into the working, and reality bends.", false, this, opal, 0,
     TO_CHAR);
   act("$n crushes $p, and the air goes strange.", true, this, opal, 0, TO_ROOM);
 
   --(*opal);
   delete opal;
 
-  act("You begin working the substance of $p.", false, this, obj, 0, TO_CHAR);
+  act("You begin warping the substance of $p.", false, this, obj, 0, TO_CHAR);
 
   learnFromDoingUnusual(LEARN_UNUSUAL_NORM_LEARN, SKILL_TRANSMUTE, 8);
 
@@ -2604,8 +2631,9 @@ void TBeing::doForgeWeapon(const char* argument) {
   int needUnits = max(1, static_cast<int>(needWeight * 10.0f));
 
   if (ingot->getIngotUnits() < needUnits) {
-    sendTo(format("A %s needs %d units of metal, and $p holds %d.\n\r") %
-           spec.name % needUnits % ingot->getIngotUnits());
+    act(format("A %s needs %d units of metal, and $p holds %d.") %
+           spec.name % needUnits % ingot->getIngotUnits(),
+      false, this, ingot, 0, TO_CHAR);
     return;
   }
 
@@ -2821,20 +2849,37 @@ void refitFinish(TBeing* ch, TObj* obj, TemplateSlot slot) {
   if (!worked)
     return;
 
+  TObj* cutoffs = nullptr;
   if (wanted > 0) {
     fresh->setVolume(wanted);
     fresh->setWeight(weightForVolume(wanted, fresh->getMaterial()));
-    makeOffcut(ch, fresh, had - wanted);
+    cutoffs = makeOffcut(ch, fresh, had - wanted);
   }
 
   worked->setDefArmorLevel(static_cast<float>(level));
 
-  act("You work $p onto a different part of the body entirely.", false, ch,
-    fresh, 0, TO_CHAR);
+  // The piece changed slot, so its noun did too -- and the size has to come
+  // from the race it was worked to, not read back off a volume that only
+  // answers for the slot it came from.
+  renameAugmented(fresh, race);
+
+  // Named for what came out, not what went in: unlike the other skills, refit
+  // hands back a piece that is a different thing from the one that went on the
+  // bench, and there is no saying "you worked the fistguard" when the fistguard
+  // is the result. A slot that needs less material leaves cutoffs; one that
+  // needs the same or more leaves nothing to mention.
+  if (cutoffs)
+    act("You complete $p and collect the cutoffs.", false, ch, fresh, 0,
+      TO_CHAR);
+  else
+    act("You complete $p.", false, ch, fresh, 0, TO_CHAR);
+
   act("$n finishes reworking $p.", true, ch, fresh, 0, TO_ROOM);
 
-  augmentTaskExp(ch, getMaterialFamily(fresh->getMaterial()) == FAM_METAL ? SKILL_FORGE
-                                                            : SKILL_SEW, fresh);
+  augmentTaskExp(ch,
+    getMaterialFamily(fresh->getMaterial()) == FAM_METAL ? SKILL_FORGE
+                                                         : SKILL_SEW,
+    fresh);
 }
 
 // forge refit and sew refit are one function: the material decides which
@@ -3200,8 +3245,9 @@ void TBeing::doSew(const char* argument) {
   int needUnits = max(1, static_cast<int>(needWeight * 10.0f));
 
   if (skein->getSkeinUnits() < needUnits) {
-    sendTo(format("That piece needs %d units of thread, and $p holds %d.\n\r") %
-           needUnits % skein->getSkeinUnits());
+    act(format("That piece needs %d units of thread, and $p holds %d.") %
+           needUnits % skein->getSkeinUnits(),
+      false, this, skein, 0, TO_CHAR);
     return;
   }
 
@@ -3325,8 +3371,9 @@ void TBeing::doForgePiece(const char* argument) {
   int needUnits = max(1, static_cast<int>(needWeight * 10.0f));
 
   if (ingot->getIngotUnits() < needUnits) {
-    sendTo(format("That piece needs %d units of metal, and $p holds %d.\n\r") %
-           needUnits % ingot->getIngotUnits());
+    act(format("That piece needs %d units of metal, and $p holds %d.") %
+           needUnits % ingot->getIngotUnits(),
+      false, this, ingot, 0, TO_CHAR);
     return;
   }
 
