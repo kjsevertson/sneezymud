@@ -80,6 +80,33 @@ void setTierFlags(TObj* obj, unsigned int flags);
 // none, or more than one.
 [[nodiscard]] TemplateSlot getWearableSlot(const TObj* obj);
 
+// Rebuild a wearable's name, keywords and ground description from what it now
+// is, after augmentation has changed its tier, slot, size or material. Strings
+// the piece first. A builder's own wording does not survive this -- see the
+// note at the definition. No-op on anything that is not wearable. Returns
+// whether it renamed anything.
+bool renameAugmented(TObj* obj);
+
+// The same, for a caller that already knows the size the piece was worked to.
+// Refit needs this: it changes slot and size together, and the size cannot be
+// read back off a volume that belongs to the slot the piece came from.
+bool renameAugmented(TObj* obj, race_t race);
+
+// Rebuild a crafted byproduct's name around the material it is now made of.
+// Ingots, skeins and offcuts all carry their material in their wording, so
+// transmuting one has to rewrite it. No-op on anything else. Returns whether
+// it renamed anything.
+bool renameByMaterial(TObj* obj);
+
+// Replace the old material's word wherever the item names it -- in the wording,
+// the ground description and the keywords -- leaving everything a builder wrote
+// around it standing. For the items no generator can rebuild: weapons,
+// containers, lights, anything whose name cannot be derived back from what it
+// is. Pass the material the item was made of before the change. Returns whether
+// it found the word at all; an item that never named its material has nothing
+// stale to fix and is left alone.
+bool renameMaterialWord(TObj* obj, unsigned short from);
+
 // Rebuild a wearable as a different item type, carrying its state across, and
 // hand it back in place of the original in ch's inventory. The original is
 // deleted. Returns nullptr, original intact, if there is no template for the
@@ -435,9 +462,13 @@ class TObj* makeOffcut(TBeing* ch, TObj* obj, int leftover);
 // what an offcut is for.
 [[nodiscard]] bool isOffcut(const TObj* obj);
 
-// Resize's finish: the piece is remade at the new size, and material cut away
-// becomes an offcut carrying what the piece carried.
-void resizeFinish(TBeing* ch, TObj* obj, race_t race);
+// Resize's finish, shared by both halves: the piece is remade at the new size,
+// and material cut away becomes an offcut carrying what the piece carried. Pass
+// the skill that was rolled -- SKILL_FORGE for metal, SKILL_TAILOR for cloth --
+// which picks the wording and takes the experience. Taking it from the caller
+// rather than from the material means a piece transmuted mid-task still credits
+// the craftsman who actually did the work.
+void resizeFinish(TBeing* ch, TObj* obj, race_t race, spellNumT skill);
 
 // The skein prototype, created by a migration.
 inline constexpr int kSkeinVnum = 29543;
@@ -461,9 +492,6 @@ inline constexpr int kSkeinVnum = 29543;
 // Weave's finish: the worn thing is pulled apart and its fibre comes back as a
 // skein carrying what it carried.
 void weaveFinish(TBeing* ch, TObj* obj, int hits, int misses);
-
-// Tailor's finish: the cloth twin, leaving clippings rather than metal.
-void tailorFinish(TBeing* ch, TObj* obj, race_t race);
 
 // The share of a suit's armor a slot carries, from TBaseClothing::armorPercs.
 // A body piece is worth seven times a wrist piece of the same level, which is

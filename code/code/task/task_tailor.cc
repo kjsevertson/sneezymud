@@ -57,7 +57,7 @@ static void tailor_pulse(TBeing* ch) {
 
   race_t race = static_cast<race_t>(ch->task->status);
   ch->stopTask();
-  tailorFinish(ch, obj, race);
+  resizeFinish(ch, obj, race, SKILL_TAILOR);
 }
 
 int task_tailor(TBeing* ch, cmdTypeT cmd, const char*, int pulse, TRoom*,

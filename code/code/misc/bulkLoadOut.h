@@ -76,6 +76,12 @@ void bulkLoadOut(TMonster* mob);
 // no size entry at all.
 [[nodiscard]] const char* raceSizeName(race_t race);
 
+// The word a player uses for this race's body when sizing gear -- "hobbit",
+// "human", "elf" -- or nullptr for a race the sizing tables do not cover.
+// Distinct from raceSizeName(): that is the adjective a piece carries, this is
+// the race it was cut for, and human has one of these but not the other.
+[[nodiscard]] const char* raceSizeKeyword(race_t race);
+
 // Name a crafted wearable the way bulk loot names a dropped one, so a forged
 // breastplate and a found one read alike:
 //

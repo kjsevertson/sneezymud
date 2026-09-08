@@ -363,6 +363,16 @@ inline constexpr std::array<SlotNames, MAX_CLASSES> classSlotNames = {{
     {},  // COMMONER (dead class)
 }};
 
+// Jewelry is not a class's tier, so it takes no row above: Bangle produces it
+// out of any slot, and an ornament needs an ornament's noun. Nothing here is
+// armor, so the words are the ones for a thing worn to be seen -- a bracelet
+// where a warrior has a vambrace.
+//
+// Head through Finger, the same order as the rows above.
+inline constexpr SlotNames jewelrySlotNames = {
+  {"circlet", "amulet", "brooch", "harness", "armlet", "bracelet", "panja",
+    "chatelaine", "anklet", "toe-ring", "bauble", "ring"}};
+
 // -----------------------------------------------------------------------
 // Racial size tiers — derived from newbie starting gear body slot volumes.
 // Human (body volume 11000) is the baseline (modifier 1.000).
@@ -1678,7 +1688,9 @@ void nameCraftedWearable(TObj* obj, Tier tier, TemplateSlot slot, race_t race,
 
   int slotIdx = static_cast<int>(slot);
   const char* baseName =
-    classSlotNames[static_cast<int>(tierNounClass(tier))][slotIdx];
+    tier == Tier_Jewelry
+      ? jewelrySlotNames[slotIdx]
+      : classSlotNames[static_cast<int>(tierNounClass(tier))][slotIdx];
   if (!baseName)
     return;
 
@@ -1779,6 +1791,11 @@ void nameCraftedWeapon(TObj* obj, const char* kind, int material,
 const char* raceSizeName(race_t race) {
   const RaceSizeInfo* size = raceSizeInfo(race);
   return size ? size->name : nullptr;
+}
+
+const char* raceSizeKeyword(race_t race) {
+  const RaceSizeInfo* size = raceSizeInfo(race);
+  return size ? size->keyword : nullptr;
 }
 
 float weightForVolume(int volume, int material) {

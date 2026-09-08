@@ -59,7 +59,7 @@ static void resize_pulse(TBeing* ch) {
 
   race_t race = static_cast<race_t>(ch->task->status);
   ch->stopTask();
-  resizeFinish(ch, obj, race);
+  resizeFinish(ch, obj, race, SKILL_FORGE);
 }
 
 int task_resize(TBeing* ch, cmdTypeT cmd, const char*, int pulse, TRoom*,

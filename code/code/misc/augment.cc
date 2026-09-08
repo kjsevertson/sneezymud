@@ -98,6 +98,193 @@ TemplateSlot getWearableSlot(const TObj* obj) {
   return found;
 }
 
+// Augmentation moves the very things a wearable's name is built out of: its
+// tier, its slot, the body it was cut for, what it is made of. A name left
+// alone after that does not merely read stale -- name is the keyword field, so
+// a bracer that still answers only to "helmet" cannot be worn, fetched or
+// found by the word for what it now is.
+//
+// So the name is rebuilt from the piece as it stands, using the same generator
+// that names crafted work. That costs whatever a builder wrote, and there is
+// no way around it: a name derived from the item cannot preserve one that was
+// not. Accurate and plain beats evocative and wrong.
+bool renameAugmented(TObj* obj, race_t race) {
+  if (!obj)
+    return false;
+
+  const TBaseClothing* clothing = dynamic_cast<const TBaseClothing*>(obj);
+  if (!clothing)
+    return false;
+
+  TemplateSlot slot = getWearableSlot(obj);
+  Tier tier = getWearableTier(clothing);
+  if (slot == TemplateSlot::COUNT || tier == Tier_Max)
+    return false;
+
+  // Prototype strings are shared across every instance of a vnum, so writing
+  // the name of one unstrung piece renames all of them.
+  obj->swapToStrung();
+
+  nameCraftedWearable(obj, tier, slot, race, obj->getMaterial(), nullptr);
+  return true;
+}
+
+// The crafted byproducts carry their material in their own name: an ingot is
+// "an ingot of iron", a skein "a skein of wool", an offcut "a piece of diamond
+// scrap". Transmute changes what a thing is made of, so on these the word and
+// the substance come apart unless the name is rebuilt with it.
+//
+// The three creation sites call this too, so the wording lives in one place.
+bool renameByMaterial(TObj* obj) {
+  if (!obj)
+    return false;
+
+  sstring what = material_nums[obj->getMaterial()].mat_name;
+
+  // Prototype strings are shared across every instance of a vnum.
+  obj->swapToStrung();
+
+  if (dynamic_cast<TIngot*>(obj)) {
+    obj->name = format("ingot %s metal") % what;
+    obj->shortDescr = format("an ingot of %s") % what;
+    obj->setDescr(format("An ingot of %s lies here.") % what);
+  } else if (dynamic_cast<TSkein*>(obj)) {
+    obj->name = format("skein thread %s") % what;
+    obj->shortDescr = format("a skein of %s thread") % what;
+    obj->setDescr(format("A skein of %s thread lies here.") % what);
+  } else if (obj->objVnum() == kOffcutVnum) {
+    // An offcut is a plain TObj, so it answers to its vnum and not its type.
+    obj->name = format("offcut scrap %s") % what;
+    obj->shortDescr = format("a piece of %s scrap") % what;
+    obj->setDescr(format("A piece of %s scrap lies here.") % what);
+  } else {
+    return false;
+  }
+
+  return true;
+}
+
+bool renameAugmented(TObj* obj) {
+  if (!obj)
+    return false;
+
+  // Reading the size back out of the volume only answers when the volume
+  // belongs to the slot being read against. Refit changes both at once and
+  // passes the size it worked to, rather than coming through here.
+  TemplateSlot slot = getWearableSlot(obj);
+  if (slot == TemplateSlot::COUNT)
+    return false;
+
+  return renameAugmented(obj, getRaceForVolume(slot, obj->getVolume()));
+}
+
+namespace {
+
+[[nodiscard]] bool isWordChar(char c) {
+  return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '-';
+}
+
+// Replace every whole-word run of `from` with `to`. Whole-word is the whole
+// point: "wood" must not be found inside "driftwood", and several material
+// names are phrases with a shorter material sitting inside them -- "cloth" is
+// in "toughened cloth". A capital on the match carries over, so a ground
+// description keeps its sentence case.
+[[nodiscard]] sstring replaceWord(const sstring& text, const sstring& from,
+  const sstring& to) {
+  if (from.empty())
+    return text;
+
+  auto sameLetter = [](char a, char b) {
+    return std::tolower(static_cast<unsigned char>(a)) ==
+           std::tolower(static_cast<unsigned char>(b));
+  };
+
+  sstring out;
+  size_t pos = 0;
+  while (pos < text.size()) {
+    auto hit = std::search(text.begin() + pos, text.end(), from.begin(),
+      from.end(), sameLetter);
+    if (hit == text.end())
+      break;
+
+    size_t at = static_cast<size_t>(hit - text.begin());
+    size_t end = at + from.size();
+    bool whole = (at == 0 || !isWordChar(text[at - 1])) &&
+                 (end == text.size() || !isWordChar(text[end]));
+
+    out += text.substr(pos, at - pos);
+    if (!whole)
+      out += text.substr(at, from.size());
+    else if (std::isupper(static_cast<unsigned char>(text[at])))
+      out += to.cap();
+    else
+      out += to;
+    pos = end;
+  }
+
+  return out += text.substr(pos);
+}
+
+// "a steel blade" turned to iron reads "a iron blade" until the article is made
+// to agree with whatever word now follows it. Re-deriving it from that word is
+// right whether or not the material is the word in question, so "a pair of
+// steel greaves" is left with the article it had.
+[[nodiscard]] sstring fixArticle(const sstring& text) {
+  size_t skip = 0;
+  if (text.compare(0, 2, "a ") == 0 || text.compare(0, 2, "A ") == 0)
+    skip = 2;
+  else if (text.compare(0, 3, "an ") == 0 || text.compare(0, 3, "An ") == 0)
+    skip = 3;
+  else
+    return text;
+
+  if (skip >= text.size())
+    return text;
+
+  sstring article = strchr("aeiouAEIOU", text[skip]) ? "an" : "a";
+  if (std::isupper(static_cast<unsigned char>(text[0])))
+    article = article.cap();
+
+  return article + " " + text.substr(skip);
+}
+
+}  // namespace
+
+// A weapon, a container, a light: nothing rebuilds the names of these, because
+// nothing about them can be derived back from the item. A blade carries no
+// record of what kind of blade it is, and a builder's wording is not recoverable
+// from anything the item still holds -- which is the reason the wearable
+// generator is allowed to cost a builder their words and this is not.
+//
+// What transmuting one does leave behind is a lie wherever the old material was
+// named, in the wording and in the keywords both: a steel sword turned mithril
+// still reads steel and still answers to "steel" and not to "mithril". So the
+// wrong word is replaced and nothing else is touched. An item that never named
+// its material has nothing stale to fix and is left entirely alone.
+bool renameMaterialWord(TObj* obj, unsigned short from) {
+  if (!obj || from == obj->getMaterial())
+    return false;
+
+  sstring was = material_nums[from].mat_name;
+  sstring now = material_nums[obj->getMaterial()].mat_name;
+
+  sstring shortDesc = fixArticle(replaceWord(obj->shortDescr, was, now));
+  sstring keywords = replaceWord(obj->name, was, now);
+  sstring ground = fixArticle(replaceWord(obj->getDescr(), was, now));
+
+  if (shortDesc == obj->shortDescr && keywords == obj->name &&
+      ground == obj->getDescr())
+    return false;
+
+  // Prototype strings are shared across every instance of a vnum.
+  obj->swapToStrung();
+
+  obj->shortDescr = shortDesc;
+  obj->name = keywords;
+  obj->setDescr(ground);
+  return true;
+}
+
 TObj* convertWearableType(TBeing* ch, TObj* obj, itemTypeT type) {
   TemplateSlot slot = getWearableSlot(obj);
   if (slot == TemplateSlot::COUNT)
@@ -384,11 +571,31 @@ TemplateSlot getTemplateSlotFromName(const sstring& name) {
 race_t getRaceFromName(const sstring& name) {
   sstring want = name.lower();
 
+  // RaceNames[] holds enum spellings -- "RACE_HOBBIT", not "hobbit" -- so it
+  // is not what a player types. The word for a body is the size keyword, which
+  // is also what the help files use and what ends up in the item's own
+  // keywords. The enum spelling is accepted with its prefix off as well, so
+  // "elven" answers alongside "elf".
+  //
+  // Only races the sizing tables know are matched. A race with no size has no
+  // volume to cut to, and failing here gives the player the word back rather
+  // than a piece that cannot be pictured on any body.
   for (int i = 0; i < MAX_RACIAL_TYPES; i++) {
-    if (!RaceNames[i])
+    race_t race = static_cast<race_t>(i);
+    const char* keyword = raceSizeKeyword(race);
+    if (!keyword)
       continue;
-    if (want == sstring(RaceNames[i]).lower())
-      return static_cast<race_t>(i);
+
+    if (want == sstring(keyword).lower())
+      return race;
+
+    if (RaceNames[i]) {
+      sstring spelling = sstring(RaceNames[i]).lower();
+      if (spelling.find("race_") == 0)
+        spelling = spelling.substr(5);
+      if (want == spelling)
+        return race;
+    }
   }
 
   return RACE_NORACE;
@@ -589,10 +796,7 @@ void smeltFinish(TBeing* ch, TObj* obj, int hits, int misses) {
   ingot->setMaxStructPoints(getIngotStructure(obj->getMaterial(), units));
   ingot->setStructPoints(ingot->getMaxStructPoints());
 
-  sstring metal = material_nums[obj->getMaterial()].mat_name;
-  ingot->name = format("ingot %s metal") % metal;
-  ingot->shortDescr = format("an ingot of %s") % metal;
-  ingot->setDescr(format("An ingot of %s lies here.") % metal);
+  renameByMaterial(ingot);
 
   // The stats come across, the armor value does not: AC belongs to the shape
   // of a thing, and the shape is what just went into the fire. Forge projects
@@ -1413,10 +1617,7 @@ TObj* makeOffcut(TBeing* ch, TObj* obj, int leftover) {
 
   copyStatApplies(obj, scrap);
 
-  sstring what = material_nums[obj->getMaterial()].mat_name;
-  scrap->name = format("offcut scrap %s") % what;
-  scrap->shortDescr = format("a piece of %s scrap") % what;
-  scrap->setDescr(format("A piece of %s scrap lies here.") % what);
+  renameByMaterial(scrap);
 
   *ch += *scrap;
 
@@ -1461,7 +1662,35 @@ bool isOffcut(const TObj* obj) {
   return obj && obj->objVnum() == kOffcutVnum;
 }
 
-void resizeFinish(TBeing* ch, TObj* obj, race_t race) {
+namespace {
+
+// A smith and a tailor do the identical thing to a piece -- remake it at
+// another body's size and keep what comes off -- and differ only in how the
+// work sounds. So the wording is the parameter and the work is shared, the way
+// refitFinish already shares its two halves.
+struct ResizeVoice {
+  const char* resized;  // "... down to <size> size."
+  const char* whole;    // nothing came off
+  const char* lost;     // something came off and could not be kept
+  const char* kept;     // something came off and became an offcut
+  const char* room;
+};
+
+[[nodiscard]] const ResizeVoice& resizeVoice(spellNumT skill) {
+  static constexpr ResizeVoice smith = {"You work it down to %s size.\n\r",
+    "You finish reworking $p.", "You finish reworking $p, and sweep the scrap away.",
+    "You finish reworking $p, and set the offcut aside.",
+    "$n finishes reworking $p."};
+  static constexpr ResizeVoice tailor = {"You cut it down to %s size.\n\r",
+    "You finish $p.", "You finish $p, and sweep the clippings away.",
+    "You finish $p, and fold the clippings aside.", "$n finishes work on $p."};
+
+  return skill == SKILL_TAILOR ? tailor : smith;
+}
+
+}  // namespace
+
+void resizeFinish(TBeing* ch, TObj* obj, race_t race, spellNumT skill) {
   TBaseClothing* clothing = dynamic_cast<TBaseClothing*>(obj);
   if (!clothing)
     return;
@@ -1479,31 +1708,38 @@ void resizeFinish(TBeing* ch, TObj* obj, race_t race) {
   obj->setVolume(wanted);
   obj->setWeight(weightForVolume(wanted, obj->getMaterial()));
 
+  // The size word is part of the piece's identity, not just this message.
+  renameAugmented(obj);
+
+  const ResizeVoice& voice = resizeVoice(skill);
+
   const char* sizeName = raceSizeName(race);
   if (sizeName)
-    ch->sendTo(format("You work it down to %s size.\n\r") % sizeName);
+    ch->sendTo(format(voice.resized) % sizeName);
 
-  // Metal cut away does not vanish. It comes off as an offcut carrying what
-  // the piece carried -- the stats, never the AC -- and has to go back through
-  // the crucible before it can be worked into anything.
+  // What is cut away does not vanish. It comes off as an offcut carrying what
+  // the piece carried -- the stats, never the AC -- and metal has to go back
+  // through the crucible before it can be worked into anything. A piece being
+  // let OUT leaves nothing behind, so it takes neither branch below: the
+  // material for that was spent up front, when the work was ordered.
   int leftover = had - wanted;
   if (leftover <= 0) {
-    act("You finish reworking $p.", false, ch, obj, 0, TO_CHAR);
-    act("$n finishes reworking $p.", true, ch, obj, 0, TO_ROOM);
+    act(voice.whole, false, ch, obj, 0, TO_CHAR);
+    act(voice.room, true, ch, obj, 0, TO_ROOM);
+    augmentTaskExp(ch, skill, obj);
     return;
   }
 
   if (!makeOffcut(ch, obj, leftover)) {
-    act("You finish reworking $p, and sweep the scrap away.", false, ch, obj, 0,
-      TO_CHAR);
+    act(voice.lost, false, ch, obj, 0, TO_CHAR);
+    augmentTaskExp(ch, skill, obj);
     return;
   }
 
-  act("You finish reworking $p, and set the offcut aside.", false, ch, obj, 0,
-    TO_CHAR);
-  act("$n finishes reworking $p.", true, ch, obj, 0, TO_ROOM);
+  act(voice.kept, false, ch, obj, 0, TO_CHAR);
+  act(voice.room, true, ch, obj, 0, TO_ROOM);
 
-  augmentTaskExp(ch, SKILL_FORGE, obj);
+  augmentTaskExp(ch, skill, obj);
 }
 
 void TBeing::doForgeResize(const char* argument) {
@@ -1608,40 +1844,6 @@ void TBeing::doForgeResize(const char* argument) {
     static_cast<ubyte>(race), 0, 0);
 }
 
-void tailorFinish(TBeing* ch, TObj* obj, race_t race) {
-  TemplateSlot slot = getWearableSlot(obj);
-  int wanted = getSlotVolumeForRace(slot, race);
-  int had = obj->getVolume();
-
-  if (wanted <= 0) {
-    act("You cannot picture $p on a body that shape.", false, ch, obj, 0,
-      TO_CHAR);
-    return;
-  }
-
-  obj->setVolume(wanted);
-  obj->setWeight(weightForVolume(wanted, obj->getMaterial()));
-
-  const char* sizeName = raceSizeName(race);
-  if (sizeName)
-    ch->sendTo(format("You cut it down to %s size.\n\r") % sizeName);
-
-  // Cloth cut away keeps what the piece carried, the same as metal does. It
-  // has no crucible of its own -- a mage distills it for essence, or
-  // transmutes it into something a smith can melt.
-  if (!makeOffcut(ch, obj, had - wanted)) {
-    act("You finish $p, and sweep the clippings away.", false, ch, obj, 0,
-      TO_CHAR);
-    return;
-  }
-
-  act("You finish $p, and fold the clippings aside.", false, ch, obj, 0,
-    TO_CHAR);
-  act("$n finishes work on $p.", true, ch, obj, 0, TO_ROOM);
-
-  augmentTaskExp(ch, SKILL_TAILOR, obj);
-}
-
 void TBeing::doTailor(const char* argument) {
   sstring args(argument);
   sstring itemName = args.word(0);
@@ -1700,21 +1902,44 @@ void TBeing::doTailor(const char* argument) {
   }
 
   // Letting a piece out needs cloth to let it out with, the same way growing
-  // a piece of armor needs a bar. Quality of the bolt does not enter it.
+  // a piece of armor needs a bar -- and the cloth twin of a bar is a skein, not
+  // a commodity. Weave is where one comes from and Sew is what spends them, so
+  // this draws on the same thread the rest of the soft side does. Quality of
+  // the skein does not enter it: letting a seam out is not making anything.
   if (wanted > obj->getVolume()) {
     int needUnits = max(1, static_cast<int>(
       weightForVolume(wanted - obj->getVolume(), obj->getMaterial()) * 10.0f));
 
-    TCommodity* bolt = findCommodity(this, obj->getMaterial());
-    if (!bolt || bolt->numUnits() < needUnits) {
-      sendTo(format("Letting $p out that far needs %d units of %s, and you "
-                    "have %d.\n\r") %
-             needUnits % material_nums[obj->getMaterial()].mat_name %
-             (bolt ? bolt->numUnits() : 0));
+    TSkein* thread = nullptr;
+    for (StuffIter it = stuff.begin(); it != stuff.end(); ++it) {
+      TSkein* candidate = dynamic_cast<TSkein*>(*it);
+      if (candidate && candidate->getMaterial() == obj->getMaterial() &&
+          candidate->getSkeinUnits() >= needUnits) {
+        thread = candidate;
+        break;
+      }
+    }
+
+    if (!thread) {
+      act(format("Letting $p out that far needs %d units of %s, and you have "
+                 "no skein with that much in it.") %
+            needUnits % material_nums[obj->getMaterial()].mat_name,
+        false, this, obj, 0, TO_CHAR);
       return;
     }
 
-    consumeCommodity(this, obj->getMaterial(), needUnits);
+    int left = thread->getSkeinUnits() - needUnits;
+    if (left <= 0) {
+      --(*thread);
+      delete thread;
+    } else {
+      thread->setSkeinUnits(left);
+      thread->setWeight(left / 10.0);
+      thread->setVolume(volumeForWeight(left / 10.0f, thread->getMaterial()));
+      thread->setMaxStructPoints(
+        getSkeinStructure(thread->getMaterial(), left));
+      thread->setStructPoints(thread->getMaxStructPoints());
+    }
   }
 
   if (task)
@@ -1780,10 +2005,7 @@ void weaveFinish(TBeing* ch, TObj* obj, int hits, int misses) {
   skein->setMaxStructPoints(getSkeinStructure(obj->getMaterial(), units));
   skein->setStructPoints(skein->getMaxStructPoints());
 
-  sstring fibre = material_nums[obj->getMaterial()].mat_name;
-  skein->name = format("skein thread %s") % fibre;
-  skein->shortDescr = format("a skein of %s thread") % fibre;
-  skein->setDescr(format("A skein of %s thread lies here.") % fibre);
+  renameByMaterial(skein);
 
   // Same rule as the crucible: the stats come across, the armor value does
   // not, and a paired piece carried double what a single one did.
