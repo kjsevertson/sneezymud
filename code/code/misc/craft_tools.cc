@@ -97,7 +97,7 @@ const char* toolTypeName(int toolType) {
     case TOOL_FORCEPS:
       return "pair of forceps";
     case TOOL_LADEL:
-      return "ladel";
+      return "ladle";
     case TOOL_SOIL:
       return "measure of soil";
     case TOOL_PLANT_OIL:

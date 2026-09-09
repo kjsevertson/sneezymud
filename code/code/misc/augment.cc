@@ -1740,7 +1740,14 @@ void distillFinish(TBeing* ch, TObj* obj) {
 
     if (corpse) {
       act("$p collapses in on itself, emptied.", false, ch, corpse, 0, TO_CHAR);
-      --(*corpse);
+      act("$p collapses in on itself.", true, ch, corpse, 0, TO_ROOM);
+
+      // Deleted where it lies, without being detached first. ~TBaseCorpse()
+      // hands whatever the body was carrying to whoever holds it or to the
+      // room it is in, and detaching beforehand leaves it owned by nothing --
+      // which sends its equipment and its coins to the "unowned corpse" branch
+      // and destroys them. The animate-dead line disposes of a corpse the same
+      // way.
       delete corpse;
     }
   }
