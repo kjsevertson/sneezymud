@@ -6,10 +6,15 @@ The essence's quality is what it writes, and the whole essence is spent
 however little of it lands -- so grow one to exactly the size you need and
 never overshoot.
 
-A piece holds three stats at most.  The first may reach five, the second
-four, the third three, and a fourth will not go on at all.  The essence
-costs the same wherever you put it, so a piece that concentrates on one
-thing beats a piece spread across three.
+A piece holds three stats at most.  Its greatest may reach five, its second
+four, its third three, and a fourth will not go on at all.  Which is which
+is decided by what each stat is worth and not by the order they were
+written, so raising one past another takes its place in the order and its
+ceiling with it.  The essence costs the same wherever you put it, so a piece
+that concentrates on one thing beats a piece spread across three.
+
+No piece can carry two fives.  Reaching five means standing first, and
+passing whatever stands there means exceeding your own ceiling to do it.
 
 Writing over a stat already there only ever raises it.  An essence that
 would match it or fall short is refused rather than wasted.
