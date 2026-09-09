@@ -464,7 +464,16 @@ void stripFinish(TBeing* ch, TObj* obj) {
   // Sets the APPLY_ARMOR modifier and both structure values together, and
   // truncates on the way in. That truncation is the whole cost of a
   // conversion: strip a piece and plate it back and it does not return.
-  clothing->setDefArmorLevel(static_cast<float>(level));
+  if (!clothing->setDefArmorLevel(static_cast<float>(level))) {
+    if (converted)
+      if (TObj* armor = convertWearableType(ch, obj, ITEM_ARMOR))
+        obj = armor;
+
+    setTierFlags(obj, before);
+    act("$p carries too much else to give up what it is.", false, ch, obj, 0,
+      TO_CHAR);
+    return;
+  }
 
   // Only now is the piece everything it will be -- reflagged, retyped and cut
   // down to the level its new rung holds -- so only now is the tier worth
@@ -541,6 +550,7 @@ void plateFinish(TBeing* ch, TObj* obj) {
 
   // The bottom rung crosses a C++ type boundary in the other direction:
   // clothing promoted to light armor has to become a TArmor.
+  bool converted = false;
   if (tier == Tier_Clothing && obj->itemType() == ITEM_WORN) {
     TObj* armor = convertWearableType(ch, obj, ITEM_ARMOR);
     if (!armor) {
@@ -553,9 +563,23 @@ void plateFinish(TBeing* ch, TObj* obj) {
     clothing = dynamic_cast<TBaseClothing*>(armor);
     if (!clothing)
       return;
+    converted = true;
   }
 
-  clothing->setDefArmorLevel(static_cast<float>(level));
+  // A piece whose every affect slot is spoken for has nowhere to keep AC, and
+  // setDefArmorLevel changes nothing at all in that case. The tier and the type
+  // have already moved by here, so the promotion has to be walked back rather
+  // than finished on top of armor that never grew.
+  if (!clothing->setDefArmorLevel(static_cast<float>(level))) {
+    if (converted)
+      if (TObj* worn = convertWearableType(ch, obj, ITEM_WORN))
+        obj = worn;
+
+    setTierFlags(obj, before);
+    act("$p has no room left to carry any more plate.", false, ch, obj, 0,
+      TO_CHAR);
+    return;
+  }
 
   // Said before the renaming, so $p is the piece that was worked rather than
   // the one the work produced.
@@ -2008,6 +2032,9 @@ void TBeing::doForgeResize(const char* argument) {
     return;
   }
 
+  if (!hasCraftTools(this, kMetalKit))
+    return;
+
   // Growing a piece needs metal from somewhere, and the only place metal comes
   // from is a bar. Shrinking one leaves metal over instead, which is the
   // offcut.
@@ -2045,9 +2072,6 @@ void TBeing::doForgeResize(const char* argument) {
       bar->setStructPoints(bar->getMaxStructPoints());
     }
   }
-
-  if (!hasCraftTools(this, kMetalKit))
-    return;
 
   if (task)
     stopTask();
@@ -2121,6 +2145,9 @@ void TBeing::doTailor(const char* argument) {
     return;
   }
 
+  if (!hasCraftTools(this, kLeatherKit))
+    return;
+
   // Letting a piece out needs cloth to let it out with, the same way growing
   // a piece of armor needs a bar -- and the cloth twin of a bar is a skein, not
   // a commodity. Weave is where one comes from and Sew is what spends them, so
@@ -2161,9 +2188,6 @@ void TBeing::doTailor(const char* argument) {
       thread->setStructPoints(thread->getMaxStructPoints());
     }
   }
-
-  if (!hasCraftTools(this, kLeatherKit))
-    return;
 
   if (task)
     stopTask();
@@ -2869,6 +2893,9 @@ void TBeing::doForgeWeapon(const char* argument) {
     return;
   }
 
+  if (!hasCraftTools(this, kMetalKit))
+    return;
+
   TObj* weapon = read_object(kWeaponVnum, VIRTUAL);
   TGenWeapon* blade = dynamic_cast<TGenWeapon*>(weapon);
   if (!blade) {
@@ -2926,9 +2953,6 @@ void TBeing::doForgeWeapon(const char* argument) {
   }
 
   *this += *weapon;
-
-  if (!hasCraftTools(this, kMetalKit))
-    return;
 
   if (task)
     stopTask();
@@ -3184,6 +3208,9 @@ void TBeing::doRefit(const char* argument, bool metal) {
     return;
   }
 
+  if (!hasCraftTools(this, metal ? kMetalKit : kOrganicKit))
+    return;
+
   // Growing into a larger slot needs material for the difference, the same as
   // letting a piece out does. Shrinking leaves an offcut instead.
   if (wanted > obj->getVolume()) {
@@ -3231,9 +3258,6 @@ void TBeing::doRefit(const char* argument, bool metal) {
       consumeCommodity(this, obj->getMaterial(), needUnits);
     }
   }
-
-  if (!hasCraftTools(this, metal ? kMetalKit : kOrganicKit))
-    return;
 
   if (task)
     stopTask();
@@ -3501,6 +3525,9 @@ void TBeing::doSew(const char* argument) {
     return;
   }
 
+  if (!hasCraftTools(this, kOrganicKit))
+    return;
+
   // Light work is armor and takes the armor template; clothing takes its own.
   itemTypeT type = (tier == Tier_Light) ? ITEM_ARMOR : ITEM_WORN;
 
@@ -3539,9 +3566,6 @@ void TBeing::doSew(const char* argument) {
   }
 
   *this += *piece;
-
-  if (!hasCraftTools(this, kOrganicKit))
-    return;
 
   if (task)
     stopTask();
@@ -3630,6 +3654,9 @@ void TBeing::doForgePiece(const char* argument) {
     return;
   }
 
+  if (!hasCraftTools(this, kMetalKit))
+    return;
+
   TObj* piece = makeBlankWearable(ITEM_ARMOR, slot);
   if (!piece) {
     sendTo("You cannot picture how that would go together.\n\r");
@@ -3672,9 +3699,6 @@ void TBeing::doForgePiece(const char* argument) {
   }
 
   *this += *piece;
-
-  if (!hasCraftTools(this, kMetalKit))
-    return;
 
   if (task)
     stopTask();

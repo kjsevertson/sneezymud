@@ -234,9 +234,9 @@ void TBaseClothing::armorPercs(double* ac_perc, double* str_perc) const {
 }
 
 // this is simplistic
-void TBaseClothing::setDefArmorLevel(float lev) {
+bool TBaseClothing::setDefArmorLevel(float lev) {
   if (isSaddle())
-    return;
+    return false;
 
   double ac_perc, str_perc, new_acVal, new_strVal;
 
@@ -284,7 +284,7 @@ void TBaseClothing::setDefArmorLevel(float lev) {
       format("setDefArmorLevel: %s has no room for APPLY_ARMOR; armor level "
              "left as it was") %
         getName());
-    return;
+    return false;
   }
 
   setMaxStructPoints((int)ceil(new_strVal));
@@ -295,12 +295,13 @@ void TBaseClothing::setDefArmorLevel(float lev) {
       if (affected[applyIndex].location == APPLY_ARMOR)
         affected[applyIndex].modifier = -(int)ceil(new_acVal);
 
-    return;
+    return true;
   }
 
   affected[empty].location = APPLY_ARMOR;
   affected[empty].modifier = -(int)ceil(new_acVal);
   affected[empty].modifier2 = 0;
+  return true;
 }
 
 // The highest armor level this piece can actually be set to without reading
