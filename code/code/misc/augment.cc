@@ -19,7 +19,6 @@
 #include "comm.h"
 #include "extern.h"
 #include "being.h"
-#include "monster.h"
 #include "handler.h"
 #include "augment.h"
 #include "obj_base_clothing.h"
@@ -1670,19 +1669,23 @@ static TBaseCorpse* corpseAnswersFor(TThing* t, unsigned short classes,
     return nullptr;
 
   long rnum = real_mobile(corpse->getCorpseVnum());
-  if (rnum < 0)
+  if (rnum < 0 || (size_t)rnum >= mob_index.size())
     return nullptr;
 
-  // The corpse keeps the level but not the class, so the mob it came from is
-  // read back to be asked -- the same way the shaman control line does it.
-  TMonster* mob = read_mobile(rnum, REAL);
-  if (!mob)
+  // The corpse keeps the level but not the class, so the class is read off the
+  // prototype's index entry -- the same value read_mobile() would hand to
+  // setClass(), without building a mob to ask. This runs over every corpse in
+  // the room and in the pack, and loading one inserts it into character_list,
+  // bumps the index count, loads its responses and fires its creation hooks,
+  // with the matching set on the way back out. None of that belongs in a scan.
+  long mobClass = mob_index[rnum].Class;
+
+  // Unset entries carry -99, whose bit pattern would answer for any class
+  // asked of it.
+  if (mobClass <= 0)
     return nullptr;
 
-  bool answers = (mob->getClass() & classes) != 0;
-  delete mob;
-
-  return answers ? corpse : nullptr;
+  return (mobClass & classes) ? corpse : nullptr;
 }
 
 // The body may be at your feet or in your arms, the same as the rites.
