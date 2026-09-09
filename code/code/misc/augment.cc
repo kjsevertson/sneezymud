@@ -2127,22 +2127,42 @@ int getStatRank(const TObj* obj, int apply) {
   if (!obj || !isStatApply(apply))
     return 0;
 
-  int rank = 0;
+  // Where the apply sits on the piece, if it is on it at all.
+  int self = -1;
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
+    if (obj->affected[i].location == apply && obj->affected[i].modifier) {
+      self = i;
+      break;
+    }
+  }
+
+  int rank = 1;
 
   for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
+    if (i == self)
+      continue;
+
     if (!isStatApply(obj->affected[i].location) || !obj->affected[i].modifier)
       continue;
 
-    rank++;
+    // Not on the piece yet: it carries nothing, so every stat already there
+    // stands above it and it comes in last.
+    if (self < 0) {
+      rank++;
+      continue;
+    }
 
-    // An apply already on the piece keeps the place it was given, so raising
-    // it later does not push it down the order.
-    if (obj->affected[i].location == apply)
-      return rank;
+    int mine = obj->affected[self].modifier;
+    int theirs = obj->affected[i].modifier;
+
+    // The hierarchy is by what each apply is worth, not by the order it was
+    // written, so the piece's own shape decides the ceilings. Ties break by
+    // slot so the order is total and does not shift under the player.
+    if (theirs > mine || (theirs == mine && i < self))
+      rank++;
   }
 
-  // Not present: it would be the next one along.
-  return rank + 1;
+  return rank;
 }
 
 int getInfuseMax(const TObj* obj, int apply) {

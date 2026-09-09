@@ -350,14 +350,15 @@ void distillFinish(TBeing* ch, TObj* obj);
 // writes five times what an essence of the other does.
 [[nodiscard]] bool isPoolApply(int apply);
 
-// Where this apply stands among the stats already on the item: 1 for the
-// first, 2 for the second, 3 for the third, 4 or more for one that cannot be
-// added. An apply already present keeps its own place in the order.
+// Where this apply stands among the stats already on the item, ranked by what
+// each is worth: 1 for the highest, 2 for the second, 3 for the third, 4 or
+// more for one that cannot be added. Ties break by slot. An apply the piece
+// does not carry ranks below every one it does.
 [[nodiscard]] int getStatRank(const TObj* obj, int apply);
 
-// The most this apply may be raised to on this item. The first stat on a piece
-// may reach 5, the second 4, the third 3 -- so a piece specialised in one
-// thing beats a piece spread across three.
+// The most this apply may be raised to on this item. The highest stat on a
+// piece may reach 5, the second 4, the third 3 -- so a piece specialised in
+// one thing beats a piece spread across three.
 [[nodiscard]] int getInfuseMax(const TObj* obj, int apply);
 
 // What an essence of this quality writes for this apply: the quality itself
