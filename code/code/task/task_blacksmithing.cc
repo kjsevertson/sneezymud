@@ -18,6 +18,7 @@
 #include "obj_commodity.h"
 #include "being.h"
 #include "materials.h"
+#include "craft_tools.h"
 
 // used to plug messages and behavior to common repair functions
 class BaseRepair {
@@ -108,43 +109,14 @@ class BaseRepair {
       bool makeScraps);  // returns true if destroyed
 };
 
+// Repair and the augmentation crafts ask the same two questions of a
+// character's hands and room, so both go through craft_tools.
 TTool* BaseRepair::GetTool(int vnum, bool primary) {
-  if (0 == vnum)
-    return NULL;
-
-  TTool* tt = NULL;
-  TTool* tool = NULL;
-
-  if ((primary || m_ch->isAmbidextrous()) && m_ch->heldInPrimHand() &&
-      (tt = dynamic_cast<TTool*>(m_ch->heldInPrimHand())) &&
-      tt->getToolType() == vnum) {
-    tool = tt;
-  }
-
-  if (!tool && (!primary || m_ch->isAmbidextrous()) && m_ch->heldInSecHand() &&
-      (tt = dynamic_cast<TTool*>(m_ch->heldInSecHand())) &&
-      tt->getToolType() == vnum) {
-    tool = tt;
-  }
-
-  return tool;
+  return findHeldTool(m_ch, vnum, primary);
 }
 
 TTool* BaseRepair::GetRoomTool(int vnum) {
-  TRoom* rp;
-  if (vnum == 0)
-    return NULL;
-
-  if (!(rp = real_roomp(m_ch->in_room)))
-    return NULL;
-
-  for (StuffIter it = rp->stuff.begin(); it != rp->stuff.end(); ++it) {
-    TTool* tt = dynamic_cast<TTool*>(*it);
-    if (tt && tt->getToolType() == vnum)
-      return tt;
-  }
-
-  return NULL;
+  return findRoomTool(m_ch, vnum);
 }
 
 bool BaseRepair::DamageTool(bool primary, TObj* o, bool makeScraps) {

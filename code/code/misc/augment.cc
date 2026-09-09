@@ -37,6 +37,22 @@
 #include "obj_skein.h"
 #include "obj_general_weapon.h"
 #include "wearTemplate.h"
+#include "craft_tools.h"
+
+namespace {
+  // Augmentation borrows the repair skills' kits rather than inventing its
+  // own, so the bench a player already keeps for mending is the bench the
+  // crafts are worked at. Which repair each one borrows from is a judgement
+  // about the work, not about the class that does it -- Strip is thief work
+  // done with a leatherworker's punch.
+  const CraftTools kMetalKit = {TOOL_HAMMER, TOOL_TONGS, TOOL_FORGE,
+    TOOL_ANVIL};                                              // MetalRepair
+  const CraftTools kOrganicKit = {TOOL_LADEL, TOOL_PLANT_OIL};  // OrganicRepair
+  const CraftTools kLeatherKit = {TOOL_PUNCH, TOOL_CORDING};    // LeatherRepair
+  const CraftTools kMagicKit = {TOOL_RUNES, TOOL_ENERGY, TOOL_PENTAGRAM};
+  const CraftTools kDeadKit = {TOOL_SCALPEL, TOOL_FORCEPS,
+    TOOL_OPERATING_TABLE};                                      // DeadRepair
+}  // namespace
 
 unsigned int getTierRungFlags(Tier tier) {
   // The masks ArmorEvaluator::getTier() layers: clothing carries nothing,
@@ -1581,6 +1597,9 @@ void TBeing::doDistill(const char* argument) {
     return;
   }
 
+  if (!hasCraftTools(this, kDeadKit))
+    return;
+
   if (task)
     stopTask();
 
@@ -1843,6 +1862,9 @@ void TBeing::doForgeResize(const char* argument) {
     }
   }
 
+  if (!hasCraftTools(this, kMetalKit))
+    return;
+
   if (task)
     stopTask();
 
@@ -1955,6 +1977,9 @@ void TBeing::doTailor(const char* argument) {
       thread->setStructPoints(thread->getMaxStructPoints());
     }
   }
+
+  if (!hasCraftTools(this, kLeatherKit))
+    return;
 
   if (task)
     stopTask();
@@ -2083,6 +2108,9 @@ void TBeing::doWeave(const char* argument) {
     act("$p is already so much thread.", false, this, obj, 0, TO_CHAR);
     return;
   }
+
+  if (!hasCraftTools(this, kOrganicKit))
+    return;
 
   if (task)
     stopTask();
@@ -2715,6 +2743,9 @@ void TBeing::doForgeWeapon(const char* argument) {
 
   *this += *weapon;
 
+  if (!hasCraftTools(this, kMetalKit))
+    return;
+
   if (task)
     stopTask();
 
@@ -3014,6 +3045,9 @@ void TBeing::doRefit(const char* argument, bool metal) {
     }
   }
 
+  if (!hasCraftTools(this, metal ? kMetalKit : kOrganicKit))
+    return;
+
   if (task)
     stopTask();
 
@@ -3070,6 +3104,9 @@ void TBeing::doStrip(const char* argument) {
       obj, 0, TO_CHAR);
     return;
   }
+
+  if (!hasCraftTools(this, kLeatherKit))
+    return;
 
   if (task)
     stopTask();
@@ -3134,6 +3171,9 @@ void TBeing::doPlate(const char* argument) {
     return;
   }
 
+  if (!hasCraftTools(this, kMetalKit))
+    return;
+
   if (task)
     stopTask();
 
@@ -3183,6 +3223,9 @@ void TBeing::doBangle(const char* argument) {
       obj, 0, TO_CHAR);
     return;
   }
+
+  if (!hasCraftTools(this, kMagicKit))
+    return;
 
   if (task)
     stopTask();
@@ -3309,6 +3352,9 @@ void TBeing::doSew(const char* argument) {
   }
 
   *this += *piece;
+
+  if (!hasCraftTools(this, kOrganicKit))
+    return;
 
   if (task)
     stopTask();
@@ -3440,6 +3486,9 @@ void TBeing::doForgePiece(const char* argument) {
 
   *this += *piece;
 
+  if (!hasCraftTools(this, kMetalKit))
+    return;
+
   if (task)
     stopTask();
 
@@ -3537,6 +3586,9 @@ void TBeing::doForge(const char* argument) {
   if (!combineCheck(this, into, from))
     return;
 
+  if (!hasCraftTools(this, kMetalKit))
+    return;
+
   if (task)
     stopTask();
 
@@ -3589,6 +3641,9 @@ void TBeing::doSmelt(const char* argument) {
     act("$p is already so much raw metal.", false, this, obj, 0, TO_CHAR);
     return;
   }
+
+  if (!hasCraftTools(this, kMetalKit))
+    return;
 
   if (task)
     stopTask();
