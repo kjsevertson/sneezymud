@@ -19,6 +19,7 @@
 #include "comm.h"
 #include "extern.h"
 #include "being.h"
+#include "monster.h"
 #include "handler.h"
 #include "augment.h"
 #include "obj_base_clothing.h"
@@ -1524,6 +1525,145 @@ TEssence* depositEssence(TBeing* ch, int apply, int charges) {
   return essence;
 }
 
+// The classes whose dead answer for each stat. A corpse pays for a
+// distillation by having carried the virtue in life, which is what makes the
+// cost particular rather than just "a body".
+unsigned short getStatClasses(int apply) {
+  switch (apply) {
+    case APPLY_STR:
+      return CLASS_WARRIOR | CLASS_MONK;
+    case APPLY_CON:
+      return CLASS_WARRIOR | CLASS_DEIKHAN | CLASS_CLERIC;
+    case APPLY_BRA:
+      return CLASS_WARRIOR | CLASS_DEIKHAN | CLASS_SHAMAN;
+    case APPLY_DEX:
+      return CLASS_THIEF | CLASS_SHAMAN | CLASS_MONK;
+    case APPLY_AGI:
+      return CLASS_WARRIOR | CLASS_MONK;
+    case APPLY_SPE:
+      return CLASS_THIEF | CLASS_MONK;
+    case APPLY_INT:
+      return CLASS_MAGE | CLASS_SHAMAN;
+    case APPLY_WIS:
+      return CLASS_DEIKHAN | CLASS_CLERIC;
+    case APPLY_FOC:
+      return CLASS_THIEF | CLASS_MAGE | CLASS_SHAMAN;
+    case APPLY_PER:
+      return CLASS_CLERIC | CLASS_MAGE;
+    case APPLY_CHA:
+      return CLASS_DEIKHAN | CLASS_THIEF | CLASS_MAGE;
+    case APPLY_KAR:
+      return CLASS_CLERIC | CLASS_SHAMAN;
+    default:
+      return 0;
+  }
+}
+
+sstring describeClasses(unsigned short mask) {
+  sstring out;
+  int written = 0, total = 0;
+
+  for (int i = 0; i < MAX_CLASSES; i++)
+    if (mask & classInfo[i].class_num)
+      total++;
+
+  for (int i = 0; i < MAX_CLASSES; i++) {
+    if (!(mask & classInfo[i].class_num))
+      continue;
+
+    if (written)
+      out += (written + 1 == total) ? " or " : ", ";
+
+    out += classInfo[i].name;
+    written++;
+  }
+
+  return written ? out : sstring("nothing that ever lived");
+}
+
+int getStatModifier(const TObj* obj, int apply) {
+  if (!obj)
+    return 0;
+
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++)
+    if (obj->affected[i].location == apply && obj->affected[i].modifier)
+      return obj->affected[i].modifier;
+
+  return 0;
+}
+
+// The stat that decides what a distillation costs: the one standing first in
+// the piece's own hierarchy. A piece carrying only pools or only penalties
+// gates on nothing.
+int getDistillGateApply(const TObj* obj) {
+  if (!obj)
+    return APPLY_NONE;
+
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
+    int apply = obj->affected[i].location;
+
+    if (!isStatApply(apply) || obj->affected[i].modifier <= 0)
+      continue;
+
+    if (getStatRank(obj, apply) == 1)
+      return apply;
+  }
+
+  return APPLY_NONE;
+}
+
+// Distill only ever takes jewelry, and jewelry answers for half of what it
+// carries: a ring holding +10 wants a corpse of level 50, not 100.
+unsigned int getDistillCorpseLevel(int modifier) {
+  return max(1, abs(modifier) * 5);
+}
+
+static TBaseCorpse* corpseAnswersFor(TThing* t, unsigned short classes,
+  unsigned int level) {
+  TBaseCorpse* corpse = dynamic_cast<TBaseCorpse*>(t);
+
+  if (!corpse || corpse->getCorpseLevel() < level)
+    return nullptr;
+
+  // Medical mobs come back -1 and player corpses -2; neither carried a class.
+  if (corpse->getCorpseVnum() <= 0)
+    return nullptr;
+
+  long rnum = real_mobile(corpse->getCorpseVnum());
+  if (rnum < 0)
+    return nullptr;
+
+  // The corpse keeps the level but not the class, so the mob it came from is
+  // read back to be asked -- the same way the shaman control line does it.
+  TMonster* mob = read_mobile(rnum, REAL);
+  if (!mob)
+    return nullptr;
+
+  bool answers = (mob->getClass() & classes) != 0;
+  delete mob;
+
+  return answers ? corpse : nullptr;
+}
+
+// The body may be at your feet or in your arms, the same as the rites.
+TBaseCorpse* findDistillCorpse(TBeing* ch, unsigned short classes,
+  unsigned int level) {
+  if (!ch || !classes)
+    return nullptr;
+
+  for (StuffIter it = ch->stuff.begin(); it != ch->stuff.end(); ++it)
+    if (TBaseCorpse* corpse = corpseAnswersFor(*it, classes, level))
+      return corpse;
+
+  if (ch->roomp)
+    for (StuffIter it = ch->roomp->stuff.begin(); it != ch->roomp->stuff.end();
+         ++it)
+      if (TBaseCorpse* corpse = corpseAnswersFor(*it, classes, level))
+        return corpse;
+
+  return nullptr;
+}
+
 void distillFinish(TBeing* ch, TObj* obj) {
   int deposits = 0;
 
@@ -1547,6 +1687,20 @@ void distillFinish(TBeing* ch, TObj* obj) {
       TO_CHAR);
 
   act("$p comes apart in $n's hands.", true, ch, obj, 0, TO_ROOM);
+
+  // The body is spent here rather than at the outset, so breaking off the work
+  // costs nothing but the time already put into it.
+  int gate = getDistillGateApply(obj);
+  if (gate != APPLY_NONE) {
+    TBaseCorpse* corpse = findDistillCorpse(ch, getStatClasses(gate),
+      getDistillCorpseLevel(getStatModifier(obj, gate)));
+
+    if (corpse) {
+      act("$p collapses in on itself, emptied.", false, ch, corpse, 0, TO_CHAR);
+      --(*corpse);
+      delete corpse;
+    }
+  }
 
   augmentTaskExp(ch, SKILL_DISTILL, obj);
 
@@ -1599,6 +1753,20 @@ void TBeing::doDistill(const char* argument) {
 
   if (!hasCraftTools(this, kDeadKit))
     return;
+
+  // The piece's first-rank stat names the dead it takes to draw it out.
+  int gate = getDistillGateApply(obj);
+  if (gate != APPLY_NONE) {
+    unsigned short classes = getStatClasses(gate);
+    unsigned int level = getDistillCorpseLevel(getStatModifier(obj, gate));
+
+    if (!findDistillCorpse(this, classes, level)) {
+      sendTo(format("Drawing %s out of that wants the corpse of a level %d %s "
+                    "to draw it into.\n\r") %
+             essenceApplyName(gate) % level % describeClasses(classes));
+      return;
+    }
+  }
 
   if (task)
     stopTask();

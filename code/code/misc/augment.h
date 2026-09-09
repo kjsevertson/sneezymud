@@ -15,6 +15,7 @@
 class TBeing;
 class TBaseClothing;
 class TCommodity;
+class TBaseCorpse;
 
 // Skills that add value do not reach what the world loads: heavy tops out at
 // level 55 rather than 60, and every other tier scales by the same factor. The
@@ -364,6 +365,28 @@ void distillFinish(TBeing* ch, TObj* obj);
 // What an essence of this quality writes for this apply: the quality itself
 // for a stat, five times it for a pool.
 [[nodiscard]] int getInfuseAmount(int apply, int quality);
+
+// What this item carries of this apply, or zero if it carries none.
+[[nodiscard]] int getStatModifier(const TObj* obj, int apply);
+
+// The classes whose dead answer for a stat, as a CLASS_* mask.
+[[nodiscard]] unsigned short getStatClasses(int apply);
+
+// The classes in a mask, written out: "warrior, deikhan or cleric".
+[[nodiscard]] sstring describeClasses(unsigned short mask);
+
+// The stat a distillation is gated on -- the piece's first-rank stat -- or
+// APPLY_NONE when it carries no positive stat at all.
+[[nodiscard]] int getDistillGateApply(const TObj* obj);
+
+// The corpse level a stat of this size demands. Distill takes only jewelry,
+// which answers for half of what it carries.
+[[nodiscard]] unsigned int getDistillCorpseLevel(int modifier);
+
+// A corpse in hand or underfoot of one of these classes and at least this
+// level, or null.
+[[nodiscard]] TBaseCorpse* findDistillCorpse(TBeing* ch, unsigned short classes,
+  unsigned int level);
 
 // Infuse's finish: the apply is written and the essence reset to quality 1.
 void infuseFinish(TBeing* ch, TObj* obj, const char* essenceName);
