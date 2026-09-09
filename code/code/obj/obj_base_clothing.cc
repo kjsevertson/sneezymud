@@ -336,8 +336,20 @@ double TBaseClothing::maxArmorLevelAtOrBelow(double lev) const {
 
   // The largest stored AC that still reads back at or below lev, and then the
   // level that writes exactly that once the write has rounded up.
+  //
+  // The level is aimed a fraction of an AC point under that mark rather than
+  // exactly at it. Callers narrow this to a float on the way in, and
+  // setDefArmorLevel then multiplies it back out in a different order, so a
+  // level sitting exactly on the boundary can come back a hair above it and
+  // take ceil() to the next whole point -- which is the very thing this
+  // function exists to prevent. A sixty-fourth of a point is far larger than
+  // any rounding error float can introduce here and far smaller than a point,
+  // so the answer is unchanged on every slot but the roundoff is absorbed.
+  const double kUnderBy = 1.0 / 64.0;
+
   int stored = (int)floor(ac_min + lev * 25.0 * ac_perc);
-  double back = (stored - (NEWBIE_AC * ac_perc)) / (25.0 * ac_perc);
+  double back =
+    ((stored - kUnderBy) - (NEWBIE_AC * ac_perc)) / (25.0 * ac_perc);
 
   return min(lev, back);
 }
