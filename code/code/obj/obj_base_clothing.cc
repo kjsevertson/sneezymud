@@ -261,33 +261,84 @@ void TBaseClothing::setDefArmorLevel(float lev) {
   // fraction never got a chance to accumulate: a ring or a pair of boots read
   // back at exactly the level it started, so Bolster would spend a whole
   // soulstone raising it and never move it at all.
+  // Where the AC is going to go, decided before anything is written. A piece
+  // with no APPLY_ARMOR entry has nowhere to keep AC, and writing the
+  // structure half anyway leaves armor that reads as armor and protects like
+  // cloth. Every caller here is asking for an armor level, so a free slot is
+  // claimed rather than half-applying -- but a piece whose five slots are all
+  // spoken for by other applies has nowhere to claim, and for that one the
+  // whole change has to be refused rather than half-made. Only bulkLoadOut
+  // seeded the slot for itself; the wearable templates carry no applies at
+  // all, so anything built off one arrives here empty.
+  bool carries = false;
+  int empty = -1;
+  for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++) {
+    if (affected[applyIndex].location == APPLY_ARMOR)
+      carries = true;
+    else if (empty < 0 && affected[applyIndex].location == APPLY_NONE)
+      empty = applyIndex;
+  }
+
+  if (!carries && empty < 0) {
+    vlogf(LOG_BUG,
+      format("setDefArmorLevel: %s has no room for APPLY_ARMOR; armor level "
+             "left as it was") %
+        getName());
+    return;
+  }
+
   setMaxStructPoints((int)ceil(new_strVal));
   setStructPoints((int)ceil(new_strVal));
 
-  bool wrote = false;
-  for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++)
-    if (affected[applyIndex].location == APPLY_ARMOR) {
-      affected[applyIndex].modifier = -(int)ceil(new_acVal);
-      wrote = true;
-    }
+  if (carries) {
+    for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++)
+      if (affected[applyIndex].location == APPLY_ARMOR)
+        affected[applyIndex].modifier = -(int)ceil(new_acVal);
 
-  if (wrote)
     return;
+  }
 
-  // A piece with no APPLY_ARMOR entry has nowhere to keep AC, and the loop
-  // above would drop the value on the floor while the structure half above it
-  // still landed -- armor that reads as armor and protects like cloth. Every
-  // caller here is asking for an armor level, so claim a free slot rather than
-  // half-applying. Only bulkLoadOut seeded the slot for itself; the wearable
-  // templates carry no applies at all, so anything built off one arrives here
-  // empty.
-  for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++)
-    if (affected[applyIndex].location == APPLY_NONE) {
-      affected[applyIndex].location = APPLY_ARMOR;
-      affected[applyIndex].modifier = -(int)ceil(new_acVal);
-      affected[applyIndex].modifier2 = 0;
-      return;
-    }
+  affected[empty].location = APPLY_ARMOR;
+  affected[empty].modifier = -(int)ceil(new_acVal);
+  affected[empty].modifier2 = 0;
+}
+
+// The highest armor level this piece can actually be set to without reading
+// back above `lev`.
+//
+// setDefArmorLevel() stores AC as an int and rounds it up, while armorLevel()
+// re-derives the level from what was stored against a *rounded* newbie
+// baseline. On most slots the two do not meet: asking for exactly 30 on a
+// head slot stores 88 where 87.5 was wanted, and that reads back as 30.29 --
+// enough for tierForArmorLevel() to call it light armor rather than clothing.
+// Seven of the twelve slots do this at the clothing and medium load levels;
+// light and heavy happen to land on whole numbers and hide the problem.
+//
+// So the caller asks for the largest level that survives the round trip. On a
+// slot where one point of AC is worth four levels -- a ring -- that can be
+// meaningfully less than what was asked for, which is the honest answer.
+double TBaseClothing::maxArmorLevelAtOrBelow(double lev) const {
+  if (isSaddle())
+    return lev;
+
+  double ac_perc, str_perc;
+  armorPercs(&ac_perc, &str_perc);
+
+  if (isPaired())
+    ac_perc *= 2.0;
+
+  if (ac_perc <= 0.0)
+    return lev;
+
+  const double NEWBIE_AC = 500.0;
+  int ac_min = (int)((NEWBIE_AC * ac_perc) + (isPaired() ? 1.0 : 0.5));
+
+  // The largest stored AC that still reads back at or below lev, and then the
+  // level that writes exactly that once the write has rounded up.
+  int stored = (int)floor(ac_min + lev * 25.0 * ac_perc);
+  double back = (stored - (NEWBIE_AC * ac_perc)) / (25.0 * ac_perc);
+
+  return min(lev, back);
 }
 
 // takes stats of eq, and returns a "level" for it

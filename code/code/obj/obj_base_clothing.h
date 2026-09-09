@@ -35,6 +35,9 @@ class TBaseClothing : public virtual TObj {
 
     int armorPriceStruct(armorLevT, double*) const;
     void setDefArmorLevel(float);
+    // The highest level setDefArmorLevel() can be given that still reads back
+    // at or below lev, which is not lev itself on most slots.
+    [[nodiscard]] double maxArmorLevelAtOrBelow(double lev) const;
     double armorLevel(armorLevT) const;
     virtual double objLevel() const;
     void armorPercs(double*, double*) const;

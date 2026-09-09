@@ -424,9 +424,15 @@ void stripFinish(TBeing* ch, TObj* obj) {
   // AC is what the cap is about, so the level read is the AC one.
   // ARMOR_LEV_REAL folds structure in at a quarter weight, which would let a
   // piece that is merely sturdy rescale as though it were well armored.
+  //
+  // The cap is what the piece can actually hold and not the round number, or
+  // the strip refuses itself: AC is stored as a rounded-up int, so on seven of
+  // the twelve slots a request for exactly the target's load level reads back a
+  // fraction above it and getTier() answers with the rung above the one being
+  // aimed at.
   double level = min(clothing->armorLevel(ARMOR_LEV_AC) *
                        (getTierLoadLevel(target) / getTierLoadLevel(tier)),
-    getTierLoadLevel(target));
+    clothing->maxArmorLevelAtOrBelow(getTierLoadLevel(target)));
 
   // The bottom rung crosses a C++ type boundary: light armor demoted to
   // clothing has to become a TWorn, which means a new object off the clothing
@@ -439,6 +445,7 @@ void stripFinish(TBeing* ch, TObj* obj) {
   // rung exactly, so a piece still armor by C++ type reads at least light no
   // matter what was cleared. Becoming a TWorn is what actually drops it, so
   // asking first would refuse every armor piece on the bottom rung.
+  bool converted = false;
   if (target == Tier_Clothing && obj->itemType() == ITEM_ARMOR) {
     TObj* worn = convertWearableType(ch, obj, ITEM_WORN);
     if (!worn) {
@@ -451,6 +458,7 @@ void stripFinish(TBeing* ch, TObj* obj) {
     clothing = dynamic_cast<TBaseClothing*>(worn);
     if (!clothing)
       return;
+    converted = true;
   }
 
   // Sets the APPLY_ARMOR modifier and both structure values together, and
@@ -466,6 +474,14 @@ void stripFinish(TBeing* ch, TObj* obj) {
   if (getWearableTier(clothing) != target) {
     setTierFlags(obj, before);
     clothing->setDefArmorLevel(static_cast<float>(priorLevel));
+
+    // The type was changed before the tier could be re-read, so putting the
+    // flags and the level back is not enough -- a refused strip that left the
+    // piece a TWorn would have quietly done half the job it just declined.
+    if (converted)
+      if (TObj* armor = convertWearableType(ch, obj, ITEM_ARMOR))
+        obj = armor;
+
     act("You cannot find a seam in $p that would give.", false, ch, obj, 0,
       TO_CHAR);
     return;
@@ -3095,10 +3111,13 @@ void refitFinish(TBeing* ch, TObj* obj, TemplateSlot slot) {
 
   act("$n finishes reworking $p.", true, ch, fresh, 0, TO_ROOM);
 
+  // The same test doRefit routed on, so the award lands on the skill that was
+  // charged. isMetalMaterial is a range check over every metal index, while
+  // FAM_METAL asks the tiered table, which ten of those metals are missing
+  // from -- a piece made of one of them took the forge path and spent an
+  // ingot, and would have been credited to a tailor.
   augmentTaskExp(ch,
-    getMaterialFamily(fresh->getMaterial()) == FAM_METAL ? SKILL_FORGE
-                                                         : SKILL_SEW,
-    fresh);
+    isMetalMaterial(fresh->getMaterial()) ? SKILL_FORGE : SKILL_SEW, fresh);
 }
 
 // forge refit and sew refit are one function: the material decides which
