@@ -34,7 +34,13 @@ class TBaseClothing : public virtual TObj {
     virtual int putMeInto(TBeing*, TOpenContainer*);
 
     int armorPriceStruct(armorLevT, double*) const;
-    void setDefArmorLevel(float);
+    // False when the piece has nowhere to keep an APPLY_ARMOR entry, in
+    // which case nothing at all was changed. Most callers are setting up a
+    // fresh piece and can ignore it; the tier transitions cannot.
+    bool setDefArmorLevel(float);
+    // The highest level setDefArmorLevel() can be given that still reads back
+    // at or below lev, which is not lev itself on most slots.
+    [[nodiscard]] double maxArmorLevelAtOrBelow(double lev) const;
     double armorLevel(armorLevT) const;
     virtual double objLevel() const;
     void armorPercs(double*, double*) const;

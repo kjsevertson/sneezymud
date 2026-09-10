@@ -18,6 +18,7 @@
 #include "obj_commodity.h"
 #include "being.h"
 #include "materials.h"
+#include "task.h"
 
 // used to plug messages and behavior to common repair functions
 class BaseRepair {
@@ -182,6 +183,7 @@ bool BaseRepair::HasTools() {
   }
   return ret;
 }
+
 
 TCommodity* getRepairMaterial(StuffList list, ubyte mat) {
   TCommodity* tc;
@@ -1511,4 +1513,33 @@ int task_repair_spirit(TBeing* ch, cmdTypeT cmd, const char*, int pulse, TRoom*,
   TObj*) {
   SpiritRepair rep(ch);
   return rep.PumpMessage(cmd, pulse);
+}
+
+// The augmentation crafts borrow these kits wholesale -- the same tools and the
+// same wording -- so they ask the repair class rather than restating either.
+bool hasRepairKit(TBeing* ch, RepairKit kit) {
+  switch (kit) {
+    case RepairKit::Metal: {
+      MetalRepair r(ch);
+      return r.HasTools();
+    }
+    case RepairKit::Organic: {
+      OrganicRepair r(ch);
+      return r.HasTools();
+    }
+    case RepairKit::Leather: {
+      LeatherRepair r(ch);
+      return r.HasTools();
+    }
+    case RepairKit::Magic: {
+      MagicRepair r(ch);
+      return r.HasTools();
+    }
+    case RepairKit::Dead: {
+      DeadRepair r(ch);
+      return r.HasTools();
+    }
+  }
+
+  return true;
 }

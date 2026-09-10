@@ -23,9 +23,9 @@ class TObj;
 // Armor tiers nest downward -- heavy-wearers wear every tier below -- so it is
 // this marginal set, not the cumulative allowed set, that ties an item to a
 // class. Ranger holds no slot, leaving Medium with cleric alone.
-inline constexpr std::array tierClothingClasses{MAGE_LEVEL_IND,
-  SHAMAN_LEVEL_IND};
-inline constexpr std::array tierLightClasses{MONK_LEVEL_IND, THIEF_LEVEL_IND};
+inline constexpr std::array tierClothingClasses{SHAMAN_LEVEL_IND,
+  MONK_LEVEL_IND};
+inline constexpr std::array tierLightClasses{MAGE_LEVEL_IND, THIEF_LEVEL_IND};
 inline constexpr std::array tierMediumClasses{CLERIC_LEVEL_IND};
 inline constexpr std::array tierHeavyClasses{WARRIOR_LEVEL_IND,
   DEIKHAN_LEVEL_IND};
@@ -75,6 +75,12 @@ void bulkLoadOut(TMonster* mob);
 // nullptr for human-sized races, which take no adjective, and for races with
 // no size entry at all.
 [[nodiscard]] const char* raceSizeName(race_t race);
+
+// The word a player uses for this race's body when sizing gear -- "hobbit",
+// "human", "elf" -- or nullptr for a race the sizing tables do not cover.
+// Distinct from raceSizeName(): that is the adjective a piece carries, this is
+// the race it was cut for, and human has one of these but not the other.
+[[nodiscard]] const char* raceSizeKeyword(race_t race);
 
 // Name a crafted wearable the way bulk loot names a dropped one, so a forged
 // breastplate and a found one read alike:

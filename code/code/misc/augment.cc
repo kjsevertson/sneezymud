@@ -40,19 +40,35 @@
 
 unsigned int getTierRungFlags(Tier tier) {
   // The masks ArmorEvaluator::getTier() layers: clothing carries nothing,
-  // light adds mage and shaman, medium adds monk and thief, heavy adds cleric
-  // and ranger. A rung owns the pair its own layer added, so clearing that
-  // pair is exactly one step down.
+  // light adds shaman and monk, medium adds mage and thief, heavy adds cleric.
+  // A rung owns the pair its own layer added -- the pair of classes that stop
+  // there -- so clearing that pair is exactly one step down.
   switch (tier) {
     case Tier_Heavy:
-      return ITEM_ANTI_CLERIC | ITEM_ANTI_RANGER;
+      return ITEM_ANTI_CLERIC;
     case Tier_Medium:
-      return ITEM_ANTI_MONK | ITEM_ANTI_THIEF;
+      return ITEM_ANTI_MAGE | ITEM_ANTI_THIEF;
     case Tier_Light:
-      return ITEM_ANTI_MAGE | ITEM_ANTI_SHAMAN;
+      return ITEM_ANTI_SHAMAN | ITEM_ANTI_MONK;
     default:
       return 0;
   }
+}
+
+// Every alteration that moves a piece between tiers sets the whole flag word
+// through here, rather than toggling the one rung it stepped over. Two things
+// make the wholesale write the safer one. A rung only counts when its whole
+// pair is present, so a flag from a rung the piece does not sit on rides along
+// invisibly until a demotion strands it. And getTier() infers restrictions the
+// flags do not carry -- a monk cannot use a heavy item whatever its flags say
+// -- so a piece can read at a tier whose flags it does not actually hold, and
+// an incremental toggle leaves that gap standing for the next skill to inherit.
+//
+// After this, what a piece reads as and what it is flagged as are the same
+// thing at every stage, and no skill has to trust the one before it.
+void setTierFlags(TObj* obj, unsigned int flags) {
+  obj->remObjStat(allTierFlags());
+  obj->addObjStat(flags);
 }
 
 Tier getWearableTier(const TBaseClothing* clothing) {
@@ -80,6 +96,193 @@ TemplateSlot getWearableSlot(const TObj* obj) {
   }
 
   return found;
+}
+
+// Augmentation moves the very things a wearable's name is built out of: its
+// tier, its slot, the body it was cut for, what it is made of. A name left
+// alone after that does not merely read stale -- name is the keyword field, so
+// a bracer that still answers only to "helmet" cannot be worn, fetched or
+// found by the word for what it now is.
+//
+// So the name is rebuilt from the piece as it stands, using the same generator
+// that names crafted work. That costs whatever a builder wrote, and there is
+// no way around it: a name derived from the item cannot preserve one that was
+// not. Accurate and plain beats evocative and wrong.
+bool renameAugmented(TObj* obj, race_t race) {
+  if (!obj)
+    return false;
+
+  const TBaseClothing* clothing = dynamic_cast<const TBaseClothing*>(obj);
+  if (!clothing)
+    return false;
+
+  TemplateSlot slot = getWearableSlot(obj);
+  Tier tier = getWearableTier(clothing);
+  if (slot == TemplateSlot::COUNT || tier == Tier_Max)
+    return false;
+
+  // Prototype strings are shared across every instance of a vnum, so writing
+  // the name of one unstrung piece renames all of them.
+  obj->swapToStrung();
+
+  nameCraftedWearable(obj, tier, slot, race, obj->getMaterial(), nullptr);
+  return true;
+}
+
+// The crafted byproducts carry their material in their own name: an ingot is
+// "an ingot of iron", a skein "a skein of wool", an offcut "a piece of diamond
+// scrap". Transmute changes what a thing is made of, so on these the word and
+// the substance come apart unless the name is rebuilt with it.
+//
+// The three creation sites call this too, so the wording lives in one place.
+bool renameByMaterial(TObj* obj) {
+  if (!obj)
+    return false;
+
+  sstring what = material_nums[obj->getMaterial()].mat_name;
+
+  // Prototype strings are shared across every instance of a vnum.
+  obj->swapToStrung();
+
+  if (dynamic_cast<TIngot*>(obj)) {
+    obj->name = format("ingot %s metal") % what;
+    obj->shortDescr = format("an ingot of %s") % what;
+    obj->setDescr(format("An ingot of %s lies here.") % what);
+  } else if (dynamic_cast<TSkein*>(obj)) {
+    obj->name = format("skein thread %s") % what;
+    obj->shortDescr = format("a skein of %s thread") % what;
+    obj->setDescr(format("A skein of %s thread lies here.") % what);
+  } else if (obj->objVnum() == kOffcutVnum) {
+    // An offcut is a plain TObj, so it answers to its vnum and not its type.
+    obj->name = format("offcut scrap %s") % what;
+    obj->shortDescr = format("a piece of %s scrap") % what;
+    obj->setDescr(format("A piece of %s scrap lies here.") % what);
+  } else {
+    return false;
+  }
+
+  return true;
+}
+
+bool renameAugmented(TObj* obj) {
+  if (!obj)
+    return false;
+
+  // Reading the size back out of the volume only answers when the volume
+  // belongs to the slot being read against. Refit changes both at once and
+  // passes the size it worked to, rather than coming through here.
+  TemplateSlot slot = getWearableSlot(obj);
+  if (slot == TemplateSlot::COUNT)
+    return false;
+
+  return renameAugmented(obj, getRaceForVolume(slot, obj->getVolume()));
+}
+
+namespace {
+
+[[nodiscard]] bool isWordChar(char c) {
+  return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '-';
+}
+
+// Replace every whole-word run of `from` with `to`. Whole-word is the whole
+// point: "wood" must not be found inside "driftwood", and several material
+// names are phrases with a shorter material sitting inside them -- "cloth" is
+// in "toughened cloth". A capital on the match carries over, so a ground
+// description keeps its sentence case.
+[[nodiscard]] sstring replaceWord(const sstring& text, const sstring& from,
+  const sstring& to) {
+  if (from.empty())
+    return text;
+
+  auto sameLetter = [](char a, char b) {
+    return std::tolower(static_cast<unsigned char>(a)) ==
+           std::tolower(static_cast<unsigned char>(b));
+  };
+
+  sstring out;
+  size_t pos = 0;
+  while (pos < text.size()) {
+    auto hit = std::search(text.begin() + pos, text.end(), from.begin(),
+      from.end(), sameLetter);
+    if (hit == text.end())
+      break;
+
+    size_t at = static_cast<size_t>(hit - text.begin());
+    size_t end = at + from.size();
+    bool whole = (at == 0 || !isWordChar(text[at - 1])) &&
+                 (end == text.size() || !isWordChar(text[end]));
+
+    out += text.substr(pos, at - pos);
+    if (!whole)
+      out += text.substr(at, from.size());
+    else if (std::isupper(static_cast<unsigned char>(text[at])))
+      out += to.cap();
+    else
+      out += to;
+    pos = end;
+  }
+
+  return out += text.substr(pos);
+}
+
+// "a steel blade" turned to iron reads "a iron blade" until the article is made
+// to agree with whatever word now follows it. Re-deriving it from that word is
+// right whether or not the material is the word in question, so "a pair of
+// steel greaves" is left with the article it had.
+[[nodiscard]] sstring fixArticle(const sstring& text) {
+  size_t skip = 0;
+  if (text.compare(0, 2, "a ") == 0 || text.compare(0, 2, "A ") == 0)
+    skip = 2;
+  else if (text.compare(0, 3, "an ") == 0 || text.compare(0, 3, "An ") == 0)
+    skip = 3;
+  else
+    return text;
+
+  if (skip >= text.size())
+    return text;
+
+  sstring article = strchr("aeiouAEIOU", text[skip]) ? "an" : "a";
+  if (std::isupper(static_cast<unsigned char>(text[0])))
+    article = article.cap();
+
+  return article + " " + text.substr(skip);
+}
+
+}  // namespace
+
+// A weapon, a container, a light: nothing rebuilds the names of these, because
+// nothing about them can be derived back from the item. A blade carries no
+// record of what kind of blade it is, and a builder's wording is not recoverable
+// from anything the item still holds -- which is the reason the wearable
+// generator is allowed to cost a builder their words and this is not.
+//
+// What transmuting one does leave behind is a lie wherever the old material was
+// named, in the wording and in the keywords both: a steel sword turned mithril
+// still reads steel and still answers to "steel" and not to "mithril". So the
+// wrong word is replaced and nothing else is touched. An item that never named
+// its material has nothing stale to fix and is left entirely alone.
+bool renameMaterialWord(TObj* obj, unsigned short from) {
+  if (!obj || from == obj->getMaterial())
+    return false;
+
+  sstring was = material_nums[from].mat_name;
+  sstring now = material_nums[obj->getMaterial()].mat_name;
+
+  sstring shortDesc = fixArticle(replaceWord(obj->shortDescr, was, now));
+  sstring keywords = replaceWord(obj->name, was, now);
+  sstring ground = fixArticle(replaceWord(obj->getDescr(), was, now));
+
+  if (shortDesc == obj->shortDescr && keywords == obj->name &&
+      ground == obj->getDescr())
+    return false;
+
+  // Prototype strings are shared across every instance of a vnum.
+  obj->swapToStrung();
+
+  obj->shortDescr = shortDesc;
+  obj->name = keywords;
+  obj->setDescr(ground);
+  return true;
 }
 
 TObj* convertWearableType(TBeing* ch, TObj* obj, itemTypeT type) {
@@ -183,29 +386,61 @@ void stripFinish(TBeing* ch, TObj* obj) {
     return;
   }
 
-  obj->remObjStat(getTierRungFlags(tier));
+  // The piece comes out carrying exactly what the tier below means -- not the
+  // tier it had minus one rung, which is a different thing whenever a stray
+  // flag rode along. See setTierFlags().
+  unsigned int before = obj->getObjStat() & allTierFlags();
+  double priorLevel = clothing->armorLevel(ARMOR_LEV_AC);
 
-  // getTier() infers restrictions the flags do not carry -- a monk cannot use
-  // a heavy item whatever its flags say -- so clearing the pair does not
-  // always move the tier. When it does not, the item would lose AC and gain
-  // nothing, so put the flags back.
-  if (getWearableTier(clothing) != target) {
-    obj->addObjStat(getTierRungFlags(tier));
-    act("You cannot find a seam in $p that would give.", false, ch, obj, 0,
-      TO_CHAR);
-    return;
-  }
+  // Structure is kept alongside it. setDefArmorLevel() derives both AC and
+  // structure from the level it is given, so putting the level back does not
+  // put the structure back: a piece that arrived damaged, or halved by an
+  // earlier Bangle, would be handed back mended or ruined by a strip that
+  // refused itself.
+  int priorMaxStruct = clothing->getMaxStructPoints();
+  int priorStruct = clothing->getStructPoints();
+  setTierFlags(obj, getTierFlags(target));
 
-  double level = clothing->armorLevel(ARMOR_LEV_REAL) *
-                 (getTierLoadLevel(target) / getTierLoadLevel(tier));
+  // Rescaling alone lets a piece land above what the rung it drops into can
+  // hold: a heavy piece off a level 70 mob comes out of three strips at 35 in
+  // clothing, where the world's best is 30 -- and the class restrictions came
+  // off on the way down. So the ratio move is capped at the tier's own load
+  // level: stripped work can equal the best that tier natively carries, and
+  // never beat it.
+  //
+  // The cap is the load level rather than the skill ceiling Plate answers to.
+  // That ceiling holds down skills which *add* value, and this piece was
+  // already this good before anyone touched it.
+  //
+  // AC is what the cap is about, so the level read is the AC one.
+  // ARMOR_LEV_REAL folds structure in at a quarter weight, which would let a
+  // piece that is merely sturdy rescale as though it were well armored.
+  //
+  // The cap is what the piece can actually hold and not the round number, or
+  // the strip refuses itself: AC is stored as a rounded-up int, so on seven of
+  // the twelve slots a request for exactly the target's load level reads back a
+  // fraction above it and getTier() answers with the rung above the one being
+  // aimed at.
+  double level = min(clothing->armorLevel(ARMOR_LEV_AC) *
+                       (getTierLoadLevel(target) / getTierLoadLevel(tier)),
+    clothing->maxArmorLevelAtOrBelow(getTierLoadLevel(target)));
 
   // The bottom rung crosses a C++ type boundary: light armor demoted to
   // clothing has to become a TWorn, which means a new object off the clothing
   // template for this slot.
+  //
+  // This happens before the tier is re-read, and it has to. getTier() infers
+  // anti-monk and anti-shaman on any TArmor whatever its flags say -- and
+  // builders often leave those flags off armor precisely because the wear
+  // command already turns both classes away from it. Those two are the light
+  // rung exactly, so a piece still armor by C++ type reads at least light no
+  // matter what was cleared. Becoming a TWorn is what actually drops it, so
+  // asking first would refuse every armor piece on the bottom rung.
+  bool converted = false;
   if (target == Tier_Clothing && obj->itemType() == ITEM_ARMOR) {
     TObj* worn = convertWearableType(ch, obj, ITEM_WORN);
     if (!worn) {
-      obj->addObjStat(getTierRungFlags(tier));
+      setTierFlags(obj, before);
       act("$p will not come apart cleanly, and you leave it whole.", false, ch,
         obj, 0, TO_CHAR);
       return;
@@ -214,16 +449,53 @@ void stripFinish(TBeing* ch, TObj* obj) {
     clothing = dynamic_cast<TBaseClothing*>(worn);
     if (!clothing)
       return;
+    converted = true;
   }
 
   // Sets the APPLY_ARMOR modifier and both structure values together, and
   // truncates on the way in. That truncation is the whole cost of a
   // conversion: strip a piece and plate it back and it does not return.
-  clothing->setDefArmorLevel(static_cast<float>(level));
+  if (!clothing->setDefArmorLevel(static_cast<float>(level))) {
+    if (converted)
+      if (TObj* armor = convertWearableType(ch, obj, ITEM_ARMOR))
+        obj = armor;
 
+    setTierFlags(obj, before);
+    act("$p carries too much else to give up what it is.", false, ch, obj, 0,
+      TO_CHAR);
+    return;
+  }
+
+  // Only now is the piece everything it will be -- reflagged, retyped and cut
+  // down to the level its new rung holds -- so only now is the tier worth
+  // re-reading. getTier() weighs what a piece carries as well as what it is
+  // flagged, and the AC is not cut until the line above, so asking any earlier
+  // would see the old armor and refuse the very demotion that fixes it.
+  if (getWearableTier(clothing) != target) {
+    setTierFlags(obj, before);
+    clothing->setDefArmorLevel(static_cast<float>(priorLevel));
+    clothing->setMaxStructPoints(priorMaxStruct);
+    clothing->setStructPoints(priorStruct);
+
+    // The type was changed before the tier could be re-read, so putting the
+    // flags and the level back is not enough -- a refused strip that left the
+    // piece a TWorn would have quietly done half the job it just declined.
+    if (converted)
+      if (TObj* armor = convertWearableType(ch, obj, ITEM_ARMOR))
+        obj = armor;
+
+    act("You cannot find a seam in $p that would give.", false, ch, obj, 0,
+      TO_CHAR);
+    return;
+  }
+
+  // Said before the renaming, so $p is the piece that was cut rather than the
+  // one the cutting produced.
   act("You cut $p down to something a good deal less demanding.", false, ch,
     obj, 0, TO_CHAR);
   act("$n finishes cutting away at $p.", true, ch, obj, 0, TO_ROOM);
+
+  renameAugmented(obj);
 
   augmentTaskExp(ch, SKILL_STRIP, obj);
 }
@@ -248,10 +520,15 @@ void plateFinish(TBeing* ch, TObj* obj) {
     return;
   }
 
-  obj->addObjStat(getTierRungFlags(target));
+  // The whole set for the tier above, not the old set plus a rung: a piece that
+  // reached its current tier on an inferred restriction rather than a flag has
+  // a hole in the middle of its flag word, and promoting it would carry that
+  // hole upward. See setTierFlags().
+  unsigned int before = obj->getObjStat() & allTierFlags();
+  setTierFlags(obj, getTierFlags(target));
 
   if (getWearableTier(clothing) != target) {
-    obj->remObjStat(getTierRungFlags(target));
+    setTierFlags(obj, before);
     act("The plates will not sit right on $p.", false, ch, obj, 0, TO_CHAR);
     return;
   }
@@ -266,10 +543,11 @@ void plateFinish(TBeing* ch, TObj* obj) {
 
   // The bottom rung crosses a C++ type boundary in the other direction:
   // clothing promoted to light armor has to become a TArmor.
+  bool converted = false;
   if (tier == Tier_Clothing && obj->itemType() == ITEM_WORN) {
     TObj* armor = convertWearableType(ch, obj, ITEM_ARMOR);
     if (!armor) {
-      obj->remObjStat(getTierRungFlags(target));
+      setTierFlags(obj, before);
       act("$p will not take a frame, and you leave it as it is.", false, ch,
         obj, 0, TO_CHAR);
       return;
@@ -278,13 +556,31 @@ void plateFinish(TBeing* ch, TObj* obj) {
     clothing = dynamic_cast<TBaseClothing*>(armor);
     if (!clothing)
       return;
+    converted = true;
   }
 
-  clothing->setDefArmorLevel(static_cast<float>(level));
+  // A piece whose every affect slot is spoken for has nowhere to keep AC, and
+  // setDefArmorLevel changes nothing at all in that case. The tier and the type
+  // have already moved by here, so the promotion has to be walked back rather
+  // than finished on top of armor that never grew.
+  if (!clothing->setDefArmorLevel(static_cast<float>(level))) {
+    if (converted)
+      if (TObj* worn = convertWearableType(ch, obj, ITEM_WORN))
+        obj = worn;
 
+    setTierFlags(obj, before);
+    act("$p has no room left to carry any more plate.", false, ch, obj, 0,
+      TO_CHAR);
+    return;
+  }
+
+  // Said before the renaming, so $p is the piece that was worked rather than
+  // the one the work produced.
   act("You work $p into something that will turn a heavier blow.", false, ch,
     obj, 0, TO_CHAR);
   act("$n finishes working at $p.", true, ch, obj, 0, TO_ROOM);
+
+  renameAugmented(obj);
 
   augmentTaskExp(ch, SKILL_PLATE, obj);
 }
@@ -333,11 +629,31 @@ TemplateSlot getTemplateSlotFromName(const sstring& name) {
 race_t getRaceFromName(const sstring& name) {
   sstring want = name.lower();
 
+  // RaceNames[] holds enum spellings -- "RACE_HOBBIT", not "hobbit" -- so it
+  // is not what a player types. The word for a body is the size keyword, which
+  // is also what the help files use and what ends up in the item's own
+  // keywords. The enum spelling is accepted with its prefix off as well, so
+  // "elven" answers alongside "elf".
+  //
+  // Only races the sizing tables know are matched. A race with no size has no
+  // volume to cut to, and failing here gives the player the word back rather
+  // than a piece that cannot be pictured on any body.
   for (int i = 0; i < MAX_RACIAL_TYPES; i++) {
-    if (!RaceNames[i])
+    race_t race = static_cast<race_t>(i);
+    const char* keyword = raceSizeKeyword(race);
+    if (!keyword)
       continue;
-    if (want == sstring(RaceNames[i]).lower())
-      return static_cast<race_t>(i);
+
+    if (want == sstring(keyword).lower())
+      return race;
+
+    if (RaceNames[i]) {
+      sstring spelling = sstring(RaceNames[i]).lower();
+      if (spelling.find("race_") == 0)
+        spelling = spelling.substr(5);
+      if (want == spelling)
+        return race;
+    }
   }
 
   return RACE_NORACE;
@@ -411,10 +727,7 @@ void sewFinish(TBeing* ch, TObj* obj) {
   augmentTaskExp(ch, SKILL_SEW, obj);
 }
 
-unsigned int allTierFlags() {
-  return getTierRungFlags(Tier_Heavy) | getTierRungFlags(Tier_Medium) |
-         getTierRungFlags(Tier_Light);
-}
+unsigned int allTierFlags() { return getTierFlags(Tier_Heavy); }
 
 void halveArmorValues(TBaseClothing* clothing) {
   if (!clothing)
@@ -446,8 +759,10 @@ void bangleFinish(TBeing* ch, TObj* obj) {
   // higher tier rescales onto that scale first -- the same ratio move Strip
   // makes, without the flag work, since jewelry's tier does not come from
   // flags at all.
-  double level = clothing->armorLevel(ARMOR_LEV_REAL) *
-                 (getTierLoadLevel(Tier_Clothing) / getTierLoadLevel(tier));
+  double level =
+    min(clothing->armorLevel(ARMOR_LEV_AC) *
+          (getTierLoadLevel(Tier_Clothing) / getTierLoadLevel(tier)),
+      getTierLoadLevel(Tier_Clothing));
 
   TObj* jewel = convertWearableType(ch, obj, ITEM_JEWELRY);
   if (!jewel) {
@@ -461,8 +776,8 @@ void bangleFinish(TBeing* ch, TObj* obj) {
     return;
 
   // Anyone may wear jewelry: the anti-class flags come off with the tier they
-  // used to mean.
-  jewel->remObjStat(allTierFlags());
+  // used to mean. Jewelry is not a rung, so the set it wants is the empty one.
+  setTierFlags(jewel, 0);
 
   worked->setDefArmorLevel(static_cast<float>(level));
 
@@ -471,10 +786,15 @@ void bangleFinish(TBeing* ch, TObj* obj) {
   // across untouched -- they are what Distill is for.
   halveArmorValues(worked);
 
+  // Said before the renaming, so $p is the piece that went in. Working a bauble
+  // down into something small and ornamental says nothing at all.
   act("You work $p down into something small and ornamental.", false, ch, jewel,
     0, TO_CHAR);
   act("$n finishes working $p into something ornamental.", true, ch, jewel, 0,
     TO_ROOM);
+
+  // The piece is an ornament now and takes an ornament's noun.
+  renameAugmented(jewel);
 
   augmentTaskExp(ch, SKILL_BANGLE, jewel);
 }
@@ -539,10 +859,7 @@ void smeltFinish(TBeing* ch, TObj* obj, int hits, int misses) {
   ingot->setMaxStructPoints(getIngotStructure(obj->getMaterial(), units));
   ingot->setStructPoints(ingot->getMaxStructPoints());
 
-  sstring metal = material_nums[obj->getMaterial()].mat_name;
-  ingot->name = format("ingot %s metal") % metal;
-  ingot->shortDescr = format("an ingot of %s") % metal;
-  ingot->setDescr(format("An ingot of %s lies here.") % metal);
+  renameByMaterial(ingot);
 
   // The stats come across, the armor value does not: AC belongs to the shape
   // of a thing, and the shape is what just went into the fire. Forge projects
@@ -1213,6 +1530,10 @@ TEssence* depositEssence(TBeing* ch, int apply, int charges) {
       return nullptr;
 
     essence->swapToStrung();
+    // The prototype carries an unnamed material out of the gap between the
+    // general and organic tables, so anything asking what an essence is made
+    // of got an empty word. Ghostly is what it should have been.
+    essence->setMaterial(MAT_GHOSTLY);
     essence->setApplyType(apply);
     essence->setQuality(1);
     essence->setCharges(0);
@@ -1223,16 +1544,19 @@ TEssence* depositEssence(TBeing* ch, int apply, int charges) {
 
   const char* what = essenceApplyName(apply);
 
-  // One vnum for every apply and Quality, so the name has to carry both or
-  // two essences are indistinguishable in inventory.
-  essence->swapToStrung();
-  essence->name = format("essence %s") % what;
-  essence->shortDescr =
-    format("an essence of %s (quality %d)") % what % essence->getQuality();
-  essence->setDescr(format("An essence of %s hangs in the air here.") % what);
+  // One vnum covers every apply and Quality, so the keywords carry the stat --
+  // a player still reaches for "strength essence" -- while the wording itself
+  // stays out of it. What the eye gets is the colour; LOOK gives the rest.
+  const char* color = essenceApplyColor(apply);
 
-  ch->sendTo(format("%d charge%s of %s essence.\n\r") % charges %
-             (charges == 1 ? "" : "s") % what);
+  essence->swapToStrung();
+  essence->name = format("essence magical %s") % what;
+  essence->shortDescr = format("%sa magical essence<z>") % color;
+  essence->setDescr(
+    format("%sA magical essence<z> hangs in the air here.") % color);
+
+  ch->sendTo(format("You withdraw %d strand%s of %s into essence form.\n\r") %
+             charges % (charges == 1 ? "" : "s") % what);
 
   if (deepened)
     act("$p deepens, and would write more than it did.", false, ch, essence, 0,
@@ -1241,8 +1565,171 @@ TEssence* depositEssence(TBeing* ch, int apply, int charges) {
   return essence;
 }
 
+// The classes whose dead answer for each stat. A corpse pays for a
+// distillation by having carried the virtue in life, which is what makes the
+// cost particular rather than just "a body".
+unsigned short getStatClasses(int apply) {
+  switch (apply) {
+    case APPLY_STR:
+      return CLASS_WARRIOR | CLASS_MONK;
+    case APPLY_CON:
+      return CLASS_WARRIOR | CLASS_DEIKHAN | CLASS_CLERIC;
+    case APPLY_BRA:
+      return CLASS_WARRIOR | CLASS_DEIKHAN | CLASS_SHAMAN;
+    case APPLY_DEX:
+      return CLASS_THIEF | CLASS_SHAMAN | CLASS_MONK;
+    case APPLY_AGI:
+      return CLASS_WARRIOR | CLASS_MONK;
+    case APPLY_SPE:
+      return CLASS_THIEF | CLASS_MONK;
+    case APPLY_INT:
+      return CLASS_MAGE | CLASS_SHAMAN;
+    case APPLY_WIS:
+      return CLASS_DEIKHAN | CLASS_CLERIC;
+    case APPLY_FOC:
+      return CLASS_THIEF | CLASS_MAGE | CLASS_SHAMAN;
+    case APPLY_PER:
+      return CLASS_CLERIC | CLASS_MAGE;
+    case APPLY_CHA:
+      return CLASS_DEIKHAN | CLASS_THIEF | CLASS_MAGE;
+    case APPLY_KAR:
+      return CLASS_CLERIC | CLASS_SHAMAN;
+    default:
+      return 0;
+  }
+}
+
+sstring describeClasses(unsigned short mask) {
+  std::vector<sstring> names;
+
+  for (int i = 0; i < MAX_CLASSES; i++)
+    if (mask & classInfo[i].class_num)
+      names.push_back(classInfo[i].name);
+
+  if (names.empty())
+    return "nothing that ever lived";
+
+  if (names.size() == 1)
+    return names.front();
+
+  // "warrior, deikhan or cleric" -- the last pair joined by the word, the rest
+  // by commas.
+  sstring last = names.back();
+  names.pop_back();
+
+  return sstring::join(names, ", ") + " or " + last;
+}
+
+int getStatModifier(const TObj* obj, int apply) {
+  if (!obj)
+    return 0;
+
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++)
+    if (obj->affected[i].location == apply && obj->affected[i].modifier)
+      return obj->affected[i].modifier;
+
+  return 0;
+}
+
+// The stat that decides what a distillation costs: the one standing first in
+// the piece's own hierarchy. A piece carrying only pools or only penalties
+// gates on nothing.
+int getDistillGateApply(const TObj* obj) {
+  if (!obj)
+    return APPLY_NONE;
+
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
+    int apply = obj->affected[i].location;
+
+    if (!isStatApply(apply) || obj->affected[i].modifier <= 0)
+      continue;
+
+    if (getStatRank(obj, apply) == 1)
+      return apply;
+  }
+
+  return APPLY_NONE;
+}
+
+// Distill only ever takes jewelry, and jewelry answers for half of what it
+// carries: a ring holding +10 wants a corpse of level 50, not 100.
+unsigned int getDistillCorpseLevel(int modifier) {
+  return max(1, abs(modifier) * 5);
+}
+
+static TBaseCorpse* corpseAnswersFor(TThing* t, unsigned short classes,
+  unsigned int level) {
+  TBaseCorpse* corpse = dynamic_cast<TBaseCorpse*>(t);
+
+  if (!corpse || corpse->getCorpseLevel() < level)
+    return nullptr;
+
+  // Medical mobs come back -1 and player corpses -2; neither carried a class.
+  if (corpse->getCorpseVnum() <= 0)
+    return nullptr;
+
+  long rnum = real_mobile(corpse->getCorpseVnum());
+  if (rnum < 0 || (size_t)rnum >= mob_index.size())
+    return nullptr;
+
+  // The corpse keeps the level but not the class, so the class is read off the
+  // prototype's index entry -- the same value read_mobile() would hand to
+  // setClass(), without building a mob to ask. This runs over every corpse in
+  // the room and in the pack, and loading one inserts it into character_list,
+  // bumps the index count, loads its responses and fires its creation hooks,
+  // with the matching set on the way back out. None of that belongs in a scan.
+  long mobClass = mob_index[rnum].Class;
+
+  // Unset entries carry -99, whose bit pattern would answer for any class
+  // asked of it.
+  if (mobClass <= 0)
+    return nullptr;
+
+  return (mobClass & classes) ? corpse : nullptr;
+}
+
+// The body may be at your feet or in your arms, the same as the rites.
+TBaseCorpse* findDistillCorpse(TBeing* ch, unsigned short classes,
+  unsigned int level) {
+  if (!ch || !classes)
+    return nullptr;
+
+  for (StuffIter it = ch->stuff.begin(); it != ch->stuff.end(); ++it)
+    if (TBaseCorpse* corpse = corpseAnswersFor(*it, classes, level))
+      return corpse;
+
+  if (ch->roomp)
+    for (StuffIter it = ch->roomp->stuff.begin(); it != ch->roomp->stuff.end();
+         ++it)
+      if (TBaseCorpse* corpse = corpseAnswersFor(*it, classes, level))
+        return corpse;
+
+  return nullptr;
+}
+
 void distillFinish(TBeing* ch, TObj* obj) {
   int deposits = 0;
+
+  // The body is found before anything is drawn out of the piece. doDistill
+  // asked for one at the outset, but a player who is rid of it before the work
+  // ends -- junked, given away, rotted -- would otherwise reach this point and
+  // be paid in full for a cost never met. Nothing is deposited, nothing is
+  // destroyed and no experience is given unless the corpse is still here to
+  // answer for it.
+  int gate = getDistillGateApply(obj);
+  TBaseCorpse* corpse = nullptr;
+
+  if (gate != APPLY_NONE) {
+    corpse = findDistillCorpse(ch, getStatClasses(gate),
+      getDistillCorpseLevel(getStatModifier(obj, gate)));
+
+    if (!corpse) {
+      act("The body you meant to draw  into is gone, and the virtue stays "
+          "where it is.",
+        false, ch, obj, 0, TO_CHAR);
+      return;
+    }
+  }
 
   // Every eligible affect deposits; nothing is chosen or discarded. A ring of
   // +3 STR and +2 DEX yields both.
@@ -1264,6 +1751,20 @@ void distillFinish(TBeing* ch, TObj* obj) {
       TO_CHAR);
 
   act("$p comes apart in $n's hands.", true, ch, obj, 0, TO_ROOM);
+
+  // The body is spent here rather than at the outset, so breaking off the work
+  // costs nothing but the time already put into it.
+  if (corpse) {
+    act("$p collapses in on itself, emptied.", false, ch, corpse, 0, TO_CHAR);
+    act("$p collapses in on itself.", true, ch, corpse, 0, TO_ROOM);
+
+    // Deleted where it lies, without being detached first. ~TBaseCorpse()
+    // hands whatever the body was carrying to whoever holds it or to the room
+    // it is in, and detaching beforehand leaves it owned by nothing -- which
+    // sends its equipment and its coins to the "unowned corpse" branch and
+    // destroys them. The animate-dead line disposes of a corpse the same way.
+    delete corpse;
+  }
 
   augmentTaskExp(ch, SKILL_DISTILL, obj);
 
@@ -1312,6 +1813,23 @@ void TBeing::doDistill(const char* argument) {
     act("$p carries nothing an essence could hold.", false, this, obj, 0,
       TO_CHAR);
     return;
+  }
+
+  if (!hasRepairKit(this, RepairKit::Dead))
+    return;
+
+  // The piece's first-rank stat names the dead it takes to draw it out.
+  int gate = getDistillGateApply(obj);
+  if (gate != APPLY_NONE) {
+    unsigned short classes = getStatClasses(gate);
+    unsigned int level = getDistillCorpseLevel(getStatModifier(obj, gate));
+
+    if (!findDistillCorpse(this, classes, level)) {
+      sendTo(format("Drawing %s out of that wants the corpse of a level %d %s "
+                    "to draw it into.\n\r") %
+             essenceApplyName(gate) % level % describeClasses(classes));
+      return;
+    }
   }
 
   if (task)
@@ -1363,10 +1881,7 @@ TObj* makeOffcut(TBeing* ch, TObj* obj, int leftover) {
 
   copyStatApplies(obj, scrap);
 
-  sstring what = material_nums[obj->getMaterial()].mat_name;
-  scrap->name = format("offcut scrap %s") % what;
-  scrap->shortDescr = format("a piece of %s scrap") % what;
-  scrap->setDescr(format("A piece of %s scrap lies here.") % what);
+  renameByMaterial(scrap);
 
   *ch += *scrap;
 
@@ -1411,7 +1926,35 @@ bool isOffcut(const TObj* obj) {
   return obj && obj->objVnum() == kOffcutVnum;
 }
 
-void resizeFinish(TBeing* ch, TObj* obj, race_t race) {
+namespace {
+
+// A smith and a tailor do the identical thing to a piece -- remake it at
+// another body's size and keep what comes off -- and differ only in how the
+// work sounds. So the wording is the parameter and the work is shared, the way
+// refitFinish already shares its two halves.
+struct ResizeVoice {
+  const char* resized;  // "... down to <size> size."
+  const char* whole;    // nothing came off
+  const char* lost;     // something came off and could not be kept
+  const char* kept;     // something came off and became an offcut
+  const char* room;
+};
+
+[[nodiscard]] const ResizeVoice& resizeVoice(spellNumT skill) {
+  static constexpr ResizeVoice smith = {"You work it down to %s size.\n\r",
+    "You finish reworking $p.", "You finish reworking $p, and sweep the scrap away.",
+    "You finish reworking $p, and set the offcut aside.",
+    "$n finishes reworking $p."};
+  static constexpr ResizeVoice tailor = {"You cut it down to %s size.\n\r",
+    "You finish $p.", "You finish $p, and sweep the clippings away.",
+    "You finish $p, and fold the clippings aside.", "$n finishes work on $p."};
+
+  return skill == SKILL_TAILOR ? tailor : smith;
+}
+
+}  // namespace
+
+void resizeFinish(TBeing* ch, TObj* obj, race_t race, spellNumT skill) {
   TBaseClothing* clothing = dynamic_cast<TBaseClothing*>(obj);
   if (!clothing)
     return;
@@ -1429,31 +1972,38 @@ void resizeFinish(TBeing* ch, TObj* obj, race_t race) {
   obj->setVolume(wanted);
   obj->setWeight(weightForVolume(wanted, obj->getMaterial()));
 
+  // The size word is part of the piece's identity, not just this message.
+  renameAugmented(obj);
+
+  const ResizeVoice& voice = resizeVoice(skill);
+
   const char* sizeName = raceSizeName(race);
   if (sizeName)
-    ch->sendTo(format("You work it down to %s size.\n\r") % sizeName);
+    ch->sendTo(format(voice.resized) % sizeName);
 
-  // Metal cut away does not vanish. It comes off as an offcut carrying what
-  // the piece carried -- the stats, never the AC -- and has to go back through
-  // the crucible before it can be worked into anything.
+  // What is cut away does not vanish. It comes off as an offcut carrying what
+  // the piece carried -- the stats, never the AC -- and metal has to go back
+  // through the crucible before it can be worked into anything. A piece being
+  // let OUT leaves nothing behind, so it takes neither branch below: the
+  // material for that was spent up front, when the work was ordered.
   int leftover = had - wanted;
   if (leftover <= 0) {
-    act("You finish reworking $p.", false, ch, obj, 0, TO_CHAR);
-    act("$n finishes reworking $p.", true, ch, obj, 0, TO_ROOM);
+    act(voice.whole, false, ch, obj, 0, TO_CHAR);
+    act(voice.room, true, ch, obj, 0, TO_ROOM);
+    augmentTaskExp(ch, skill, obj);
     return;
   }
 
   if (!makeOffcut(ch, obj, leftover)) {
-    act("You finish reworking $p, and sweep the scrap away.", false, ch, obj, 0,
-      TO_CHAR);
+    act(voice.lost, false, ch, obj, 0, TO_CHAR);
+    augmentTaskExp(ch, skill, obj);
     return;
   }
 
-  act("You finish reworking $p, and set the offcut aside.", false, ch, obj, 0,
-    TO_CHAR);
-  act("$n finishes reworking $p.", true, ch, obj, 0, TO_ROOM);
+  act(voice.kept, false, ch, obj, 0, TO_CHAR);
+  act(voice.room, true, ch, obj, 0, TO_ROOM);
 
-  augmentTaskExp(ch, SKILL_FORGE, obj);
+  augmentTaskExp(ch, skill, obj);
 }
 
 void TBeing::doForgeResize(const char* argument) {
@@ -1506,6 +2056,9 @@ void TBeing::doForgeResize(const char* argument) {
     return;
   }
 
+  if (!hasRepairKit(this, RepairKit::Metal))
+    return;
+
   // Growing a piece needs metal from somewhere, and the only place metal comes
   // from is a bar. Shrinking one leaves metal over instead, which is the
   // offcut.
@@ -1524,9 +2077,10 @@ void TBeing::doForgeResize(const char* argument) {
     }
 
     if (!bar) {
-      sendTo(format("Making $p that much bigger needs %d units of %s, and you "
-                    "have no bar with that much in it.\n\r") %
-             needUnits % material_nums[obj->getMaterial()].mat_name);
+      act(format("Making $p that much bigger needs %d units of %s, and you "
+                 "have no bar with that much in it.") %
+            needUnits % material_nums[obj->getMaterial()].mat_name,
+        false, this, obj, 0, TO_CHAR);
       return;
     }
 
@@ -1556,40 +2110,6 @@ void TBeing::doForgeResize(const char* argument) {
   start_task(this, obj, nullptr, TASK_RESIZE, "",
     max(1, static_cast<int>(obj->getMaxStructPoints())), in_room,
     static_cast<ubyte>(race), 0, 0);
-}
-
-void tailorFinish(TBeing* ch, TObj* obj, race_t race) {
-  TemplateSlot slot = getWearableSlot(obj);
-  int wanted = getSlotVolumeForRace(slot, race);
-  int had = obj->getVolume();
-
-  if (wanted <= 0) {
-    act("You cannot picture $p on a body that shape.", false, ch, obj, 0,
-      TO_CHAR);
-    return;
-  }
-
-  obj->setVolume(wanted);
-  obj->setWeight(weightForVolume(wanted, obj->getMaterial()));
-
-  const char* sizeName = raceSizeName(race);
-  if (sizeName)
-    ch->sendTo(format("You cut it down to %s size.\n\r") % sizeName);
-
-  // Cloth cut away keeps what the piece carried, the same as metal does. It
-  // has no crucible of its own -- a mage distills it for essence, or
-  // transmutes it into something a smith can melt.
-  if (!makeOffcut(ch, obj, had - wanted)) {
-    act("You finish $p, and sweep the clippings away.", false, ch, obj, 0,
-      TO_CHAR);
-    return;
-  }
-
-  act("You finish $p, and fold the clippings aside.", false, ch, obj, 0,
-    TO_CHAR);
-  act("$n finishes work on $p.", true, ch, obj, 0, TO_ROOM);
-
-  augmentTaskExp(ch, SKILL_TAILOR, obj);
 }
 
 void TBeing::doTailor(const char* argument) {
@@ -1649,22 +2169,48 @@ void TBeing::doTailor(const char* argument) {
     return;
   }
 
+  if (!hasRepairKit(this, RepairKit::Leather))
+    return;
+
   // Letting a piece out needs cloth to let it out with, the same way growing
-  // a piece of armor needs a bar. Quality of the bolt does not enter it.
+  // a piece of armor needs a bar -- and the cloth twin of a bar is a skein, not
+  // a commodity. Weave is where one comes from and Sew is what spends them, so
+  // this draws on the same thread the rest of the soft side does. Quality of
+  // the skein does not enter it: letting a seam out is not making anything.
   if (wanted > obj->getVolume()) {
     int needUnits = max(1, static_cast<int>(
       weightForVolume(wanted - obj->getVolume(), obj->getMaterial()) * 10.0f));
 
-    TCommodity* bolt = findCommodity(this, obj->getMaterial());
-    if (!bolt || bolt->numUnits() < needUnits) {
-      sendTo(format("Letting $p out that far needs %d units of %s, and you "
-                    "have %d.\n\r") %
-             needUnits % material_nums[obj->getMaterial()].mat_name %
-             (bolt ? bolt->numUnits() : 0));
+    TSkein* thread = nullptr;
+    for (StuffIter it = stuff.begin(); it != stuff.end(); ++it) {
+      TSkein* candidate = dynamic_cast<TSkein*>(*it);
+      if (candidate && candidate->getMaterial() == obj->getMaterial() &&
+          candidate->getSkeinUnits() >= needUnits) {
+        thread = candidate;
+        break;
+      }
+    }
+
+    if (!thread) {
+      act(format("Letting $p out that far needs %d units of %s, and you have "
+                 "no skein with that much in it.") %
+            needUnits % material_nums[obj->getMaterial()].mat_name,
+        false, this, obj, 0, TO_CHAR);
       return;
     }
 
-    consumeCommodity(this, obj->getMaterial(), needUnits);
+    int left = thread->getSkeinUnits() - needUnits;
+    if (left <= 0) {
+      --(*thread);
+      delete thread;
+    } else {
+      thread->setSkeinUnits(left);
+      thread->setWeight(left / 10.0);
+      thread->setVolume(volumeForWeight(left / 10.0f, thread->getMaterial()));
+      thread->setMaxStructPoints(
+        getSkeinStructure(thread->getMaterial(), left));
+      thread->setStructPoints(thread->getMaxStructPoints());
+    }
   }
 
   if (task)
@@ -1730,10 +2276,7 @@ void weaveFinish(TBeing* ch, TObj* obj, int hits, int misses) {
   skein->setMaxStructPoints(getSkeinStructure(obj->getMaterial(), units));
   skein->setStructPoints(skein->getMaxStructPoints());
 
-  sstring fibre = material_nums[obj->getMaterial()].mat_name;
-  skein->name = format("skein thread %s") % fibre;
-  skein->shortDescr = format("a skein of %s thread") % fibre;
-  skein->setDescr(format("A skein of %s thread lies here.") % fibre);
+  renameByMaterial(skein);
 
   // Same rule as the crucible: the stats come across, the armor value does
   // not, and a paired piece carried double what a single one did.
@@ -1798,6 +2341,9 @@ void TBeing::doWeave(const char* argument) {
     return;
   }
 
+  if (!hasRepairKit(this, RepairKit::Organic))
+    return;
+
   if (task)
     stopTask();
 
@@ -1841,22 +2387,42 @@ int getStatRank(const TObj* obj, int apply) {
   if (!obj || !isStatApply(apply))
     return 0;
 
-  int rank = 0;
+  // Where the apply sits on the piece, if it is on it at all.
+  int self = -1;
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
+    if (obj->affected[i].location == apply && obj->affected[i].modifier) {
+      self = i;
+      break;
+    }
+  }
+
+  int rank = 1;
 
   for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
+    if (i == self)
+      continue;
+
     if (!isStatApply(obj->affected[i].location) || !obj->affected[i].modifier)
       continue;
 
-    rank++;
+    // Not on the piece yet: it carries nothing, so every stat already there
+    // stands above it and it comes in last.
+    if (self < 0) {
+      rank++;
+      continue;
+    }
 
-    // An apply already on the piece keeps the place it was given, so raising
-    // it later does not push it down the order.
-    if (obj->affected[i].location == apply)
-      return rank;
+    int mine = obj->affected[self].modifier;
+    int theirs = obj->affected[i].modifier;
+
+    // The hierarchy is by what each apply is worth, not by the order it was
+    // written, so the piece's own shape decides the ceilings. Ties break by
+    // slot so the order is total and does not shift under the player.
+    if (theirs > mine || (theirs == mine && i < self))
+      rank++;
   }
 
-  // Not present: it would be the next one along.
-  return rank + 1;
+  return rank;
 }
 
 int getInfuseMax(const TObj* obj, int apply) {
@@ -1935,9 +2501,9 @@ void TBeing::doInfuse(const char* argument) {
     // thing is spent either way, and a piece that already carries one virtue
     // gives back less for the next. Anything above the cap is simply lost.
     if (amount > cap) {
-      sendTo(format("$p will take only +%d of %s from that; the rest is "
-                    "lost.\n\r") %
-             cap % what);
+      act(format("$p will take only +%d of %s from that; the rest is lost.") %
+             cap % what,
+        false, this, obj, 0, TO_CHAR);
       amount = cap;
     }
   }
@@ -1946,8 +2512,9 @@ void TBeing::doInfuse(const char* argument) {
     // Raising only. An essence that would write what the piece already has,
     // or less, is refused rather than spent.
     if (amount <= obj->affected[found].modifier) {
-      sendTo(format("$p already carries +%d of %s.\n\r") %
-             obj->affected[found].modifier % what);
+      act(format("$p already carries +%d of %s.") %
+             obj->affected[found].modifier % what,
+        false, this, obj, 0, TO_CHAR);
       return;
     }
   } else if (empty < 0) {
@@ -2173,6 +2740,7 @@ void transmuteFinish(TBeing* ch, TObj* obj, unsigned short material, int hits,
     return;
   }
 
+  unsigned short was = obj->getMaterial();
   obj->setMaterial(material);
 
   // Volume is what a thing is; weight is what that volume of this stuff comes
@@ -2181,9 +2749,20 @@ void transmuteFinish(TBeing* ch, TObj* obj, unsigned short material, int hits,
   if (obj->getVolume() > 0)
     obj->setWeight(weightForVolume(obj->getVolume(), material));
 
+  // Said before the renaming below, so $p is still the thing that went into the
+  // working rather than the thing that came out. "A steel vest shivers, and is
+  // something else now" only means anything if the steel vest is what it was.
   act("$p shivers, and is something else now.", false, ch, obj, 0, TO_CHAR);
-  ch->sendTo(format("It is %s.\n\r") % material_nums[material].mat_name);
   act("$p shivers in $n's hands and changes.", true, ch, obj, 0, TO_ROOM);
+
+  // The material word is in the name and in the keywords. A wearable and a
+  // byproduct can each be named again from scratch; everything else -- a
+  // weapon above all -- can only have the one wrong word replaced, so it is
+  // tried last and only where no generator owns the name.
+  if (!renameAugmented(obj) && !renameByMaterial(obj))
+    renameMaterialWord(obj, was);
+
+  ch->sendTo(format("It is %s.\n\r") % material_nums[material].mat_name);
 
   augmentTaskExp(ch, SKILL_TRANSMUTE, obj);
 }
@@ -2262,14 +2841,14 @@ void TBeing::doTransmute(const char* argument) {
   if (task)
     stopTask();
 
-  act("You crush $p into the working, and it begins.", false, this, opal, 0,
+  act("You crush $p into the working, and reality bends.", false, this, opal, 0,
     TO_CHAR);
   act("$n crushes $p, and the air goes strange.", true, this, opal, 0, TO_ROOM);
 
   --(*opal);
   delete opal;
 
-  act("You begin working the substance of $p.", false, this, obj, 0, TO_CHAR);
+  act("You begin warping the substance of $p.", false, this, obj, 0, TO_CHAR);
 
   learnFromDoingUnusual(LEARN_UNUSUAL_NORM_LEARN, SKILL_TRANSMUTE, 8);
 
@@ -2332,10 +2911,14 @@ void TBeing::doForgeWeapon(const char* argument) {
   int needUnits = max(1, static_cast<int>(needWeight * 10.0f));
 
   if (ingot->getIngotUnits() < needUnits) {
-    sendTo(format("A %s needs %d units of metal, and $p holds %d.\n\r") %
-           spec.name % needUnits % ingot->getIngotUnits());
+    act(format("A %s needs %d units of metal, and $p holds %d.") %
+           spec.name % needUnits % ingot->getIngotUnits(),
+      false, this, ingot, 0, TO_CHAR);
     return;
   }
+
+  if (!hasRepairKit(this, RepairKit::Metal))
+    return;
 
   TObj* weapon = read_object(kWeaponVnum, VIRTUAL);
   TGenWeapon* blade = dynamic_cast<TGenWeapon*>(weapon);
@@ -2549,20 +3132,40 @@ void refitFinish(TBeing* ch, TObj* obj, TemplateSlot slot) {
   if (!worked)
     return;
 
+  TObj* cutoffs = nullptr;
   if (wanted > 0) {
     fresh->setVolume(wanted);
     fresh->setWeight(weightForVolume(wanted, fresh->getMaterial()));
-    makeOffcut(ch, fresh, had - wanted);
+    cutoffs = makeOffcut(ch, fresh, had - wanted);
   }
 
   worked->setDefArmorLevel(static_cast<float>(level));
 
-  act("You work $p onto a different part of the body entirely.", false, ch,
-    fresh, 0, TO_CHAR);
+  // The piece changed slot, so its noun did too -- and the size has to come
+  // from the race it was worked to, not read back off a volume that only
+  // answers for the slot it came from.
+  renameAugmented(fresh, race);
+
+  // Named for what came out, not what went in: unlike the other skills, refit
+  // hands back a piece that is a different thing from the one that went on the
+  // bench, and there is no saying "you worked the fistguard" when the fistguard
+  // is the result. A slot that needs less material leaves cutoffs; one that
+  // needs the same or more leaves nothing to mention.
+  if (cutoffs)
+    act("You complete $p and collect the cutoffs.", false, ch, fresh, 0,
+      TO_CHAR);
+  else
+    act("You complete $p.", false, ch, fresh, 0, TO_CHAR);
+
   act("$n finishes reworking $p.", true, ch, fresh, 0, TO_ROOM);
 
-  augmentTaskExp(ch, getMaterialFamily(fresh->getMaterial()) == FAM_METAL ? SKILL_FORGE
-                                                            : SKILL_SEW, fresh);
+  // The same test doRefit routed on, so the award lands on the skill that was
+  // charged. isMetalMaterial is a range check over every metal index, while
+  // FAM_METAL asks the tiered table, which ten of those metals are missing
+  // from -- a piece made of one of them took the forge path and spent an
+  // ingot, and would have been credited to a tailor.
+  augmentTaskExp(ch,
+    isMetalMaterial(fresh->getMaterial()) ? SKILL_FORGE : SKILL_SEW, fresh);
 }
 
 // forge refit and sew refit are one function: the material decides which
@@ -2628,6 +3231,9 @@ void TBeing::doRefit(const char* argument, bool metal) {
     sendTo("You have no pattern for that.\n\r");
     return;
   }
+
+  if (!hasRepairKit(this, metal ? RepairKit::Metal : RepairKit::Organic))
+    return;
 
   // Growing into a larger slot needs material for the difference, the same as
   // letting a piece out does. Shrinking leaves an offcut instead.
@@ -2734,6 +3340,9 @@ void TBeing::doStrip(const char* argument) {
     return;
   }
 
+  if (!hasRepairKit(this, RepairKit::Leather))
+    return;
+
   if (task)
     stopTask();
 
@@ -2797,6 +3406,9 @@ void TBeing::doPlate(const char* argument) {
     return;
   }
 
+  if (!hasRepairKit(this, RepairKit::Metal))
+    return;
+
   if (task)
     stopTask();
 
@@ -2846,6 +3458,9 @@ void TBeing::doBangle(const char* argument) {
       obj, 0, TO_CHAR);
     return;
   }
+
+  if (!hasRepairKit(this, RepairKit::Magic))
+    return;
 
   if (task)
     stopTask();
@@ -2928,10 +3543,14 @@ void TBeing::doSew(const char* argument) {
   int needUnits = max(1, static_cast<int>(needWeight * 10.0f));
 
   if (skein->getSkeinUnits() < needUnits) {
-    sendTo(format("That piece needs %d units of thread, and $p holds %d.\n\r") %
-           needUnits % skein->getSkeinUnits());
+    act(format("That piece needs %d units of thread, and $p holds %d.") %
+           needUnits % skein->getSkeinUnits(),
+      false, this, skein, 0, TO_CHAR);
     return;
   }
+
+  if (!hasRepairKit(this, RepairKit::Organic))
+    return;
 
   // Light work is armor and takes the armor template; clothing takes its own.
   itemTypeT type = (tier == Tier_Light) ? ITEM_ARMOR : ITEM_WORN;
@@ -2945,7 +3564,7 @@ void TBeing::doSew(const char* argument) {
   piece->setMaterial(skein->getMaterial());
   piece->setVolume(volume);
   piece->setWeight(needWeight);
-  piece->addObjStat(getTierFlags(tier));
+  setTierFlags(piece, getTierFlags(tier));
 
   nameCraftedWearable(piece, tier, slot, race, skein->getMaterial(), nullptr);
 
@@ -3053,10 +3672,14 @@ void TBeing::doForgePiece(const char* argument) {
   int needUnits = max(1, static_cast<int>(needWeight * 10.0f));
 
   if (ingot->getIngotUnits() < needUnits) {
-    sendTo(format("That piece needs %d units of metal, and $p holds %d.\n\r") %
-           needUnits % ingot->getIngotUnits());
+    act(format("That piece needs %d units of metal, and $p holds %d.") %
+           needUnits % ingot->getIngotUnits(),
+      false, this, ingot, 0, TO_CHAR);
     return;
   }
+
+  if (!hasRepairKit(this, RepairKit::Metal))
+    return;
 
   TObj* piece = makeBlankWearable(ITEM_ARMOR, slot);
   if (!piece) {
@@ -3067,7 +3690,7 @@ void TBeing::doForgePiece(const char* argument) {
   piece->setMaterial(ingot->getMaterial());
   piece->setVolume(volume);
   piece->setWeight(needWeight);
-  piece->addObjStat(getTierFlags(tier));
+  setTierFlags(piece, getTierFlags(tier));
 
   nameCraftedWearable(piece, tier, slot, race, ingot->getMaterial(), nullptr);
 
@@ -3198,6 +3821,9 @@ void TBeing::doForge(const char* argument) {
   if (!combineCheck(this, into, from))
     return;
 
+  if (!hasRepairKit(this, RepairKit::Metal))
+    return;
+
   if (task)
     stopTask();
 
@@ -3250,6 +3876,9 @@ void TBeing::doSmelt(const char* argument) {
     act("$p is already so much raw metal.", false, this, obj, 0, TO_CHAR);
     return;
   }
+
+  if (!hasRepairKit(this, RepairKit::Metal))
+    return;
 
   if (task)
     stopTask();

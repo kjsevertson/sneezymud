@@ -18,6 +18,8 @@
 #include "materials.h"
 #include "monster.h"
 #include "obj_base_clothing.h"
+#include "obj_essence.h"
+#include "augment.h"
 #include "obj_commodity.h"
 #include "obj_general_weapon.h"
 #include "bulkLoadOut.h"
@@ -362,6 +364,16 @@ inline constexpr std::array<SlotNames, MAX_CLASSES> classSlotNames = {{
     {},  // RANGER (dead class)
     {},  // COMMONER (dead class)
 }};
+
+// Jewelry is not a class's tier, so it takes no row above: Bangle produces it
+// out of any slot, and an ornament needs an ornament's noun. Nothing here is
+// armor, so the words are the ones for a thing worn to be seen -- a bracelet
+// where a warrior has a vambrace.
+//
+// Head through Finger, the same order as the rows above.
+inline constexpr SlotNames jewelrySlotNames = {
+  {"circlet", "amulet", "brooch", "harness", "armlet", "bracelet", "panja",
+    "chatelaine", "anklet", "toe-ring", "bauble", "ring"}};
 
 // -----------------------------------------------------------------------
 // Racial size tiers — derived from newbie starting gear body slot volumes.
@@ -1678,7 +1690,9 @@ void nameCraftedWearable(TObj* obj, Tier tier, TemplateSlot slot, race_t race,
 
   int slotIdx = static_cast<int>(slot);
   const char* baseName =
-    classSlotNames[static_cast<int>(tierNounClass(tier))][slotIdx];
+    tier == Tier_Jewelry
+      ? jewelrySlotNames[slotIdx]
+      : classSlotNames[static_cast<int>(tierNounClass(tier))][slotIdx];
   if (!baseName)
     return;
 
@@ -1740,9 +1754,31 @@ void nameCraftedWearable(TObj* obj, Tier tier, TemplateSlot slot, race_t race,
     keywords += "]";
   }
 
-  obj->shortDescr = shortDesc;
+  // Augmented gear is coloured by what it is best at, in the same families an
+  // essence of that stat takes: might red, quickness green, mind cyan,
+  // presence purple. A piece carrying no stats takes no colour. Only the
+  // augmentation skills reach this function -- bulk loot names itself, and
+  // keeps its own scheme, where the colour means the secondary bonus instead.
+  const char* statColor = nullptr;
+  int best = 0;
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
+    if (!isStatApply(obj->affected[i].location))
+      continue;
+
+    if (obj->affected[i].modifier > best) {
+      best = obj->affected[i].modifier;
+      statColor = essenceApplyColor(obj->affected[i].location);
+    }
+  }
+
+  // Coloured after the capitalisation, not before: cap() on a string that
+  // opens with a colour tag would capitalise the tag and leave the word alone.
+  sstring lead = statColor ? sstring(statColor) : sstring("");
+  sstring tail = statColor ? sstring("<z>") : sstring("");
+
+  obj->shortDescr = lead + shortDesc + tail;
   obj->name = keywords;
-  obj->setDescr(format("%s lies here.") % sstring(shortDesc).cap());
+  obj->setDescr(lead + sstring(shortDesc).cap() + " lies here." + tail);
 }
 
 void nameCraftedWeapon(TObj* obj, const char* kind, int material,
@@ -1779,6 +1815,11 @@ void nameCraftedWeapon(TObj* obj, const char* kind, int material,
 const char* raceSizeName(race_t race) {
   const RaceSizeInfo* size = raceSizeInfo(race);
   return size ? size->name : nullptr;
+}
+
+const char* raceSizeKeyword(race_t race) {
+  const RaceSizeInfo* size = raceSizeInfo(race);
+  return size ? size->keyword : nullptr;
 }
 
 float weightForVolume(int volume, int material) {

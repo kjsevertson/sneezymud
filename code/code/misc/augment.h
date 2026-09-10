@@ -15,30 +15,7 @@
 class TBeing;
 class TBaseClothing;
 class TCommodity;
-
-// AC and structure both derive from one number: the level of the mob that
-// loads the gear. Each armor tier sits at a fixed point on that scale, and a
-// tier move is a rescale between two of these -- see the tier table in
-// docs/superpowers/specs/2026-08-23-gear-augmentation-design.md.
-//
-// Demotion rescales the item's own level rather than snapping it to the tier's
-// number, so a piece that loaded off a level 70 mob keeps what made it good.
-// The skill ceiling in that table caps the skills that *add* value; Strip only
-// ever subtracts, so it needs no cap.
-[[nodiscard]] constexpr double getTierLoadLevel(Tier tier) {
-  switch (tier) {
-    case Tier_Heavy:
-      return 60.0;
-    case Tier_Medium:
-      return 50.0;
-    case Tier_Light:
-      return 40.0;
-    case Tier_Clothing:
-      return 30.0;
-    default:
-      return 0.0;
-  }
-}
+class TBaseCorpse;
 
 // Skills that add value do not reach what the world loads: heavy tops out at
 // level 55 rather than 60, and every other tier scales by the same factor. The
@@ -90,6 +67,12 @@ inline constexpr double kSkillCeilingFactor = 55.0 / 60.0;
 // layering in ArmorEvaluator::getTier().
 [[nodiscard]] unsigned int getTierRungFlags(Tier tier);
 
+// Write an item's tier flags wholesale, replacing whatever was there. Every
+// alteration that moves a tier goes through this rather than toggling the rung
+// it stepped over -- see the note at the definition for why the difference
+// matters.
+void setTierFlags(TObj* obj, unsigned int flags);
+
 // The item's tier as the evaluator sees it, including the restrictions that
 // getTier() infers rather than reads off flags.
 [[nodiscard]] Tier getWearableTier(const TBaseClothing* clothing);
@@ -97,6 +80,33 @@ inline constexpr double kSkillCeilingFactor = 55.0 / 60.0;
 // The item's wear slot as a template slot, or TemplateSlot::COUNT if it has
 // none, or more than one.
 [[nodiscard]] TemplateSlot getWearableSlot(const TObj* obj);
+
+// Rebuild a wearable's name, keywords and ground description from what it now
+// is, after augmentation has changed its tier, slot, size or material. Strings
+// the piece first. A builder's own wording does not survive this -- see the
+// note at the definition. No-op on anything that is not wearable. Returns
+// whether it renamed anything.
+bool renameAugmented(TObj* obj);
+
+// The same, for a caller that already knows the size the piece was worked to.
+// Refit needs this: it changes slot and size together, and the size cannot be
+// read back off a volume that belongs to the slot the piece came from.
+bool renameAugmented(TObj* obj, race_t race);
+
+// Rebuild a crafted byproduct's name around the material it is now made of.
+// Ingots, skeins and offcuts all carry their material in their wording, so
+// transmuting one has to rewrite it. No-op on anything else. Returns whether
+// it renamed anything.
+bool renameByMaterial(TObj* obj);
+
+// Replace the old material's word wherever the item names it -- in the wording,
+// the ground description and the keywords -- leaving everything a builder wrote
+// around it standing. For the items no generator can rebuild: weapons,
+// containers, lights, anything whose name cannot be derived back from what it
+// is. Pass the material the item was made of before the change. Returns whether
+// it found the word at all; an item that never named its material has nothing
+// stale to fix and is left alone.
+bool renameMaterialWord(TObj* obj, unsigned short from);
 
 // Rebuild a wearable as a different item type, carrying its state across, and
 // hand it back in place of the original in ch's inventory. The original is
@@ -341,19 +351,42 @@ void distillFinish(TBeing* ch, TObj* obj);
 // writes five times what an essence of the other does.
 [[nodiscard]] bool isPoolApply(int apply);
 
-// Where this apply stands among the stats already on the item: 1 for the
-// first, 2 for the second, 3 for the third, 4 or more for one that cannot be
-// added. An apply already present keeps its own place in the order.
+// Where this apply stands among the stats already on the item, ranked by what
+// each is worth: 1 for the highest, 2 for the second, 3 for the third, 4 or
+// more for one that cannot be added. Ties break by slot. An apply the piece
+// does not carry ranks below every one it does.
 [[nodiscard]] int getStatRank(const TObj* obj, int apply);
 
-// The most this apply may be raised to on this item. The first stat on a piece
-// may reach 5, the second 4, the third 3 -- so a piece specialised in one
-// thing beats a piece spread across three.
+// The most this apply may be raised to on this item. The highest stat on a
+// piece may reach 5, the second 4, the third 3 -- so a piece specialised in
+// one thing beats a piece spread across three.
 [[nodiscard]] int getInfuseMax(const TObj* obj, int apply);
 
 // What an essence of this quality writes for this apply: the quality itself
 // for a stat, five times it for a pool.
 [[nodiscard]] int getInfuseAmount(int apply, int quality);
+
+// What this item carries of this apply, or zero if it carries none.
+[[nodiscard]] int getStatModifier(const TObj* obj, int apply);
+
+// The classes whose dead answer for a stat, as a CLASS_* mask.
+[[nodiscard]] unsigned short getStatClasses(int apply);
+
+// The classes in a mask, written out: "warrior, deikhan or cleric".
+[[nodiscard]] sstring describeClasses(unsigned short mask);
+
+// The stat a distillation is gated on -- the piece's first-rank stat -- or
+// APPLY_NONE when it carries no positive stat at all.
+[[nodiscard]] int getDistillGateApply(const TObj* obj);
+
+// The corpse level a stat of this size demands. Distill takes only jewelry,
+// which answers for half of what it carries.
+[[nodiscard]] unsigned int getDistillCorpseLevel(int modifier);
+
+// A corpse in hand or underfoot of one of these classes and at least this
+// level, or null.
+[[nodiscard]] TBaseCorpse* findDistillCorpse(TBeing* ch, unsigned short classes,
+  unsigned int level);
 
 // Infuse's finish: the apply is written and the essence reset to quality 1.
 void infuseFinish(TBeing* ch, TObj* obj, const char* essenceName);
@@ -453,9 +486,13 @@ class TObj* makeOffcut(TBeing* ch, TObj* obj, int leftover);
 // what an offcut is for.
 [[nodiscard]] bool isOffcut(const TObj* obj);
 
-// Resize's finish: the piece is remade at the new size, and material cut away
-// becomes an offcut carrying what the piece carried.
-void resizeFinish(TBeing* ch, TObj* obj, race_t race);
+// Resize's finish, shared by both halves: the piece is remade at the new size,
+// and material cut away becomes an offcut carrying what the piece carried. Pass
+// the skill that was rolled -- SKILL_FORGE for metal, SKILL_TAILOR for cloth --
+// which picks the wording and takes the experience. Taking it from the caller
+// rather than from the material means a piece transmuted mid-task still credits
+// the craftsman who actually did the work.
+void resizeFinish(TBeing* ch, TObj* obj, race_t race, spellNumT skill);
 
 // The skein prototype, created by a migration.
 inline constexpr int kSkeinVnum = 29543;
@@ -479,9 +516,6 @@ inline constexpr int kSkeinVnum = 29543;
 // Weave's finish: the worn thing is pulled apart and its fibre comes back as a
 // skein carrying what it carried.
 void weaveFinish(TBeing* ch, TObj* obj, int hits, int misses);
-
-// Tailor's finish: the cloth twin, leaving clippings rather than metal.
-void tailorFinish(TBeing* ch, TObj* obj, race_t race);
 
 // The share of a suit's armor a slot carries, from TBaseClothing::armorPercs.
 // A body piece is worth seven times a wrist piece of the same level, which is

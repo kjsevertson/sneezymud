@@ -234,9 +234,9 @@ void TBaseClothing::armorPercs(double* ac_perc, double* str_perc) const {
 }
 
 // this is simplistic
-void TBaseClothing::setDefArmorLevel(float lev) {
+bool TBaseClothing::setDefArmorLevel(float lev) {
   if (isSaddle())
-    return;
+    return false;
 
   double ac_perc, str_perc, new_acVal, new_strVal;
 
@@ -254,12 +254,104 @@ void TBaseClothing::setDefArmorLevel(float lev) {
   new_acVal = min(1000.0, max(-1000.0, new_acVal));
   new_strVal = min(100.0, max(0.0, new_strVal));
 
-  setMaxStructPoints((int)new_strVal);
-  setStructPoints((int)new_strVal);
-
-  for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++)
+  // Rounded up rather than truncated. Both values are stored as ints, and a
+  // level is worth 25 * the slot's share of a suit -- which on the small slots
+  // is a fraction of a point. Truncating threw that fraction away, and because
+  // the level is re-derived from what was stored rather than carried along, the
+  // fraction never got a chance to accumulate: a ring or a pair of boots read
+  // back at exactly the level it started, so Bolster would spend a whole
+  // soulstone raising it and never move it at all.
+  // Where the AC is going to go, decided before anything is written. A piece
+  // with no APPLY_ARMOR entry has nowhere to keep AC, and writing the
+  // structure half anyway leaves armor that reads as armor and protects like
+  // cloth. Every caller here is asking for an armor level, so a free slot is
+  // claimed rather than half-applying -- but a piece whose five slots are all
+  // spoken for by other applies has nowhere to claim, and for that one the
+  // whole change has to be refused rather than half-made. Only bulkLoadOut
+  // seeded the slot for itself; the wearable templates carry no applies at
+  // all, so anything built off one arrives here empty.
+  bool carries = false;
+  int empty = -1;
+  for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++) {
     if (affected[applyIndex].location == APPLY_ARMOR)
-      affected[applyIndex].modifier = -(int)new_acVal;
+      carries = true;
+    else if (empty < 0 && affected[applyIndex].location == APPLY_NONE)
+      empty = applyIndex;
+  }
+
+  if (!carries && empty < 0) {
+    vlogf(LOG_BUG,
+      format("setDefArmorLevel: %s has no room for APPLY_ARMOR; armor level "
+             "left as it was") %
+        getName());
+    return false;
+  }
+
+  setMaxStructPoints((int)ceil(new_strVal));
+  setStructPoints((int)ceil(new_strVal));
+
+  if (carries) {
+    for (int applyIndex = 0; applyIndex < MAX_OBJ_AFFECT; applyIndex++)
+      if (affected[applyIndex].location == APPLY_ARMOR)
+        affected[applyIndex].modifier = -(int)ceil(new_acVal);
+
+    return true;
+  }
+
+  affected[empty].location = APPLY_ARMOR;
+  affected[empty].modifier = -(int)ceil(new_acVal);
+  affected[empty].modifier2 = 0;
+  return true;
+}
+
+// The highest armor level this piece can actually be set to without reading
+// back above `lev`.
+//
+// setDefArmorLevel() stores AC as an int and rounds it up, while armorLevel()
+// re-derives the level from what was stored against a *rounded* newbie
+// baseline. On most slots the two do not meet: asking for exactly 30 on a
+// head slot stores 88 where 87.5 was wanted, and that reads back as 30.29 --
+// enough for tierForArmorLevel() to call it light armor rather than clothing.
+// Seven of the twelve slots do this at the clothing and medium load levels;
+// light and heavy happen to land on whole numbers and hide the problem.
+//
+// So the caller asks for the largest level that survives the round trip. On a
+// slot where one point of AC is worth four levels -- a ring -- that can be
+// meaningfully less than what was asked for, which is the honest answer.
+double TBaseClothing::maxArmorLevelAtOrBelow(double lev) const {
+  if (isSaddle())
+    return lev;
+
+  double ac_perc, str_perc;
+  armorPercs(&ac_perc, &str_perc);
+
+  if (isPaired())
+    ac_perc *= 2.0;
+
+  if (ac_perc <= 0.0)
+    return lev;
+
+  const double NEWBIE_AC = 500.0;
+  int ac_min = (int)((NEWBIE_AC * ac_perc) + (isPaired() ? 1.0 : 0.5));
+
+  // The largest stored AC that still reads back at or below lev, and then the
+  // level that writes exactly that once the write has rounded up.
+  //
+  // The level is aimed a fraction of an AC point under that mark rather than
+  // exactly at it. Callers narrow this to a float on the way in, and
+  // setDefArmorLevel then multiplies it back out in a different order, so a
+  // level sitting exactly on the boundary can come back a hair above it and
+  // take ceil() to the next whole point -- which is the very thing this
+  // function exists to prevent. A sixty-fourth of a point is far larger than
+  // any rounding error float can introduce here and far smaller than a point,
+  // so the answer is unchanged on every slot but the roundoff is absorbed.
+  const double kUnderBy = 1.0 / 64.0;
+
+  int stored = (int)floor(ac_min + lev * 25.0 * ac_perc);
+  double back =
+    ((stored - kUnderBy) - (NEWBIE_AC * ac_perc)) / (25.0 * ac_perc);
+
+  return min(lev, back);
 }
 
 // takes stats of eq, and returns a "level" for it

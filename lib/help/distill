@@ -16,5 +16,39 @@ all -- charges scattered across duplicates never reach anything.
 Armor is not among the stats an essence can hold.  Armor belongs to the
 body, and to the smiths.
 
-See also: INFUSE, BANGLE, ESSENCE
+THE PRICE
+
+The work is done over a body.  You need a scalpel in hand and forceps in the
+other, an operating table in the room, and a corpse that answered to the
+virtue you are drawing out.
+
+The greatest stat on the piece is the one that names the corpse -- not the
+first written on it, the largest.  Its class must be one that carries that
+stat in life:
+
+  strength      warrior or monk
+  brawn         warrior, deikhan or shaman
+  constitution  warrior, deikhan or cleric
+  dexterity     thief, shaman or monk
+  agility       warrior or monk
+  speed         thief or monk
+  intelligence  mage or shaman
+  wisdom        deikhan or cleric
+  focus         thief, mage or shaman
+  perception    cleric or mage
+  charisma      deikhan, thief or mage
+  karma         cleric or shaman
+
+The corpse must also have been strong enough to be worth drawing from.
+Jewelry answers for half of what it carries, so five levels of the dead buy
+one point of the stat: a ring of ten dexterity wants a level fifty thief,
+shaman or monk.  A piece carrying nothing but hit points, mana or movement
+names no corpse and costs none.
+
+The body may be in your arms or at your feet, and it is spent only when the
+work finishes -- breaking off costs you nothing but the time already in it.
+A corpse rots, so a shaman's embalming is what makes one found today worth
+keeping until the piece to spend it on turns up.
+
+See also: INFUSE, BANGLE, ESSENCE, EMBALM, RITES
 Related Topics: MAGE

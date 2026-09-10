@@ -64,3 +64,8 @@ class TEssence : public TObj {
 
 // Display name for an apply an essence can hold.
 [[nodiscard]] const char* essenceApplyName(int apply);
+
+// The colour an essence of this apply is seen in. The stat is kept out of the
+// essence's own wording, so the colour is what tells two of them apart on the
+// ground; LOOK spells it out.
+[[nodiscard]] const char* essenceApplyColor(int apply);
