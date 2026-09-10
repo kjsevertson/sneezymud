@@ -6,6 +6,8 @@
 //
 //////////////////////////////////////////////////////////////////////////
 
+#include <cstring>
+
 #include "craft_tools.h"
 
 #include "comm.h"
@@ -143,6 +145,13 @@ const char* toolTypeName(int toolType) {
   }
 }
 
+// "a hammer", but "an anvil". Several tool names begin with a vowel, and the
+// message reads as broken English without this.
+static const char* toolArticle(int toolType) {
+  const char* name = toolTypeName(toolType);
+  return (name && strchr("aeiouAEIOU", name[0])) ? "an" : "a";
+}
+
 bool hasCraftTools(TBeing* ch, const CraftTools& tools) {
   if (!ch)
     return false;
@@ -150,26 +159,26 @@ bool hasCraftTools(TBeing* ch, const CraftTools& tools) {
   // Hands first, then the room: a player who is holding nothing wants to hear
   // about the hammer before being sent looking for a forge.
   if (tools.primary && !findHeldTool(ch, tools.primary, true)) {
-    ch->sendTo(format("You need to be holding a %s to do that.\n\r") %
-               toolTypeName(tools.primary));
+    ch->sendTo(format("You need to be holding %s %s to do that.\n\r") %
+               toolArticle(tools.primary) % toolTypeName(tools.primary));
     return false;
   }
 
   if (tools.secondary && !findHeldTool(ch, tools.secondary, false)) {
-    ch->sendTo(format("You need a %s in your other hand to do that.\n\r") %
-               toolTypeName(tools.secondary));
+    ch->sendTo(format("You need %s %s in your other hand to do that.\n\r") %
+               toolArticle(tools.secondary) % toolTypeName(tools.secondary));
     return false;
   }
 
   if (tools.room1 && !findRoomTool(ch, tools.room1)) {
-    ch->sendTo(
-      format("You need a %s here.\n\r") % toolTypeName(tools.room1));
+    ch->sendTo(format("You need %s %s here.\n\r") % toolArticle(tools.room1) %
+               toolTypeName(tools.room1));
     return false;
   }
 
   if (tools.room2 && !findRoomTool(ch, tools.room2)) {
-    ch->sendTo(
-      format("You need a %s here.\n\r") % toolTypeName(tools.room2));
+    ch->sendTo(format("You need %s %s here.\n\r") % toolArticle(tools.room2) %
+               toolTypeName(tools.room2));
     return false;
   }
 

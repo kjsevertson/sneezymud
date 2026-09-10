@@ -1710,6 +1710,27 @@ TBaseCorpse* findDistillCorpse(TBeing* ch, unsigned short classes,
 void distillFinish(TBeing* ch, TObj* obj) {
   int deposits = 0;
 
+  // The body is found before anything is drawn out of the piece. doDistill
+  // asked for one at the outset, but a player who is rid of it before the work
+  // ends -- junked, given away, rotted -- would otherwise reach this point and
+  // be paid in full for a cost never met. Nothing is deposited, nothing is
+  // destroyed and no experience is given unless the corpse is still here to
+  // answer for it.
+  int gate = getDistillGateApply(obj);
+  TBaseCorpse* corpse = nullptr;
+
+  if (gate != APPLY_NONE) {
+    corpse = findDistillCorpse(ch, getStatClasses(gate),
+      getDistillCorpseLevel(getStatModifier(obj, gate)));
+
+    if (!corpse) {
+      act("The body you meant to draw  into is gone, and the virtue stays "
+          "where it is.",
+        false, ch, obj, 0, TO_CHAR);
+      return;
+    }
+  }
+
   // Every eligible affect deposits; nothing is chosen or discarded. A ring of
   // +3 STR and +2 DEX yields both.
   for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
@@ -1733,23 +1754,16 @@ void distillFinish(TBeing* ch, TObj* obj) {
 
   // The body is spent here rather than at the outset, so breaking off the work
   // costs nothing but the time already put into it.
-  int gate = getDistillGateApply(obj);
-  if (gate != APPLY_NONE) {
-    TBaseCorpse* corpse = findDistillCorpse(ch, getStatClasses(gate),
-      getDistillCorpseLevel(getStatModifier(obj, gate)));
+  if (corpse) {
+    act("$p collapses in on itself, emptied.", false, ch, corpse, 0, TO_CHAR);
+    act("$p collapses in on itself.", true, ch, corpse, 0, TO_ROOM);
 
-    if (corpse) {
-      act("$p collapses in on itself, emptied.", false, ch, corpse, 0, TO_CHAR);
-      act("$p collapses in on itself.", true, ch, corpse, 0, TO_ROOM);
-
-      // Deleted where it lies, without being detached first. ~TBaseCorpse()
-      // hands whatever the body was carrying to whoever holds it or to the
-      // room it is in, and detaching beforehand leaves it owned by nothing --
-      // which sends its equipment and its coins to the "unowned corpse" branch
-      // and destroys them. The animate-dead line disposes of a corpse the same
-      // way.
-      delete corpse;
-    }
+    // Deleted where it lies, without being detached first. ~TBaseCorpse()
+    // hands whatever the body was carrying to whoever holds it or to the room
+    // it is in, and detaching beforehand leaves it owned by nothing -- which
+    // sends its equipment and its coins to the "unowned corpse" branch and
+    // destroys them. The animate-dead line disposes of a corpse the same way.
+    delete corpse;
   }
 
   augmentTaskExp(ch, SKILL_DISTILL, obj);
