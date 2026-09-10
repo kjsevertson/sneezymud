@@ -391,6 +391,14 @@ void stripFinish(TBeing* ch, TObj* obj) {
   // flag rode along. See setTierFlags().
   unsigned int before = obj->getObjStat() & allTierFlags();
   double priorLevel = clothing->armorLevel(ARMOR_LEV_AC);
+
+  // Structure is kept alongside it. setDefArmorLevel() derives both AC and
+  // structure from the level it is given, so putting the level back does not
+  // put the structure back: a piece that arrived damaged, or halved by an
+  // earlier Bangle, would be handed back mended or ruined by a strip that
+  // refused itself.
+  int priorMaxStruct = clothing->getMaxStructPoints();
+  int priorStruct = clothing->getStructPoints();
   setTierFlags(obj, getTierFlags(target));
 
   // Rescaling alone lets a piece land above what the rung it drops into can
@@ -466,6 +474,8 @@ void stripFinish(TBeing* ch, TObj* obj) {
   if (getWearableTier(clothing) != target) {
     setTierFlags(obj, before);
     clothing->setDefArmorLevel(static_cast<float>(priorLevel));
+    clothing->setMaxStructPoints(priorMaxStruct);
+    clothing->setStructPoints(priorStruct);
 
     // The type was changed before the tier could be re-read, so putting the
     // flags and the level back is not enough -- a refused strip that left the
