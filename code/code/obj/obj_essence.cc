@@ -18,31 +18,36 @@ namespace {
   struct EssenceApply {
       int apply;
       const char* name;
+      const char* color;  // what an essence of it looks like
   };
 
-  // Six primary stats, six secondary, three pools, two combat, two
-  // perception. CAN_BE_SEEN and VISION read as behavioral but are plain
-  // additive bonuses in affectModify, which is the test that matters.
+  // Six primary stats, six secondary, three pools, two perception, and
+  // critical frequency. Stats are coloured by family -- might is red, quickness
+  // green, mind cyan, presence purple -- while the pools and the perception
+  // pair take the colour bulk gear already gives those same bonuses. Hitroll
+  // and damroll are deliberately absent: what a piece strikes with is not
+  // something the essence trade gets to move. CAN_BE_SEEN and VISION read as
+  // behavioral but are plain additive bonuses in affectModify, which is the
+  // test that matters.
   const EssenceApply essenceApplies[] = {
-    {APPLY_STR, "strength"},
-    {APPLY_INT, "intelligence"},
-    {APPLY_WIS, "wisdom"},
-    {APPLY_DEX, "dexterity"},
-    {APPLY_CON, "constitution"},
-    {APPLY_KAR, "karma"},
-    {APPLY_BRA, "brawn"},
-    {APPLY_AGI, "agility"},
-    {APPLY_FOC, "focus"},
-    {APPLY_SPE, "speed"},
-    {APPLY_PER, "perception"},
-    {APPLY_CHA, "charisma"},
-    {APPLY_HIT, "hit points"},
-    {APPLY_MANA, "mana"},
-    {APPLY_MOVE, "movement"},
-    {APPLY_HITROLL, "hitroll"},
-    {APPLY_DAMROLL, "damroll"},
-    {APPLY_CAN_BE_SEEN, "visibility"},
-    {APPLY_VISION, "vision"},
+    {APPLY_STR, "strength", "<R>"},
+    {APPLY_INT, "intelligence", "<C>"},
+    {APPLY_WIS, "wisdom", "<C>"},
+    {APPLY_DEX, "dexterity", "<g>"},
+    {APPLY_CON, "constitution", "<R>"},
+    {APPLY_KAR, "karma", "<p>"},
+    {APPLY_BRA, "brawn", "<R>"},
+    {APPLY_AGI, "agility", "<g>"},
+    {APPLY_FOC, "focus", "<C>"},
+    {APPLY_SPE, "speed", "<g>"},
+    {APPLY_PER, "perception", "<p>"},
+    {APPLY_CHA, "charisma", "<p>"},
+    {APPLY_HIT, "hit points", "<r>"},
+    {APPLY_MANA, "mana", "<c>"},
+    {APPLY_MOVE, "movement", "<G>"},
+    {APPLY_CAN_BE_SEEN, "visibility", "<k>"},
+    {APPLY_VISION, "vision", "<y>"},
+    {APPLY_CRIT_FREQUENCY, "critical frequency", "<P>"},
   };
 }  // namespace
 
@@ -60,6 +65,14 @@ const char* essenceApplyName(int apply) {
       return entry.name;
 
   return "nothing";
+}
+
+const char* essenceApplyColor(int apply) {
+  for (const auto& entry : essenceApplies)
+    if (entry.apply == apply)
+      return entry.color;
+
+  return "<w>";
 }
 
 TEssence::TEssence() : TObj(), applyType(APPLY_NONE), quality(1), charges(0) {}

@@ -18,6 +18,8 @@
 #include "materials.h"
 #include "monster.h"
 #include "obj_base_clothing.h"
+#include "obj_essence.h"
+#include "augment.h"
 #include "obj_commodity.h"
 #include "obj_general_weapon.h"
 #include "bulkLoadOut.h"
@@ -1752,9 +1754,31 @@ void nameCraftedWearable(TObj* obj, Tier tier, TemplateSlot slot, race_t race,
     keywords += "]";
   }
 
-  obj->shortDescr = shortDesc;
+  // Augmented gear is coloured by what it is best at, in the same families an
+  // essence of that stat takes: might red, quickness green, mind cyan,
+  // presence purple. A piece carrying no stats takes no colour. Only the
+  // augmentation skills reach this function -- bulk loot names itself, and
+  // keeps its own scheme, where the colour means the secondary bonus instead.
+  const char* statColor = nullptr;
+  int best = 0;
+  for (int i = 0; i < MAX_OBJ_AFFECT; i++) {
+    if (!isStatApply(obj->affected[i].location))
+      continue;
+
+    if (obj->affected[i].modifier > best) {
+      best = obj->affected[i].modifier;
+      statColor = essenceApplyColor(obj->affected[i].location);
+    }
+  }
+
+  // Coloured after the capitalisation, not before: cap() on a string that
+  // opens with a colour tag would capitalise the tag and leave the word alone.
+  sstring lead = statColor ? sstring(statColor) : sstring("");
+  sstring tail = statColor ? sstring("<z>") : sstring("");
+
+  obj->shortDescr = lead + shortDesc + tail;
   obj->name = keywords;
-  obj->setDescr(format("%s lies here.") % sstring(shortDesc).cap());
+  obj->setDescr(lead + sstring(shortDesc).cap() + " lies here." + tail);
 }
 
 void nameCraftedWeapon(TObj* obj, const char* kind, int material,

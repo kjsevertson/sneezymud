@@ -1520,6 +1520,10 @@ TEssence* depositEssence(TBeing* ch, int apply, int charges) {
       return nullptr;
 
     essence->swapToStrung();
+    // The prototype carries an unnamed material out of the gap between the
+    // general and organic tables, so anything asking what an essence is made
+    // of got an empty word. Ghostly is what it should have been.
+    essence->setMaterial(MAT_GHOSTLY);
     essence->setApplyType(apply);
     essence->setQuality(1);
     essence->setCharges(0);
@@ -1530,16 +1534,19 @@ TEssence* depositEssence(TBeing* ch, int apply, int charges) {
 
   const char* what = essenceApplyName(apply);
 
-  // One vnum for every apply and Quality, so the name has to carry both or
-  // two essences are indistinguishable in inventory.
-  essence->swapToStrung();
-  essence->name = format("essence %s") % what;
-  essence->shortDescr =
-    format("an essence of %s (quality %d)") % what % essence->getQuality();
-  essence->setDescr(format("An essence of %s hangs in the air here.") % what);
+  // One vnum covers every apply and Quality, so the keywords carry the stat --
+  // a player still reaches for "strength essence" -- while the wording itself
+  // stays out of it. What the eye gets is the colour; LOOK gives the rest.
+  const char* color = essenceApplyColor(apply);
 
-  ch->sendTo(format("%d charge%s of %s essence.\n\r") % charges %
-             (charges == 1 ? "" : "s") % what);
+  essence->swapToStrung();
+  essence->name = format("essence magical %s") % what;
+  essence->shortDescr = format("%sa magical essence<z>") % color;
+  essence->setDescr(
+    format("%sA magical essence<z> hangs in the air here.") % color);
+
+  ch->sendTo(format("You withdraw %d strand%s of %s into essence form.\n\r") %
+             charges % (charges == 1 ? "" : "s") % what);
 
   if (deepened)
     act("$p deepens, and would write more than it did.", false, ch, essence, 0,
