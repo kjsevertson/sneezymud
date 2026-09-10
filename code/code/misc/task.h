@@ -205,3 +205,18 @@ extern TaskEntry tasks[NUM_TASKS];
 extern int start_task(TBeing*, TThing*, TRoom*, taskTypeT, const char*, int,
   unsigned short, ubyte, int, int);
 extern void warn_busy(TBeing* ch);
+
+// The gear augmentation crafts are gated on the same tools the repair skills
+// use, and ask the repair classes themselves rather than keeping a second list
+// of tools and messages. Each names the repair whose kit it borrows.
+enum class RepairKit {
+  Metal,    // hammer, tongs, forge, anvil
+  Organic,  // ladle, oil
+  Leather,  // punch, cording
+  Magic,    // runes, energy, pentagram
+  Dead,     // scalpel, forceps, operating table
+};
+
+// True when the character has that kit to hand. Otherwise says what is
+// missing, in the repair's own words, and returns false.
+bool hasRepairKit(TBeing* ch, RepairKit kit);

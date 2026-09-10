@@ -37,22 +37,6 @@
 #include "obj_skein.h"
 #include "obj_general_weapon.h"
 #include "wearTemplate.h"
-#include "craft_tools.h"
-
-namespace {
-  // Augmentation borrows the repair skills' kits rather than inventing its
-  // own, so the bench a player already keeps for mending is the bench the
-  // crafts are worked at. Which repair each one borrows from is a judgement
-  // about the work, not about the class that does it -- Strip is thief work
-  // done with a leatherworker's punch.
-  const CraftTools kMetalKit = {TOOL_HAMMER, TOOL_TONGS, TOOL_FORGE,
-    TOOL_ANVIL};                                              // MetalRepair
-  const CraftTools kOrganicKit = {TOOL_LADEL, TOOL_PLANT_OIL};  // OrganicRepair
-  const CraftTools kLeatherKit = {TOOL_PUNCH, TOOL_CORDING};    // LeatherRepair
-  const CraftTools kMagicKit = {TOOL_RUNES, TOOL_ENERGY, TOOL_PENTAGRAM};
-  const CraftTools kDeadKit = {TOOL_SCALPEL, TOOL_FORCEPS,
-    TOOL_OPERATING_TABLE};                                      // DeadRepair
-}  // namespace
 
 unsigned int getTierRungFlags(Tier tier) {
   // The masks ArmorEvaluator::getTier() layers: clothing carries nothing,
@@ -1599,25 +1583,24 @@ unsigned short getStatClasses(int apply) {
 }
 
 sstring describeClasses(unsigned short mask) {
-  sstring out;
-  int written = 0, total = 0;
+  std::vector<sstring> names;
 
   for (int i = 0; i < MAX_CLASSES; i++)
     if (mask & classInfo[i].class_num)
-      total++;
+      names.push_back(classInfo[i].name);
 
-  for (int i = 0; i < MAX_CLASSES; i++) {
-    if (!(mask & classInfo[i].class_num))
-      continue;
+  if (names.empty())
+    return "nothing that ever lived";
 
-    if (written)
-      out += (written + 1 == total) ? " or " : ", ";
+  if (names.size() == 1)
+    return names.front();
 
-    out += classInfo[i].name;
-    written++;
-  }
+  // "warrior, deikhan or cleric" -- the last pair joined by the word, the rest
+  // by commas.
+  sstring last = names.back();
+  names.pop_back();
 
-  return written ? out : sstring("nothing that ever lived");
+  return sstring::join(names, ", ") + " or " + last;
 }
 
 int getStatModifier(const TObj* obj, int apply) {
@@ -1815,7 +1798,7 @@ void TBeing::doDistill(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kDeadKit))
+  if (!hasRepairKit(this, RepairKit::Dead))
     return;
 
   // The piece's first-rank stat names the dead it takes to draw it out.
@@ -2056,7 +2039,7 @@ void TBeing::doForgeResize(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kMetalKit))
+  if (!hasRepairKit(this, RepairKit::Metal))
     return;
 
   // Growing a piece needs metal from somewhere, and the only place metal comes
@@ -2169,7 +2152,7 @@ void TBeing::doTailor(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kLeatherKit))
+  if (!hasRepairKit(this, RepairKit::Leather))
     return;
 
   // Letting a piece out needs cloth to let it out with, the same way growing
@@ -2341,7 +2324,7 @@ void TBeing::doWeave(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kOrganicKit))
+  if (!hasRepairKit(this, RepairKit::Organic))
     return;
 
   if (task)
@@ -2917,7 +2900,7 @@ void TBeing::doForgeWeapon(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kMetalKit))
+  if (!hasRepairKit(this, RepairKit::Metal))
     return;
 
   TObj* weapon = read_object(kWeaponVnum, VIRTUAL);
@@ -3232,7 +3215,7 @@ void TBeing::doRefit(const char* argument, bool metal) {
     return;
   }
 
-  if (!hasCraftTools(this, metal ? kMetalKit : kOrganicKit))
+  if (!hasRepairKit(this, metal ? RepairKit::Metal : RepairKit::Organic))
     return;
 
   // Growing into a larger slot needs material for the difference, the same as
@@ -3340,7 +3323,7 @@ void TBeing::doStrip(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kLeatherKit))
+  if (!hasRepairKit(this, RepairKit::Leather))
     return;
 
   if (task)
@@ -3406,7 +3389,7 @@ void TBeing::doPlate(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kMetalKit))
+  if (!hasRepairKit(this, RepairKit::Metal))
     return;
 
   if (task)
@@ -3459,7 +3442,7 @@ void TBeing::doBangle(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kMagicKit))
+  if (!hasRepairKit(this, RepairKit::Magic))
     return;
 
   if (task)
@@ -3549,7 +3532,7 @@ void TBeing::doSew(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kOrganicKit))
+  if (!hasRepairKit(this, RepairKit::Organic))
     return;
 
   // Light work is armor and takes the armor template; clothing takes its own.
@@ -3678,7 +3661,7 @@ void TBeing::doForgePiece(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kMetalKit))
+  if (!hasRepairKit(this, RepairKit::Metal))
     return;
 
   TObj* piece = makeBlankWearable(ITEM_ARMOR, slot);
@@ -3821,7 +3804,7 @@ void TBeing::doForge(const char* argument) {
   if (!combineCheck(this, into, from))
     return;
 
-  if (!hasCraftTools(this, kMetalKit))
+  if (!hasRepairKit(this, RepairKit::Metal))
     return;
 
   if (task)
@@ -3877,7 +3860,7 @@ void TBeing::doSmelt(const char* argument) {
     return;
   }
 
-  if (!hasCraftTools(this, kMetalKit))
+  if (!hasRepairKit(this, RepairKit::Metal))
     return;
 
   if (task)

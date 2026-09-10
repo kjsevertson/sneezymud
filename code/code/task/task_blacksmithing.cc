@@ -18,7 +18,7 @@
 #include "obj_commodity.h"
 #include "being.h"
 #include "materials.h"
-#include "craft_tools.h"
+#include "task.h"
 
 // used to plug messages and behavior to common repair functions
 class BaseRepair {
@@ -109,14 +109,43 @@ class BaseRepair {
       bool makeScraps);  // returns true if destroyed
 };
 
-// Repair and the augmentation crafts ask the same two questions of a
-// character's hands and room, so both go through craft_tools.
 TTool* BaseRepair::GetTool(int vnum, bool primary) {
-  return findHeldTool(m_ch, vnum, primary);
+  if (0 == vnum)
+    return NULL;
+
+  TTool* tt = NULL;
+  TTool* tool = NULL;
+
+  if ((primary || m_ch->isAmbidextrous()) && m_ch->heldInPrimHand() &&
+      (tt = dynamic_cast<TTool*>(m_ch->heldInPrimHand())) &&
+      tt->getToolType() == vnum) {
+    tool = tt;
+  }
+
+  if (!tool && (!primary || m_ch->isAmbidextrous()) && m_ch->heldInSecHand() &&
+      (tt = dynamic_cast<TTool*>(m_ch->heldInSecHand())) &&
+      tt->getToolType() == vnum) {
+    tool = tt;
+  }
+
+  return tool;
 }
 
 TTool* BaseRepair::GetRoomTool(int vnum) {
-  return findRoomTool(m_ch, vnum);
+  TRoom* rp;
+  if (vnum == 0)
+    return NULL;
+
+  if (!(rp = real_roomp(m_ch->in_room)))
+    return NULL;
+
+  for (StuffIter it = rp->stuff.begin(); it != rp->stuff.end(); ++it) {
+    TTool* tt = dynamic_cast<TTool*>(*it);
+    if (tt && tt->getToolType() == vnum)
+      return tt;
+  }
+
+  return NULL;
 }
 
 bool BaseRepair::DamageTool(bool primary, TObj* o, bool makeScraps) {
@@ -154,6 +183,7 @@ bool BaseRepair::HasTools() {
   }
   return ret;
 }
+
 
 TCommodity* getRepairMaterial(StuffList list, ubyte mat) {
   TCommodity* tc;
@@ -1483,4 +1513,33 @@ int task_repair_spirit(TBeing* ch, cmdTypeT cmd, const char*, int pulse, TRoom*,
   TObj*) {
   SpiritRepair rep(ch);
   return rep.PumpMessage(cmd, pulse);
+}
+
+// The augmentation crafts borrow these kits wholesale -- the same tools and the
+// same wording -- so they ask the repair class rather than restating either.
+bool hasRepairKit(TBeing* ch, RepairKit kit) {
+  switch (kit) {
+    case RepairKit::Metal: {
+      MetalRepair r(ch);
+      return r.HasTools();
+    }
+    case RepairKit::Organic: {
+      OrganicRepair r(ch);
+      return r.HasTools();
+    }
+    case RepairKit::Leather: {
+      LeatherRepair r(ch);
+      return r.HasTools();
+    }
+    case RepairKit::Magic: {
+      MagicRepair r(ch);
+      return r.HasTools();
+    }
+    case RepairKit::Dead: {
+      DeadRepair r(ch);
+      return r.HasTools();
+    }
+  }
+
+  return true;
 }
