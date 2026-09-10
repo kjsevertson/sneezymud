@@ -21,7 +21,12 @@ const int MOB_STAT = 1;
 
 class GameStats {
   public:
-    int deaths[71][2];
+    // Indexed by the dead thing's level. Mob levels are not the builder's
+    // number: read_mobile() recomputes them as the mean of the hp, armor and
+    // damage levels, which puts 479 of the world's mobs above 70 and the
+    // highest at 132. Sized well past that so the world can grow into it.
+    static const int MAX_DEATH_LEVEL = 200;
+    int deaths[MAX_DEATH_LEVEL][2];
 
     int levels[MAX_CLASSES][50];
     long time_levels[MAX_CLASSES][50];

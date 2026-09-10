@@ -576,8 +576,10 @@ int TBeing::die(spellNumT dam_type, TBeing* tKiller) {
     }
   }
 
-  stats.deaths[GetMaxLevel()][!isPc()] =
-    stats.deaths[GetMaxLevel()][!isPc()] + 1;
+  // Clamped: the tally is only a tally, and no level the world invents later
+  // is worth writing off the end of it.
+  int deathLev = min<int>(GetMaxLevel(), GameStats::MAX_DEATH_LEVEL - 1);
+  stats.deaths[deathLev][!isPc()] = stats.deaths[deathLev][!isPc()] + 1;
 
   if (rp) {
     if (isPc() && !rp->isRoomFlag(ROOM_ARENA) && !skip_death) {
