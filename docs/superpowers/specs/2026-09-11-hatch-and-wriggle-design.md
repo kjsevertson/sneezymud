@@ -75,9 +75,19 @@ it decays on its own, and it wears out under traffic — which means a hatch
 is a route with a limited number of uses rather than a permanent second
 door.
 
-Wriggling costs movement. Whether it is instant or a short task is not yet
-settled — a task makes it interruptible and gives the room something to
-watch, an instant squeeze makes it a genuine escape.
+Wriggling costs movement and is a short task. It can be interrupted, and
+the room gets to watch a thief work his way into a hole in the wall, which
+is the version worth having as the default.
+
+A failed Wriggle sets a short cooldown before it can be tried again.
+`addSkillLag()` is the existing mechanism and takes the lag from the
+skill's own `discArray` entry, so how long the thief is left stuck against
+the wall is data rather than a number buried in the code.
+
+That it is a task leaves room for a third skill later: a way to go through
+at once, at the cost of doing more damage to the hatch. Hurrying through a
+hole in a wall should cost the hole — which is why Wriggle's wear lives on
+the window's structure and not on a counter of uses.
 
 Movement follows the tail of `TPortal::enterMe()` rather than reinventing
 it: the destination's mob limit, the flying-sector transition, then
@@ -150,7 +160,15 @@ target gone and breaks itself.
 Exits being rewritten underneath a hatch is not a case worth handling —
 nothing in the game changes an exit's destination at runtime.
 
+## Later
+
+A third skill for going through a hatch immediately rather than working at
+it, paid for with heavier damage to the window. Out of scope here, but the
+reason Wriggle is a task and the reason wear is tracked as structure.
+
 ## Open questions
 
-- Is Wriggle instant, or a short task?
-- What does a failed Wriggle cost beyond the movement it already spends?
+- How long is the failed-Wriggle lag, and how much structure does a
+  successful squeeze cost?
+- Does a hatch announce itself to the room it was cut into, or is it found
+  by looking?
