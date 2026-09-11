@@ -79,10 +79,15 @@ Wriggling costs movement and is a short task. It can be interrupted, and
 the room gets to watch a thief work his way into a hole in the wall, which
 is the version worth having as the default.
 
-A failed Wriggle sets a short cooldown before it can be tried again.
-`addSkillLag()` is the existing mechanism and takes the lag from the
-skill's own `discArray` entry, so how long the thief is left stuck against
-the wall is data rather than a number buried in the code.
+A failed Wriggle sets a cooldown of **one mud hour** before it can be tried
+again. `addSkillLag()` is the existing mechanism and takes the lag from the
+skill's own `discArray` entry, so the number lives in the skill's data
+rather than buried in the code.
+
+For scale: `Pulse::MUDHOUR` is `UPDATE * 4` = 1440 pulses, which is 144
+real seconds — a little under two and a half minutes, or 120 combat
+rounds. Long enough that a failed squeeze is a genuine setback and not
+something to spam at a door.
 
 That it is a task leaves room for a third skill later: a way to go through
 at once, at the cost of doing more damage to the hatch. Hurrying through a
@@ -184,5 +189,5 @@ reason Wriggle is a task and the reason wear is tracked as structure.
 
 ## Open questions
 
-- How long is the failed-Wriggle lag, and how much structure does a
-  successful squeeze cost?
+- How much structure does a successful squeeze cost, and how much does the
+  hurried version cost when it arrives?
