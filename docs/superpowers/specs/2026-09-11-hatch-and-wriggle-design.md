@@ -55,8 +55,13 @@ The target is the exit's `to_room`, written onto the window with
 interrupted cut leaves nothing behind.
 
 The exit carries more than the destination — `door_type`, `weight`,
-`lock_difficulty` — and a heavier door plausibly ought to resist. Left as
-an open question rather than guessed at.
+`lock_difficulty` — and none of it matters. A hatch is cut in the wall
+beside the door, not through the door, so what the door is made of has no
+say in the work.
+
+**Cutting needs tools:** a hammer and a chisel. The augmentation crafts set
+the precedent of borrowing a kit the world already stocks, and stonework is
+what this is.
 
 ## Wriggle
 
@@ -69,6 +74,10 @@ a hatch cut to nothing closes for good. That gives it two clocks at once —
 it decays on its own, and it wears out under traffic — which means a hatch
 is a route with a limited number of uses rather than a permanent second
 door.
+
+Wriggling costs movement. Whether it is instant or a short task is not yet
+settled — a task makes it interruptible and gives the room something to
+watch, an instant squeeze makes it a genuine escape.
 
 Movement follows the tail of `TPortal::enterMe()` rather than reinventing
 it: the destination's mob limit, the flying-sector transition, then
@@ -126,11 +135,22 @@ already has. This also means the pair id never has to disambiguate two
 hatches in the same place, though it is kept anyway so that correctness
 does not rest on the refusal being remembered.
 
+## A hatch to nowhere
+
+If a hatch's target room stops existing, the hatch breaks. `windowLook()`
+already notices the case — it sends "You see only an empty void" and logs
+the dangling vnum — so that is the condition to hang it on: a window whose
+target does not resolve is a hole into nothing, and should close rather
+than sit there.
+
+That covers a destroyed room from both sides. The half standing *in* the
+lost room goes with the room; the half in the surviving room finds its
+target gone and breaks itself.
+
+Exits being rewritten underneath a hatch is not a case worth handling —
+nothing in the game changes an exit's destination at runtime.
+
 ## Open questions
 
-- Does door weight or type affect the difficulty of cutting, or the wear a
-  wriggle inflicts?
-- Does a hatch need tools, the way the augmentation crafts do?
-- What does a failed Wriggle cost — time, movement, or a stuck thief?
-- What happens to the far half if its room is destroyed or its exit
-  rewritten underneath it?
+- Is Wriggle instant, or a short task?
+- What does a failed Wriggle cost beyond the movement it already spends?
