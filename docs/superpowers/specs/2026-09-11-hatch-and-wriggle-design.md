@@ -160,6 +160,22 @@ target gone and breaks itself.
 Exits being rewritten underneath a hatch is not a case worth handling —
 nothing in the game changes an exit's destination at runtime.
 
+## Both rooms see it happen
+
+A hatch announces itself where it appears. The room being cut into is told
+a small opening has appeared, named by the surface it came through: a wall
+for the compass directions, the floor for a hatch cut downward, the ceiling
+for one cut up.
+
+The far side takes the opposite direction. Cut north and the room beyond
+watches an opening appear in its *south* wall; cut up and the room above
+gets one in its floor. The thief is working from one side of the same hole.
+
+This matters more than flavour. The far half lands in a room the thief may
+never have stood in and cannot see, and the people standing there have
+every right to notice a hole opening in their wall. It is what keeps Hatch
+from being a silent way into an occupied room.
+
 ## Later
 
 A third skill for going through a hatch immediately rather than working at
@@ -170,5 +186,3 @@ reason Wriggle is a task and the reason wear is tracked as structure.
 
 - How long is the failed-Wriggle lag, and how much structure does a
   successful squeeze cost?
-- Does a hatch announce itself to the room it was cut into, or is it found
-  by looking?
