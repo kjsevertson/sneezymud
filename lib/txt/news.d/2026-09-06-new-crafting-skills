@@ -1,0 +1,21 @@
+New skills for making and improving gear.
+
+ - Smelt (warrior): melt metal items and ore down into ingots.
+ - Forge (warrior): make armor and weapons from ingots.
+ - Weave (monk): unravel cloth and leather into thread.
+ - Sew (monk): make clothing and light armor from thread.
+ - Strip (thief): cut armor down a tier so more classes can wear it.
+ - Plate (deikhan): build armor up a tier for more protection.
+ - Transmute (mage): change what an item is made of.
+ - Distill (mage): break jewelry down into essences.
+ - Infuse (mage): add an essence's stat to a piece of gear.
+ - Bangle (shaman): turn gear into jewelry any class can wear.
+ - Ensoul (shaman): make a soulstone from an opal.
+ - Rites (cleric): draw a corpse's soul into a soulstone.
+ - Mine (adventuring): dig ore out of hills, mountains and caves.
+ - Tailor (adventuring): resize clothing for another race.
+ - Bolster (adventuring): improve armor using a soulstone.
+
+TNT now sets off other armed traps, and blasting rock frees ore.
+
+See HELP AUGMENTATION.
