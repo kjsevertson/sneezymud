@@ -121,8 +121,10 @@ bool TEssence::addCharges(int n) {
   int before = quality;
   charges += n;
 
-  while (quality < ESSENCE_MAX_QUALITY && charges >= nextThreshold())
+  while (quality < ESSENCE_MAX_QUALITY && charges >= nextThreshold()) {
+    charges -= nextThreshold();
     quality++;
+  }
 
   return quality > before;
 }
