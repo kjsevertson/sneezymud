@@ -8,6 +8,7 @@
 #include <cassert>
 #include <boost/format.hpp>
 #include <map>
+#include <utility>
 
 namespace {
   int getVersion(TDatabase& sneezy) {
@@ -3109,6 +3110,65 @@ void runMigrations() {
         "cur_struct, decay, volume, material) VALUES "
         "(29545,'ore chunk rough','a chunk of ore','A chunk of ore lies "
         "here.','',13,0,1,0,0,0,0,10,20,3,0,9999,20,20,-1,2000,159)");
+    },
+
+    // A window is the only object a thief can wriggle through, and the wear a
+    // squeeze puts on one is tracked as structure -- so a window's structure
+    // is now the count of squeezes it survives. Almost none of them could
+    // carry that weight: of the fifty windows with positive structure, thirty
+    // sat at exactly 1 and nine at 2, so the first or second thief through
+    // would have destroyed them.
+    //
+    // Structure is now 15 plus the average level of the mobs in the zone the
+    // window loads into, so a window in a level-forty zone outlasts one in a
+    // newbie area. Six prototypes are never placed by any zone command; those
+    // fall back to the zone their own vnum sits in, and the two whose zones
+    // hold no mobs at all take a flat 25.
+    //
+    // The update only raises. Eleven of the fifty were already built sturdier
+    // than a bare 1 or 2, and three of those sit above what this formula would
+    // give them, so max_struct < points leaves a window that is already good
+    // enough alone.
+    //
+    // max_struct > 0 skips both sentinels, and it is not the same guard: -1 is
+    // lower than any value here, so raising alone would still swallow it. -1
+    // means indestructible, which 124 of the game's 174 windows are -- they
+    // take full AC and full hardness, and their callers exempt them from wear
+    // and tear rather than damageItem() doing it. damageItem() has no guard of
+    // its own, so one handed an indestructible window reads
+    // addToStructPoints(max(-amt, -getStructPoints())) as max(-1, 1), adds a
+    // point to land on 0, and scraps the object instead of wearing it. 0 is
+    // the separate "no structure at all" sentinel and is left alone too.
+    //
+    // type 33 == ITEM_WINDOW. Absolute values make this idempotent.
+    [&]() {
+      vlogf(LOG_MISC, "Setting window structure from zone mob levels");
+
+      static const std::pair<int, const char*> windowStruct[] = {
+        {25, "19079,29942"},
+        {26, "24402,24403,27321"},
+        {28, "26864"},
+        {29, "26877"},
+        {30, "1439,1440,15205,15224,15225,15270,15271,15274,15275,15278"},
+        {32, "15402,15403"},
+        {35, "10109,10114"},
+        {36, "1423,31092"},
+        {37, "7522"},
+        {38, "34111,34160,34161,34163"},
+        {39, "16218"},
+        {41, "33662,33663"},
+        {42, "1424,1425,1426,1427,1428,1429"},
+        {46, "8787,8855"},
+        {55, "1430,1431,1432,1433,1434,1435,1436,1437,1438"},
+        {72, "16150,16156"},
+      };
+
+      for (const auto& [points, vnums] : windowStruct)
+        sneezy.query(
+          "UPDATE obj SET max_struct = %i, cur_struct = %i "
+          "WHERE type = 33 AND max_struct > 0 AND max_struct < %i "
+          "AND vnum IN (%s)",
+          points, points, points, vnums);
     },
 
   };

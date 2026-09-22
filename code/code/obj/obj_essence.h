@@ -15,8 +15,9 @@
 //
 // Quality alone decides what Infuse can write -- a Quality 3 essence writes
 // +3 -- and charges exist only to grow the Quality, never entering the
-// application. An essence deepens at quality x 10 charges and caps at 10, so
-// +10 is the largest bonus this system can ever write.
+// application. An essence deepens at quality x 10 charges, which deepening
+// spends, and caps at 10, so +10 is the largest bonus this system can ever
+// write. Quality 5 costs 10 + 20 + 30 + 40 = 100 charges in all.
 //
 // The threshold is checked only on gain, so an essence never loses Quality.
 // Unlike a soulstone, Quality does nothing to what Distill deposits: the same
