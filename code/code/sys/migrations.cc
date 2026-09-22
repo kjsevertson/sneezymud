@@ -3125,10 +3125,20 @@ void runMigrations() {
     // fall back to the zone their own vnum sits in, and the two whose zones
     // hold no mobs at all take a flat 25.
     //
-    // Windows at max_struct -1 are deliberately untouched. -1 is the
-    // indestructible sentinel, and damageItem() must never be handed one:
-    // addToStructPoints(max(-amt, -getStructPoints())) reads max(-1, 1) there
-    // and scraps the object instead of wearing it.
+    // The update only raises. Eleven of the fifty were already built sturdier
+    // than a bare 1 or 2, and three of those sit above what this formula would
+    // give them, so max_struct < points leaves a window that is already good
+    // enough alone.
+    //
+    // max_struct > 0 skips both sentinels, and it is not the same guard: -1 is
+    // lower than any value here, so raising alone would still swallow it. -1
+    // means indestructible, which 124 of the game's 174 windows are -- they
+    // take full AC and full hardness, and their callers exempt them from wear
+    // and tear rather than damageItem() doing it. damageItem() has no guard of
+    // its own, so one handed an indestructible window reads
+    // addToStructPoints(max(-amt, -getStructPoints())) as max(-1, 1), adds a
+    // point to land on 0, and scraps the object instead of wearing it. 0 is
+    // the separate "no structure at all" sentinel and is left alone too.
     //
     // type 33 == ITEM_WINDOW. Absolute values make this idempotent.
     [&]() {
@@ -3156,8 +3166,9 @@ void runMigrations() {
       for (const auto& [points, vnums] : windowStruct)
         sneezy.query(
           "UPDATE obj SET max_struct = %i, cur_struct = %i "
-          "WHERE type = 33 AND vnum IN (%s)",
-          points, points, vnums);
+          "WHERE type = 33 AND max_struct > 0 AND max_struct < %i "
+          "AND vnum IN (%s)",
+          points, points, points, vnums);
     },
 
   };
